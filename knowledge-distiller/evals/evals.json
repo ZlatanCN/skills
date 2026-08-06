@@ -1,0 +1,93 @@
+{
+  "skill_name": "knowledge-distiller",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "/knowledge-distiller TCP拥塞控制 I've been thinking about TCP congestion control. So basically TCP has this mechanism where it starts by sending like 1 packet, then 2, then 4 — doubling each time until there's a loss. That's slow start. When loss happens, it cuts in half and then starts increasing more slowly (additive increase). I think modern TCP uses something called cubic which is better for high-bandwidth networks because it uses a cubic function instead of linear. Also there's something called BBR from Google that's even better because it measures bandwidth instead of using loss. The whole point is to be fair to other connections. Is my understanding roughly right? Also I heard QUIC does all this at the application layer instead of in the kernel. Am I on the right track?",
+      "expected_output": "A Chinese Obsidian note about TCP congestion control (slow start, AIMD, CUBIC, BBR, QUIC) with frontmatter, callouts, and wikilinks",
+      "files": [],
+      "expectations": [
+        "Note stays focused on TCP congestion control mechanisms, not general networking",
+        "Title is derived from content (not a verbatim copy of the topic parameter)",
+        "Key concepts are explained correctly; any user errors are silently corrected",
+        "Note body is entirely in Chinese; terminology follows the skill's decision tree — inline 中文（English）gloss for first mentions, vault-defined terms wikilinked rather than re-explained, common English terms (API, GPU) used as-is",
+        "Note contains no second-person conversational references (你说的, 你列的, etc.)",
+        "Frontmatter has 3-5 tags (PascalCase where applicable, brand names keep official casing) and a quoted Chinese summary",
+        "No 'Introduction' or 'Conclusion' sections in the note",
+        "Wikilinks point to real existing vault notes; zero is acceptable only when the vault has no related notes (never invent links)"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "/knowledge-distiller 容器运行时栈 So I'm trying to understand Docker's architecture. Docker uses containerd under the hood to manage containers, and containerd uses runc to actually run them. The Docker daemon is this big API server that handles everything — building images, managing containers, networking, volumes. I think containerd is the industry standard now since Kubernetes uses it directly, you don't even need Docker anymore. But what I don't get is: what does containerd actually do that Docker doesn't? Is it just a stripped-down Docker? And what's this nerdctl thing I keep hearing about? Also, is there something newer than runc now? I heard about youki or something written in Rust.",
+      "expected_output": "A Chinese Obsidian note about the container runtime stack (Docker, containerd, runc, youki, nerdctl) with proper architecture explanation",
+      "files": [],
+      "expectations": [
+        "Note stays focused on container runtime layer architecture (Docker/containerd/runc/youki/nerdctl)",
+        "Title is derived from content, not just the topic parameter verbatim",
+        "Architectural layering is correct and up to date",
+        "Note body is entirely in Chinese; terminology follows the skill's decision tree — inline 中文（English）gloss for first mentions, vault-defined terms wikilinked rather than re-explained, common English terms (API, GPU) used as-is",
+        "Note contains no second-person conversational references",
+        "Frontmatter has 3-5 tags (PascalCase where applicable, brand names keep official casing) and a quoted Chinese summary",
+        "No 'Introduction' or 'Conclusion' sections",
+        "Wikilinks point to real existing vault notes; zero is acceptable only when the vault has no related notes (never invent links)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I've been thinking about why microservices fail at a lot of companies. My take is: most teams jump into microservices because they think it'll make them faster, but they end up with distributed monoliths — basically the same bad code just split across services. The real problems are: (1) you need really good CI/CD before you can even think about it, (2) network latency makes everything slower than you expect, (3) debugging becomes a nightmare across 20 services, (4) you need someone who really understands distributed systems. I think the right approach is modular monolith first, then extract services when you have clear boundaries. But what actually makes the difference between a successful microservices adoption and a failed one? Is there something about Conway's Law and org structure I'm missing?",
+      "expected_output": "A Chinese Obsidian note about microservices failure patterns and success factors, without the /knowledge-distiller prefix gracefully inferred",
+      "files": [],
+      "expectations": [
+        "Skill handles missing /skill prefix gracefully — produces a quality note without explicit topic parameter",
+        "Note is about microservices adoption, distributed monoliths, CI/CD dependencies, modular monolith approach",
+        "Note contains no second-person conversational references",
+        "Note body is entirely in Chinese; terminology follows the skill's decision tree — inline 中文（English）gloss for first mentions, vault-defined terms wikilinked rather than re-explained, common English terms (API, GPU) used as-is",
+        "Frontmatter has 3-5 tags (PascalCase where applicable, brand names keep official casing) and a quoted Chinese summary",
+        "No 'Introduction' or 'Conclusion' sections",
+        "Wikilinks point to real existing vault notes; zero is acceptable only when the vault has no related notes (never invent links)",
+        "Note adds web-researched depth beyond user's own analysis (team size, org structure, Conway's Law, real examples)"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/knowledge-distiller 长上下文的注意力稀释 我在想为什么长上下文会让模型表现变差。我的理解是：Transformer 的注意力是 O(n²) 的，上下文越长，注意力被摊得越薄，模型对中间位置的记忆就越差，这就是 Lost in the Middle 现象；还有人说上下文越长信息召回越差，叫 context rot。缓解手段我想到的是：提示词只放高信号内容、系统提示词要精炼、需要时才加载而不是一股脑把资料塞进上下文。但我不确定注意力稀释本身是不是根本没法消除，只能靠把上下文做短？",
+      "expected_output": "A Chinese Obsidian note about long-context attention dilution (Lost in the Middle, context rot) and mitigation strategies, linking to the existing LLM agent series notes at specific sections",
+      "files": [],
+      "expectations": [
+        "New note (not an in-place update of an existing series note) on long-context attention dilution / context rot",
+        "Every cross-note wikilink is anchored to a specific position ([[Note#Heading|alias]] or [[Note#^block-id|alias]]); zero bare whole-note links",
+        "Each #Heading anchor text exists as a real heading in the target note",
+        "At least 2 cross-note wikilinks connecting to the LLM agent series notes (01-05 in 02 - Area/AI/)",
+        "Link aliases name the concept, not the note number",
+        "Note body is entirely in Chinese; terminology follows the skill's decision tree — inline 中文（English）gloss for first mentions, vault-defined terms wikilinked rather than re-explained, common English terms (API, GPU) used as-is",
+        "Note contains no second-person conversational references",
+        "Frontmatter has 3-5 tags (PascalCase where applicable) and a quoted Chinese summary",
+        "No 'Introduction' or 'Conclusion' sections",
+        "No invented links — every target note exists in the vault",
+        "Concepts already defined in the LLM series notes are linked to their defining position, not re-explained inline",
+        "Common English terms (token, softmax, LLM) are used as-is or with an established Chinese name — no invented translations like 词元"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "/knowledge-distiller 模型为什么会幻觉 我在想 LLM 为什么会有幻觉（hallucination）。我的理解是：训练目标就是预测下一个 token，不是求真；训练数据里有错误和偏见；生成时模型会自信地编造，长上下文里埋在中间的细节尤其容易丢失导致编造。工程上的缓解有 RAG 检索增强、给模型工具去查证、还有 harness 层的验证与纠错。但我搞不清的是：为什么多给上下文能减少幻觉？幻觉是不是只能缓解、不能根除？系统提示词里写「不要编造」到底有没有用？",
+      "expected_output": "A Chinese Obsidian note about LLM hallucination causes and mitigations (RAG, tools, harness verification), linking to the existing LLM agent series notes at specific sections",
+      "files": [],
+      "expectations": [
+        "New note (not an in-place update of an existing series note) on hallucination mechanisms and mitigation",
+        "Every cross-note wikilink is anchored to a specific position ([[Note#Heading|alias]] or [[Note#^block-id|alias]]); zero bare whole-note links",
+        "Each #Heading anchor text exists as a real heading in the target note",
+        "At least 2 cross-note wikilinks connecting to the LLM agent series notes (01-05 in 02 - Area/AI/)",
+        "Link aliases name the concept, not the note number",
+        "Note body is entirely in Chinese; terminology follows the skill's decision tree — inline 中文（English）gloss for first mentions, vault-defined terms wikilinked rather than re-explained, common English terms (API, GPU) used as-is",
+        "Note contains no second-person conversational references",
+        "Frontmatter has 3-5 tags (PascalCase where applicable) and a quoted Chinese summary",
+        "No 'Introduction' or 'Conclusion' sections",
+        "No invented links — every target note exists in the vault",
+        "Concepts already defined in the LLM series notes are linked to their defining position, not re-explained inline",
+        "Common English terms (token, softmax, LLM) are used as-is or with an established Chinese name — no invented translations like 词元"
+      ]
+    }
+  ]
+}
