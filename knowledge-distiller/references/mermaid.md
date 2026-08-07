@@ -1,18 +1,43 @@
 # Mermaid Diagram Conventions for Knowledge Notes
 
-Use these conventions when including architecture diagrams, sequence flows, or state machines in knowledge-distiller notes.
+A diagram in a knowledge note compresses a structural or temporal relationship that prose would take paragraphs to convey. These conventions keep every diagram render-safe in both Obsidian themes, terminology-consistent with the note, and glanceable. A diagram that fails any of the three does not belong in the note (Phase 5's 5D removal test).
 
-## Principles
+## Choose the diagram type by what you are showing
 
-- **One diagram = one concept.** If you need labels explaining what the diagram shows, split it.
-- **No hardcoded colors.** Obsidian has light and dark themes. Hardcoded `fill:` / `stroke:` / `color:` will look wrong in one of them. Rely on the theme's default Mermaid rendering — it works in both modes automatically.
-- **Prefer `flowchart` over `graph`** for better layout control.
-- **Use `subgraph` blocks** to group related components in architecture diagrams.
-- **Distinguish node types by shape** (rectangle vs rounded vs cylinder for database vs diamond for decision), not by color.
+| The note is showing | Use |
+|---|---|
+| Architecture, layering, data flow, protocol flow | `flowchart` |
+| Interaction order between components | `sequenceDiagram` |
+| A system's states and the transitions between them | `stateDiagram-v2` |
 
-## Label Convention
+`flowchart` is the modern keyword; `graph` is its legacy alias, kept only for backward compatibility. Always write `flowchart`.
 
-Labels follow the note body's terminology rules (§2 of SKILL.md): gloss `中文（English）` on first mention when Chinese is what people say (branch 2), or use the English term as-is when that's the common usage (branch 3 — `API`, `RAG`). Wikilinks (branch 1) don't apply inside a diagram, so diagrams use branches 2/3 only. Do not use emoji — labels are technical identifiers, not icons.
+## Render safely in both themes
+
+Obsidian bundles Mermaid with the light theme and fakes dark mode by applying a CSS `invert()` filter to the rendered SVG. A hardcoded `fill:` / `stroke:` / `color:` reads correctly in one theme, but the other theme applies the `invert()` filter, so the same color lands wrong there. Rely on the theme's default Mermaid rendering — it adapts automatically.
+
+## One concept per diagram
+
+A reader takes in a diagram as a single unit. If it needs labels explaining what it shows, or you catch yourself mixing layers with message order, split it. Each diagram teaches exactly one relationship.
+
+## Node shape carries the type, never color
+
+- Rectangle — process or service (the default)
+- Cylinder `[(…)]` — database or storage
+- Diamond `{…}` — decision
+- `subgraph` — a boundary or grouping, not a node
+
+Shape alone must convey the role, because color is unreliable across themes.
+
+## Labels follow the note's terminology (§2 of SKILL.md)
+
+A diagram is part of the note, so its labels obey the same terminology rules as the body: gloss `中文（English）` on first mention when Chinese is what people say (branch 2), or use the English term as-is when that is the common usage (branch 3 — `API`, `RAG`). One difference: a wikilink inside a diagram block surfaces as literal text, not a resolved link, so branch 1's link-to-definition rule never applies — diagrams use branches 2/3 only, and a label must match the exact term the surrounding prose uses, never a fresh variant.
+
+No emoji in labels. Emoji renders inconsistently across platforms and reads as icons, not identifiers.
+
+## Examples
+
+### Flowchart — architecture with a database
 
 ```mermaid
 flowchart TB
@@ -20,11 +45,12 @@ flowchart TB
     Gateway --> Auth["认证服务（Auth Service）"]
     Gateway --> API["API 服务"]
     API --> DB[("数据库（PostgreSQL）")]
+    API --> Backend{缓存命中?}
+    Backend -- 是 --> DB
+    Backend -- 否 --> Upstream["上游服务"]
 ```
 
-## Architecture Diagrams
-
-Use `subgraph` to group layers or bounded contexts:
+### Flowchart — grouping with subgraphs
 
 ```mermaid
 flowchart TB
@@ -41,10 +67,26 @@ flowchart TB
     Gateway --> Service
 ```
 
-## Anti-patterns
+### Sequence diagram — interaction order
 
-| Don't | Why |
-|---|---|
-| Emoji in labels (`👤 用户`, `🔐 认证服务`) | Renders inconsistently across platforms. Unprofessional in a reference note. |
-| Hardcoded colors (`fill:#90EE90,color:darkgreen`) | Breaks in dark mode. Theme default handles both modes. |
-| One diagram explaining multiple concepts | Reader can't parse it at a glance — defeats the purpose. |
+```mermaid
+sequenceDiagram
+    participant C as 客户端
+    participant G as API 网关
+    participant A as 认证服务
+    C->>G: 请求
+    G->>A: 校验令牌
+    A-->>G: 通过
+    G-->>C: 响应
+```
+
+### State diagram — states and transitions
+
+```mermaid
+stateDiagram-v2
+    [*] --> 慢启动
+    慢启动 --> 拥塞避免: 达到 ssthresh
+    拥塞避免 --> 快速恢复: 3 个重复 ACK
+    快速恢复 --> 拥塞避免: 新 ACK
+    快速恢复 --> [*]
+```
