@@ -3,3 +3,4 @@ state.json
 knowledge-distiller-workspace/
 .DS_Store
 node_modules/
+.idea

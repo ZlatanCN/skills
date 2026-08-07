@@ -5,9 +5,9 @@ description: >
   grounded in first-principles thinking. The skill researches and fact-checks every specific claim, silently
   corrects errors, and produces vault-native markdown with frontmatter, callouts, and position-anchored wikilinks.
   Use when the user shares rough notes, half-formed reasoning, or an incomplete mental model of a technical
-  topic — even without asking for a note — especially after they have thought through something complex,
-  are unsure whether part of their understanding is correct, or dump a block of raw thoughts that need
-  structure and fact-checking.
+  topic. This even applies when they have not asked for a note: it is for exactly the moment after they have
+  thought through something complex, are unsure whether part of their understanding is correct, or dump a
+  block of raw thoughts that need structure and fact-checking.
   Do NOT use for polishing or rephrasing existing text (humanizer-zh) or for general vault/note operations
   (obsidian-cli, obsidian-markdown).
 ---
@@ -28,9 +28,20 @@ This skill references other skills for extended capabilities. Missing ones degra
 
 If you don't have these, the skill still works — just with degraded capabilities.
 
-## §1 Language Rules
+## §1 What Makes a Note Durable
 
-**The entire note body MUST be in Chinese.** The vault is Chinese-language, the user takes notes in Chinese, and the note must be consistent with existing content.
+A durable note survives in the vault for months or years. It's the one you'd want to re-read. It does four things:
+
+1. **Teaches from first principles.** Not "what it is" but *why it exists*, *what problem it solves*, and *how it works*. Each section teaches one idea deeply rather than listing many superficially.
+2. **Surfaces trade-offs and context.** "看情况" is a valid answer — and explains what it depends on. Connects to broader patterns ("this is an example of backpressure", "this is essentially a lease mechanism").
+3. **Is correct every time.** Every specific claim is verified against current sources. Errors in the user's input are silently corrected — the note contains only correct information.
+4. **Is connected to the vault.** Wikilinks point to real existing notes at the **specific position** that defines or explains the concept — never a bare whole-note link unless the concept genuinely spans the entire note (mechanics and examples in Phase 4). The note doesn't exist in isolation — it's part of a growing knowledge graph.
+
+Every rule in this skill serves one of these four goals. If a rule ever fights a goal, the goal wins.
+
+## §2 Language Rules
+
+**The entire note body MUST be in Chinese** (unless the user explicitly requests another language — §4 Edge Cases). The vault is Chinese-language, the user takes notes in Chinese, and the note must be consistent with existing content.
 
 **Terminology — one definition per term, everything else references it.** Every term is defined exactly once in the knowledge graph: inline in this note, or in an existing vault note. On first use, walk this tree:
 
@@ -45,18 +56,23 @@ If you don't have these, the skill still works — just with degraded capabiliti
 
    **The test:** would a Chinese engineer writing this sentence naturally write the Chinese term? `词元` for token and `归一化指数函数` for softmax are dictionary lookups nobody uses — branch 3. `采样`、`权重`、`似然` are what people actually say — branch 2.
 
-Formula symbols follow the same rule: define each one where it first appears, or link to the note that defines it. A reader meeting a bare `K` mid-formula has to guess — that's a failed note.
+Formula symbols follow the same rule: define each one where it first appears, or link to the note that defines it. A reader meeting a bare `K` mid-formula has to guess — that's a failed note. This is the most common source of "看着吃力" in dense notes, and it's mechanical: enforce it while composing, not in review.
 
-## §2 What Makes a Note Durable
+**Sentence discipline — never suspend the main clause.** The reader of a durable note is yourself six months out, skimming. Every inline insertion (a parenthetical, or an em-dash aside) forces the reader to hold the main clause in working memory while the insertion is read. The longer the insertion, the more likely the main clause is gone by the time it closes — and whatever follows lands with no context. Two gates enforce this, each with its own reason:
 
-A durable note survives in the vault for months or years. It's the one you'd want to re-read. It does four things:
+1. **Nested em-dashes are banned outright.** A paired `A——B——C` in one clause is ambiguous no matter how short B is: is the second dash closing the aside, or starting a new turn? That reparse cost is a tell of AI-generated prose (humanizer-zh flags 破折号过度). No length exception — the ambiguity is inherent. A single em-dash for contrast or apposition is fine (`上下文学习是临时的——持久记忆是主动沉淀的`), and multiple *independent* single em-dashes are fine when each sits in its own clause (`A——…；B——…` — the semicolon marks the boundary, so the reader is not left hanging).
+2. **Parentheses are weight-gated.** A short gloss or cross-reference is cheap (`（in-context learning）`、`（见下一节「存储格式」）`). A parenthetical long enough to form its own clause suspends the sentence and must not sit mid-sentence; a long parenthetical at the very end of a sentence suspends nothing (nothing follows it), but if it carries a definition or explanation it still belongs in a callout — buried parens are what a skimmer skips.
 
-1. **Teaches from first principles.** Not "what it is" but *why it exists*, *what problem it solves*, and *how it works*. Each section teaches one idea deeply rather than listing many superficially.
-2. **Surfaces trade-offs and context.** "看情况" is a valid answer — and explains what it depends on. Connects to broader patterns ("this is an example of backpressure", "this is essentially a lease mechanism").
-3. **Is correct every time.** Every specific claim is verified against current sources. Errors in the user's input are silently corrected — the note contains only correct information.
-4. **Is connected to the vault.** Wikilinks point to real existing notes at the **specific position** that defines or explains the concept — never a bare whole-note link unless the concept genuinely spans the entire note (mechanics and examples in Phase 4). The note doesn't exist in isolation — it's part of a growing knowledge graph.
+Choose the structure by how much weight the insertion can carry:
 
-Every structural rule below serves one of these four goals.
+| Insertion | Use |
+| --- | --- |
+| Term gloss / brief cross-ref | 括号 inline — `（in-context learning）` |
+| Definition / multi-clause explanation / example | a callout (`> [!note]`) right after the sentence that references it |
+| Inline explanation | 冒号 — `记忆需要压缩：无关记忆会淹没相关记忆` |
+| Long-run aside | split into its own sentence |
+
+When you catch yourself about to write a nested em-dash or a clause-length parenthetical, the rule is not to delete the punctuation — it is to **promote the insertion out of the sentence**. Definitions and explanations belong in callouts of their own, where they stay readable and anchorable.
 
 ## §3 Workflow
 
@@ -70,15 +86,7 @@ bash "<script-path>"
 ```
 
 - Exit **0** → `state.json` exists. The user has already been asked about missing skills. Skip Phase 0. Proceed to Phase 1.
-- Exit **1** → first (or fresh) invocation. Unavailable skills are expected — the agent has fallbacks for all of them. Check availability of each of the 5 referenced skills through your environment's skill mechanism (e.g. a `skill://` URI read, a `skill()` call, or a file probe — whichever exists here):
-
-```
-web-access        → available?   (fallback: built-in search + URL reading)
-obsidian-cli      → available?   (fallback: grep/glob + direct file write)
-humanizer-zh      → available?   (fallback: manual checklist)
-defuddle          → available?   (fallback: built-in URL reading)
-obsidian-markdown → available?   (fallback: rules in this skill)
-```
+- Exit **1** → first (or fresh) invocation. Unavailable skills are expected — the agent has fallbacks for all of them (each fallback is listed in the Prerequisites section). Check availability of each of the 5 skills there through your environment's skill mechanism (e.g. a `skill://` URI read, a `skill()` call, or a file probe — whichever exists here): `web-access`, `obsidian-cli`, `humanizer-zh`, `defuddle`, `obsidian-markdown`. Record each as available/missing.
 
 - If **all 5 are available** → write state immediately (nothing to install, suppress future checks): `bash "<script-path>" write`
 - If **any are missing** → record which ones. Do NOT write state yet — Phase 8 will ask the user what to do.
@@ -89,7 +97,7 @@ The user invokes as `/knowledge-distiller <content>` — the entire rest of the 
 
 Parse the input to identify:
 - Core topic(s) and subtopics (this will become the note title / filename)
-- **Diagram dimension** — does the topic involve architecture, protocol flow, data flow, state machine, or any structural/temporal dimension? If yes, flag it for a Mermaid diagram; §5E's structural/temporal criterion decides in Phase 5 whether one actually lands.
+- **Diagram dimension** — does the topic involve architecture, protocol flow, data flow, state machine, or any structural/temporal dimension? If yes, flag it for a Mermaid diagram; Phase 5's 5D criterion decides whether one actually lands.
 - Claims needing verification (anything specific: numbers, dates, behaviors, performance claims)
 - Gaps in the explanation
 - Potential misconceptions or oversimplifications
@@ -128,7 +136,7 @@ This log keeps one format and maps 1:1 onto the Phase 8 修正记录 — the rep
 ### Phase 4: Scan Vault
 
 Before composing, scan the vault for existing notes to link to:
-1. Identify 3-5 key concepts in the topic (these become the main linking targets), and note every other term the note will likely use — §1 branch 1 resolves each one at composition time
+1. Identify 3-5 key concepts in the topic (these become the main linking targets), and note every other term the note will likely use — §2 branch 1 resolves each one at composition time
 2. Search the vault for matching notes — load `obsidian-cli` via your environment's skill mechanism for tag/property-based searches. If obsidian-cli is unavailable, use grep/glob alone. Complement with grep/glob for full-text and filename matching in either case.
 3. Read any MOC files in the relevant area to understand organizational logic
 4. Read related notes to gauge depth, terminology, and which wikilinks already exist
@@ -139,21 +147,19 @@ Before composing, scan the vault for existing notes to link to:
   - **Section anchor:** `[[01. LLM Agent 架构：Harness、Assembled Prompt 与 Agentic Loop#静态前缀|静态前缀]]` — the `#` part is the target section's exact heading text. Don't guess it: grep the target note's headings (`^#{1,3} `) and copy the exact text before writing the link.
   - **Block anchor:** `[[Note#^block-id|alias]]` — when the concept lives in a specific paragraph or table without a natural heading (e.g. a rules-summary table), append a `^block-id` anchor as its own line immediately after that block in the target note (you write into the vault, so this is allowed), then link to it. The id is short and kebab-case (`^softmax-budget`), unique within that note. You are mutating an existing note — report it on one line in Phase 8 (库内修改).
   - **The alias names the concept**, not the note: `|KV Cache 铁律`, `|right altitude` — the reader should know what they're jumping to before clicking.
-  - Read enough of the target note to know exactly where the concept is defined. A link to the wrong section is worse than no link — and a passing mention is not a definition (see §1 branch 1). The whole-note exception applies only when no single section carries the concept — e.g. the target note's entire subject IS the concept.
-- If an existing note already covers something well, reference it rather than re-explaining — this is what feeds §1's branch 1: find the defining note here, link to it there
+  - Read enough of the target note to know exactly where the concept is defined. A link to the wrong section is worse than no link — and a passing mention is not a definition (see §2 branch 1). The whole-note exception applies only when no single section carries the concept — e.g. the target note's entire subject IS the concept.
+- If an existing note already covers something well, reference it rather than re-explaining — this is what feeds §2's branch 1: find the defining note here, link to it there
 - If no note exists for a related concept, suggest creating it in the report
 
 **Same-topic collision:** if Phase 4 finds an existing note on the *same core topic* as this one, prefer updating that note in place — keep its filename and numbering, integrate the new content and corrections into it. Create a new note only when the new content is a genuinely distinct angle (e.g. 速查 vs 深度讲解); in that case, explain in one sentence in the Phase 8 report why the new angle earns its own note. When updating in place, the same quality bar applies to the whole merged file: re-verify the claims you integrate, spot-check what you keep for staleness, and report corrections to the EXISTING note's content in 修正记录 like any other.
 
 ### Phase 5: Compose the Note
 
-This is where everything comes together. Follow the language rules (§1) and durability guidelines (§2) to produce a standalone reference document.
+This is where everything comes together. Follow the durability guidelines (§1) and language rules (§2) to produce a standalone reference document.
 
-#### 5A: Tone — The Note Is Not a Conversation
+#### 5A: Standalone Voice — No Trace of the Conversation
 
-The note lives in the vault. Someone reading it 6 months from now has no context for "你刚才说的..." or "你列的那几点..." — the conversation is ephemeral, the note is permanent.
-
-**Frame every statement as a direct assertion of fact.** Do not reference the conversation. Do not address the user. Do not use second person (`你`, `你的`) to refer to the user. Do not use third person (`用户`, `用户的理解`, `用户说的`, `用户提到`) to refer to what was discussed — it's still a reference to the ephemeral context.
+The note is a **standalone reference document**. Someone reading it 6 months from now has no context for "你刚才说的..." — the conversation is ephemeral, the note is permanent. So the body must contain no trace that a conversation produced it: no deictic `你` addressing the conversation's user (`你`, `你的`), no reference to the discussion (`用户的理解`, `这里要纠正一下`, `这个理解忽略了`), no framing about who said something or whether it's correct. All corrections, enrichments, and additions from web research are silently incorporated; every statement reads as a direct assertion of fact, as if written by a domain expert from scratch.
 
 | If you want to say this | Write this instead |
 |---|---|
@@ -163,19 +169,11 @@ The note lives in the vault. Someone reading it 6 months from now has no context
 | 用户的理解是大致正确的：公平性是拥塞控制的重要目标 | 公平性（Fairness）是拥塞控制设计的重要目标 |
 | 用户提到的"三次函数代替线性"是正确的 | CUBIC 使用三次函数而非线性增长 |
 
-**Rule of thumb:** if any phrase refers to the user who just spoke (`你`, `你的`, `用户`, `用户的理解`, `用户说的`, `用户提到`, `你说的`, `你的答案`, `你的理解`), it does not belong in the note body. Replace it with a direct assertion of the fact, with no framing about who said it or whether it's correct.
+**The rule is about deixis, not pronouns.** The ban is on referencing the conversation and its participants — the speaker (`你`, `你的`) and the discussion (`用户`, `用户的理解`, `用户说的`, `用户提到`, `你说的`, `你的答案`, `你的理解`). A `你` addressed to a generic reader in a conditional scenario (`如果你团队只有 5 个人……`) is a standard Chinese tech-writing device and is fine; the pronoun is not the problem, the ephemeral reference is.
 
-If it refers to a generic reader in a conditional scenario (`如果你团队只有 5 个人……`), it's acceptable — that's a standard Chinese tech-writing device.
+**The Phase 8 report to the user may use conversational tone** — it's ephemeral, not the note. Corrections and additions are reported only in that conversation (Phase 8), never written into the vault as a separate file, never as a footnote in the note.
 
-**The Phase 8 report to the user may use conversational tone** — it's ephemeral, not the note. Corrections are reported only in that conversation; never written into the vault as a separate file.
-
-#### 5B: Silence Rule — No Trace of the Conversation
-
-The note is a **standalone reference document**: all corrections, enrichments, and additions from web research are silently incorporated, and the body must not contain any evidence that a conversation produced it — no "用户的理解", no "这里要纠正一下", no "这个理解忽略了". Every statement must read as a direct assertion of fact, as if written by a domain expert from scratch, because the reader 6 months from now has no access to the conversation.
-
-Corrections and additions are reported only in the conversation (Phase 8), never in the note body.
-
-#### 5C: Frontmatter
+#### 5B: Frontmatter
 
 ```yaml
 ---
@@ -193,7 +191,7 @@ summary: "A 1-2 sentence summary in Chinese capturing what this covers and why i
 - **Summary**: 1-2 sentences in Chinese. Captures what the note covers and why it matters. Replaces the need for an introduction — the frontmatter summary is the first thing a reader sees. Always double-quote the YAML value; if the text itself quotes something, use full-width quotes “” inside so the YAML doesn't break.
 - **No other fields** unless the user explicitly requests them.
 
-#### 5D: Body Structure
+#### 5C: Body Structure
 
 The note is a reference document, not an essay or a conversation response. This means:
 
@@ -206,11 +204,11 @@ The note is a reference document, not an essay or a conversation response. This 
 
 **How to think about sectioning:** Imagine you're explaining this to a colleague over whiteboard. Each `#` section is one big idea. Each `##` is a subtopic within it. Each `###` is a specific mechanism, example, or nuance. If a section doesn't teach something substantive, merge or remove it.
 
-**Terminology invariant.** Every term is defined-or-linked on first use — walk §1's decision tree, don't improvise. Every symbol in every formula / LaTeX block must be explicitly defined — if a reader meets a bare `K` in `$W(t) = C(t-K)^3 + W_{max}$` and has to guess its meaning, the note has failed. This is the most common source of "看着吃力" in dense notes, and it's mechanical: enforce it while composing, not in review.
+**Terminology invariant.** Every term is defined-or-linked on first use — walk §2's decision tree, don't improvise. Formula symbols are terms too: §2's "define each symbol where it first appears" applies verbatim to every `$…$` and `$$…$$` block. These are the single most common source of "看着吃力" in dense notes, and they are mechanical to enforce — do it while composing, not in review.
 
 **Make definitions linkable.** A definition sits at an anchorable position — its own `##`/`###` heading, or a paragraph tagged with `^block-id` — so future notes can point at it. A note that teaches a term better than anywhere else in the vault becomes the graph's defining source for that term; write it so later notes can link to it. The graph grows only if definitions are reachable.
 
-#### 5E: Obsidian Features
+#### 5D: Obsidian Features
 
 Callouts are how a note becomes **scannable** — a reader skimming it months later should find the key insights, gotchas, and trade-offs at a glance, without reading every paragraph. Plan callouts while composing, not as an afterthought.
 
@@ -266,7 +264,7 @@ After the first draft is written, verify that the note teaches well (clarity) an
 ```
 You are a junior engineer learning this topic. Read the note at <vault-path>/<area>/<filename>.md. Treat your own prior knowledge of this topic as near-zero and judge whether the note alone lets you follow along. Work through this checklist and report ONLY concrete findings, quoting the exact passage for each:
 - List every symbol in any formula/equation that is never defined (quote the formula and the symbol).
-- List every technical term used before it is defined inline, wikilinked to a defining note, or used as-is as a common English term (per §1 branch 3 — `API`, `token`, `softmax` need no definition).
+- List every technical term used before it is defined inline, wikilinked to a defining note, or used as-is as a common English term (per §2 branch 3 — `API`, `token`, `softmax` need no definition).
 - Flag any single sentence containing 3+ unexplained technical terms (branch-3 fixtures excluded).
 - Find any passage that states a mechanism or behavior but never says why it is designed that way.
 - Name the single section where a reader is most likely to get stuck, and the specific missing prerequisite that caused it.
@@ -296,7 +294,7 @@ Collect both results. Give each reviewer a bounded waiting window (a few minutes
 After the note is created (or updated in place), report the factual sections below — include each section only when it has content, and never evaluate the user's input quality, understanding, or correctness. Report only what was done:
 
 ```
-✅ 笔记已创建: path/to/Title.md (Phase 7 双轴审查通过，N 轮修订) — "双轴审查通过" only when both reviewers returned clean; otherwise rephrase per 如实反映审查状态 below.
+✅ 笔记已创建: path/to/Title.md (Phase 7 双轴审查通过，N 轮修订)
 
 **标签说明**: [brief, factual explanation of tag choices]
 
@@ -307,7 +305,7 @@ After the note is created (or updated in place), report the factual sections bel
 - *来源*: [link]
 - *为什么*: [brief explanation]
 
-If no corrections were needed, skip this section entirely. Do not say "no corrections found" — silence implies correctness.
+If no corrections were needed, skip this section entirely. Do not say "no corrections found" — an absent section means none were needed.
 
 **额外补充** — notable additions from web research:
 📚 [new info filling a gap]
@@ -341,7 +339,7 @@ After the report, if Phase 0 recorded missing skills and `state.json` has not be
 
 | Scenario | Response |
 |----------|----------|
-| User provides very little content | Build out the note via web research. Report what was added under Phase 8 额外补充 — never inside the note, the silence rule applies. The output note should still be substantial. |
+| User provides very little content | Build out the note via web research. Report what was added under Phase 8 额外补充 — never inside the note (5A's standalone-voice rule). The output note should still be substantial. |
 | User is confident but wrong | Correct silently with clear evidence. The Phase 8 修正记录 states facts (原文/修正为/来源/为什么) — never evaluate the user's input. |
 | Conflicting search results | Present both sides. Use `> [!question]` to frame the disagreement. Explain why they differ. |
 | Broad topic with no focus | Ask: "You mentioned [topic] — is there a specific aspect you're exploring, or do you want a general overview?" |
@@ -350,13 +348,13 @@ After the report, if Phase 0 recorded missing skills and `state.json` has not be
 | Web research unavailable or finds nothing authoritative | Write only what you can verify; mark the rest in Phase 8's 未核实 section instead of asserting it in the note. |
 | Obsidian CLI and direct write both unavailable | Display full note content in conversation: "📝 Note content ready to copy. Paste this into a new note." |
 | Input contains code | Include with proper syntax highlighting. Verify it works (mentally or with tools). |
-| Mixed Chinese/English input | Normalize to Chinese. Terminology follows §1's decision tree: vault-defined terms wikilinked, first mentions glossed `中文（English）`, common English terms (`API`, `GPU`) used as-is. |
-| User explicitly wants the note in another language | Comply — an explicit request overrides §1's Chinese mandate; keep everything else intact. |
+| Mixed Chinese/English input | Normalize to Chinese. Terminology follows §2's decision tree: vault-defined terms wikilinked, first mentions glossed `中文（English）`, common English terms (`API`, `GPU`) used as-is. |
+| User explicitly wants the note in another language | Comply — an explicit request overrides §2's Chinese mandate; keep everything else intact. |
 
 ## §5 Self-Check (run after Phase 7 review cycle, before Phase 8 report)
 
 Run these checks after all content revisions are final. If any check fails, fix it before reporting:
-- [ ] Note body entirely in Chinese? Terminology follows §1's decision tree — every term defined exactly once: inline (`中文（English）`), wikilinked to its defining note, or used as-is as a common English term (branch 3); nothing re-explained, no invented translations, every formula symbol explicitly defined?
+- [ ] Note body entirely in Chinese (unless the user requested another language, per §4)? Terminology follows §2's decision tree — every term defined exactly once: inline (`中文（English）`), wikilinked to its defining note, or used as-is as a common English term (branch 3); nothing re-explained, no invented translations, every formula symbol explicitly defined?
 - [ ] No conversation references in the note body — no `你说的`, `你列的`, `你的答案`, `用户的理解`, `用户说的`, `用户提到`?
 - [ ] Claims verified by web research? Correction log populated correctly?
 - [ ] Tags: 3-5, PascalCase where applicable (brand names keep official casing)? Summary: 1-2 Chinese sentences, double-quoted, no unescaped quotes?
@@ -364,11 +362,11 @@ Run these checks after all content revisions are final. If any check fails, fix 
 - [ ] Wikilinks woven into prose (not a "see also" block)?
 - [ ] Every cross-note wikilink carries a position anchor (`[[Note#Heading]]` or `[[Note#^block-id]]`) — zero bare whole-note links except where the concept genuinely spans the whole note?
 - [ ] Each anchor's section/block actually DEFINES the concept (a passing mention doesn't count)? Anchor texts verified against the target notes' actual headings (grep `^#{1,3} `), and any `^block-id` anchors actually present in the targets?
-- [ ] Writing voice reads like an engineer talking, not a translated textbook? Run the humanizer-zh patterns checklist: load the `humanizer-zh` skill via your environment's skill mechanism, then apply its patterns. If the skill is unavailable, manually check for: 过度强调意义, AI 词汇堆砌, 模糊归因, 填充短语, 三段式, 破折号过度, 否定式排比, 通用积极结尾.
+- [ ] Writing voice reads like an engineer talking, not a translated textbook? Run the humanizer-zh patterns checklist: load the `humanizer-zh` skill via your environment's skill mechanism, then apply its patterns. If the skill is unavailable, manually check for: 过度强调意义, AI 词汇堆砌, 模糊归因, 填充短语, 三段式, 破折号过度, 否定式排比, 通用积极结尾. As the mechanical sub-step for the punctuation item (per §2's sentence discipline), grep the note body prose — after stripping fenced code blocks, inline `code` spans, LaTeX, and quoted examples — for (a) nested em-dash asides, `——[^——。！？；]*——` (banned outright, no length exception), and (b) long parentheticals, `（[^）]{25,}）`. For each hit: nested em-dashes get rewritten to a single em-dash, a short parenthesis, a colon, or a split sentence; long parentheticals get promoted into a callout right after the referencing sentence or split into their own sentence. Judgment notes: strip any inner `（…（…）…）` spans before measuring a parenthetical's length, so a nested paren doesn't truncate the count; treat the 25-char floor as a heuristic — also catch shorter mid-sentence insertions that split a clause, and skip parentheticals that close the sentence (nothing follows them, so nothing is suspended — but promote them anyway if they carry a definition).
 - [ ] Vault scanned — wikilinks point to real existing notes where possible?
 - [ ] Obsidian features used meaningfully (not gratuitously)?
-- [ ] Callouts present — at least 2 across the note, matching the signal-mapping table? (Zero callouts = not distilled enough.)
+- [ ] Callouts present, matching the signal-mapping table? (Zero callouts is a red flag unless 5D's removal test says to skip them. If a section's gotcha or key insight sits in plain prose, it belongs in a callout. Per §1, when this check fights a section's natural structure, the deeper goal it serves — teaching deeply and clearly — wins.)
 - [ ] Mermaid diagram included if the topic has architecture, protocol, flow, or state dimensions? (Phase 1 flagged if yes — check that it was acted on.)
-- [ ] Mermaid diagram (if any) follows `references/mermaid.md` — no hardcoded colors, no emoji labels, one concept per diagram, labels follow §1's terminology tree?
+- [ ] Mermaid diagram (if any) follows `references/mermaid.md` — no hardcoded colors, no emoji labels, one concept per diagram, labels follow §2's terminology tree?
 - [ ] If an existing note covers the same topic, was the update-vs-create decision made explicitly (and reported in Phase 8 if a new note was created)?
 - [ ] File placed in correct directory and successfully created?

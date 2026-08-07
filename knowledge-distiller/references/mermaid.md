@@ -12,7 +12,7 @@ Use these conventions when including architecture diagrams, sequence flows, or s
 
 ## Label Convention
 
-Labels follow the note body's terminology rules (§1 of SKILL.md): gloss `中文（English）` on first mention when Chinese is what people say (branch 2), or use the English term as-is when that's the common usage (branch 3 — `API`, `RAG`). Wikilinks (branch 1) don't apply inside a diagram, so diagrams use branches 2/3 only. Do not use emoji — labels are technical identifiers, not icons.
+Labels follow the note body's terminology rules (§2 of SKILL.md): gloss `中文（English）` on first mention when Chinese is what people say (branch 2), or use the English term as-is when that's the common usage (branch 3 — `API`, `RAG`). Wikilinks (branch 1) don't apply inside a diagram, so diagrams use branches 2/3 only. Do not use emoji — labels are technical identifiers, not icons.
 
 ```mermaid
 flowchart TB
