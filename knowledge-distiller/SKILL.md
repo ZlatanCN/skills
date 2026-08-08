@@ -209,7 +209,8 @@ contract and turn the provisional skeleton into a stable teaching model:
   alternatives;
 - resolve conflicting sources by their conditions and limits. Do not silently choose a winner;
 - create the section blueprint described in `references/reader-model.md`: question, answer, prerequisites, next
-  question, relation and why-next edge, admitted claims/examples, and boundary for every top-level section.
+  question, relation and why-next edge, admitted claims/examples, boundary, parent, children, and heading level for
+  every section. The blueprint is a tree, not a flat list; heading depth must express the teaching model.
 
 Every included claim must earn its place in the spine. A verified fact with no reader question, role, dependency, or
 boundary is deferred or dropped. If the evidence changes the reader, after-state, central question, scope, or axes,
@@ -218,8 +219,9 @@ Phase 4 only when the model is stable enough that each section can be described 
 each adjacent relation has a reason, and no section is named only for a source or product.
 
 Before leaving this phase, record a compact Teaching Model checkpoint (internally, and in the execution report when
-one is being kept): `reader`, `question`, `after`, `scope`, `spine`, `axes`, and the complete section blueprint. A
-post-hoc summary of drafted prose is not a checkpoint; without this model, do not enter Phase 4 or Phase 5.
+one is being kept): `reader`, `question`, `after`, `scope`, `spine`, `axes`, `heading_convention`, and the complete
+section tree. A post-hoc summary of drafted prose is not a checkpoint; without this model, do not enter Phase 4 or
+Phase 5.
 
 This adversarial log feeds Phase 8. Corrections and scope decisions are reported in the conversation, not inserted as
 commentary into the standalone note. If a conflict materially affects the reader's decision, carry its conditions
@@ -286,7 +288,13 @@ because this template does not use them. Quote the summary safely; use full-widt
 
 #### 5B. Body structure
 
-The filename is the title; do not add a duplicate `# Title` heading unless required by the existing convention or user.
+The filename is the title by default; do not add a duplicate `# Title` heading unless the existing convention or user
+explicitly requires an explicit body title. In the default implicit-title convention, every major chapter is a `#`
+heading. In the explicit-title convention, the matching `# Title` is the root and major chapters are `##`. In either
+case, map the Phase 3 section tree to heading levels: a child is exactly one level deeper than its parent, and parallel
+chapters are siblings. Do not put one substantive chapter at `#` and then hang unrelated major chapters below it just
+because Markdown needs a parent; that makes the outline contradict the teaching model.
+
 Let the argument determine the outline; there is no section-count target. Each top-level section answers a necessary
 subquestion; parallel sections state their shared question and relationship. Name sections after the question or
 decision they resolve, not merely after a product or noun. Use one running example when several mechanisms are
@@ -329,6 +337,11 @@ Check for a filename collision before creating a new note. Write with the enviro
 After read-back, run the deterministic wikilink gate from `references/wikilinks.md` against the actual vault and
 the note path. Do not start review or report a passing self-check while that gate is failing. If a target is
 ambiguous or missing, remove the link or report the missing vault connection; do not guess.
+
+Run `node scripts/check-heading-tree.ts --strict --file "<note-path>"` as well. This catches skipped heading levels
+and the common structural error where a substantive first section becomes the sole parent of otherwise unrelated
+chapters. The script cannot decide whether two concepts belong together; that remains a Phase 3 and clarity-review
+judgment, not a mechanical formatting rule.
 
 Prefer a temporary file plus atomic replacement when the environment supports it. For an update, retain the
 original content until read-back confirms the replacement. Use the write states in

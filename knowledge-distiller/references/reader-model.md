@@ -62,6 +62,22 @@ why_next → why this answer makes that relation or next question necessary
 admitted → claim IDs, examples, and boundaries that earn a place here
 ```
 
+The blueprint is a tree, not a flat list. Record the parent, children, heading level, and sibling relation for every
+section. Heading depth is semantic: it tells the reader what belongs under what; it is not a font-size choice.
+
+Choose one title convention for the note and keep it consistent:
+
+- **Implicit filename title** — the filename is the title, so each major chapter is a `#` heading and its children are
+  `##`/`###` headings. Do not make the first substantive chapter the sole `#` parent of unrelated chapters.
+- **Explicit body title** — the first `#` heading is the note title, normally matching the filename or frontmatter
+  title; major chapters are `##`, and their children are `###`/`####` headings.
+
+The two conventions are both valid, but a content section must not masquerade as the document root. Parallel chapters
+must be siblings under the same parent; mechanisms that share a failure question should sit under that question rather
+than appearing as a flat row of unrelated top-level sections. Never jump from `#` to `###` without an intermediate
+parent. Before drafting, inspect the outline as a tree and ask: “Can a reader tell what these sections have in common
+without reading their paragraphs?” If not, change the teaching model before changing prose.
+
 Do not promote a section into the body merely because it is related to the topic or backed by a source. If its `answer`
 does not make the next section more intelligible—or, for a parallel/composable section, does not make its relationship
 to the shared question explicit—merge, move, defer, or drop it. This blueprint is the gate between research evidence and

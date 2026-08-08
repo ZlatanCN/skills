@@ -295,8 +295,10 @@ report only concrete findings and quote the exact passage for each:
 - C4: any mechanism or behavior stated without explaining why it is designed that way;
 - C5: every end-to-end break: a missing central question or transition, a section that is not needed for the next
   section, an orphan fact or branch, a comparison of different axes as alternatives, a prerequisite introduced after
-  its dependent idea, or an after-state the note does not actually enable. Quote the smallest passage that proves a
-  local break; for a missing edge between sections, give `before_heading`, `after_heading`, and the missing relation.
+  its dependent idea, a heading tree whose levels contradict the teaching model (including unrelated major chapters
+  nested under one substantive first section), or an after-state the note does not actually enable. Quote the smallest
+  passage or outline fragment that proves a local break; for a missing edge between sections, give `before_heading`,
+  `after_heading`, and the missing relation.
 Return the `teach_back`, all five labels using “—” for an item with no finding, followed by `result: clean` or
 `result: findings`. Preserve the metadata above exactly. Do not give vague praise. Say `result: clean` only when every
 item has no finding and the teach-back reaches the reader's usable model.

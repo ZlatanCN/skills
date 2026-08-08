@@ -10,6 +10,9 @@ the file was not safely written, check the draft but mark path/file checks not a
 - A linear read without following links recovers the spine and the role of each section; no paragraph or comparison is
   an orphan, a false alternative, or a mechanically appended research/reviewer return; every material paragraph maps to
   a section role in the Teaching Model.
+- The heading tree matches the Teaching Model: the title convention is explicit, heading levels encode parent/child
+  relations, parallel chapters are siblings, no level is skipped, and no substantive chapter is the sole parent of
+  unrelated major sections. `check-heading-tree.ts --strict` passes.
 - Each comparison uses one coherent axis; a cross-axis mechanism has an explicit primary and secondary role.
 - Language, terminology, formulas, code, and conversation-boundary rules are satisfied.
 - Material claims have direct evidence; unverified claims are removed or qualified, with important current or

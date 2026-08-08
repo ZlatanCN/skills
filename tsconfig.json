@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "moduleDetection": "force"
   },
   "include": ["knowledge-distiller/scripts/**/*.ts"]
 }

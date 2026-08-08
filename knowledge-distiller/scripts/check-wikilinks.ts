@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Node 24+ runs this TypeScript directly with its built-in type stripping.
 
-const fs = require("node:fs");
-const path = require("node:path");
-const os = require("node:os");
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 
 type ErrorItem = { file: string; line: number; message: string };
 

@@ -156,6 +156,7 @@
         "The note does not present all named techniques as mutually exclusive alternatives or as an unconnected product catalog",
         "A linear reader can explain why the next major section is necessary without following wikilinks",
         "Every top-level section has a necessary question, answer, and transition; a section is not present merely because a source or product was found",
+        "The Markdown heading tree matches the teaching model: the title convention is clear, major chapters are not falsely nested under one substantive first section, and child headings are used for genuine subtopics",
         "If a comparison table groups methods from different axes, it gives each method an explicit primary role instead of hiding the axis conflict under one row",
         "The note remains subject to the existing frontmatter, Chinese prose, evidence, anchored wikilink, and safe-review rules"
       ]
@@ -170,6 +171,7 @@
         "The note states which methods operate on representation, retrieval, context navigation, or query orchestration and does not imply false replacement relationships",
         "At least one explicit scope or pruning decision is visible through omission or synthesis of non-load-bearing details",
         "The note explains a common failure model before introducing the named methods and ends with a usable selection or composition rule",
+        "The Markdown heading tree expresses real parent-child and sibling relationships rather than putting all major concepts at one effective level",
         "Each surviving research fragment is rewritten into a section or paragraph role in the teaching model; unsupported or non-load-bearing fragments are omitted rather than appended",
         "The note has a recoverable teach-back: one spine, the question answered by each major section, and what the reader can explain, predict, or choose afterward",
         "The note passes the existing Chinese prose, frontmatter, evidence, anchored-link, and review lifecycle requirements"
