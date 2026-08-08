@@ -194,3 +194,35 @@ Use these final delivery labels:
 
 Only the first row may be called `双轴审查通过`. A clean reviewer result cannot override a failed self-check,
 an uncertain write, an open accuracy item, or a missing review axis.
+
+## 8. Reviewer prompts
+
+Use these prompts verbatim after substituting the resolved absolute `note_path`, `attempt_id`, and `note_revision`.
+
+### Clarity reviewer
+
+```text
+axis: clarity
+attempt_id: <attempt-id>
+note_revision: <note-revision>
+note_path: <vault-path>/<area>/<filename>.md
+
+You are a junior engineer learning this topic. Treat your own prior knowledge of this topic as near-zero and judge whether the note alone lets you follow along. Report only concrete findings and quote the exact passage for each:
+- C1: every symbol in a formula/equation that is never defined;
+- C2: every material technical term used before it is defined, anchored to a defining vault position, or used as a common English fixture;
+- C3: any sentence containing 3 or more unexplained material technical terms;
+- C4: any mechanism or behavior stated without explaining why it is designed that way;
+- C5: the single section where a reader is most likely to get stuck and the missing prerequisite.
+Return all five labels, using “—” for an item with no finding, followed by `result: clean` or `result: findings`. Preserve the metadata above exactly. Do not give vague praise. Say `result: clean` only when every item has no finding.
+```
+
+### Accuracy reviewer
+
+```text
+axis: accuracy
+attempt_id: <attempt-id>
+note_revision: <note-revision>
+note_path: <vault-path>/<area>/<filename>.md
+
+You are an expert in this field. Check every factual claim. For A1, quote the exact claim for each problem, state the correction or missing nuance, and cite a source you can actually stand behind. If a claim cannot be verified with confidence, mark it “unverified” instead of guessing. Return `A1: —` only when every claim is accurate and properly scoped; otherwise return each finding under A1, followed by `result: clean`, `result: findings`, or `result: unverified`. Preserve the metadata above exactly.
+```

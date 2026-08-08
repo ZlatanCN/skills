@@ -285,18 +285,16 @@ the note path. Do not start review or report a passing self-check while that gat
 ambiguous or missing, remove the link or report the missing vault connection; do not guess.
 
 Prefer a temporary file plus atomic replacement when the environment supports it. For an update, retain the
-original content until a follow-up read confirms the replacement. If the write command errors before a usable
-new file exists, set `write_status=not_written`. If a new file exists but its intended content cannot be
-confirmed by read-back, set `write_status=possibly_partial`. If an existing file may have been changed but
-recovery or read-back is uncertain, first restore the original content when it is available and verify it. If
-restoration is confirmed, set `write_status=unchanged`; otherwise set `write_status=possibly_partial`, stop
-further writes, and report that state. Only set `write_status=written` or `updated` after read-back confirms the
-intended content. A non-delivery write state has no path-based review result.
+original content until read-back confirms the replacement. Use the write states in
+`references/review-lifecycle.md` §7: an uncertain write or recovery is `possibly_partial`, and only a confirmed
+read-back may be `written` or `updated`; stop further writes when recovery is uncertain. A non-delivery write
+state has no path-based review result.
 
 ### Phase 7: Best-effort review without false gates
 
 Review improves confidence but is not a hard dependency on delivery. Spawn two read-only reviewers in parallel
-when the environment supports it, using the prompts below verbatim. Keep their lifecycles independent.
+when the environment supports it, using the prompts in `references/review-lifecycle.md` §8 verbatim. Keep their
+lifecycles independent.
 
 Resolve the note path, `attempt_id`, and `note_revision` before dispatch. Substitute all three into the prompt
 metadata and resolve `<vault-path>/<area>/<filename>.md` to the actual absolute note path; pass the resulting
@@ -314,55 +312,20 @@ obvious evidence or link failures before reviewers spend time on a broken draft.
 
 #### 7A. Reviewer lifecycle
 
-Read `references/review-lifecycle.md` before dispatch. It is the source of truth for attempt IDs, execution
-states, late results, retry safety, complete reviewer-result validation, manual fallback, and the final delivery
-matrix. In particular:
+Read `references/review-lifecycle.md` before dispatch and follow it as the source of truth for state, evidence,
+result validation, fallback, retries, and delivery. Keep these invariants visible:
 
-- `unknown` means an opaque provider may still be working; it is not a failure;
-- `deferred` means the parent stopped awaiting; it is not cancellation;
-- `cancel-requested` does not mean the provider terminated the work;
-- `canceled-confirmed` is still not a quality pass;
-- read §3A for the evidence boundary: a client timeout or empty poll is not provider liveness, failure, or cancellation confirmation;
-- `No issues` is valid only when every required checklist item is returned for the exact note revision and
-  attempt ID;
-- a missing or protocol-invalid axis must be `manual_checked` against the Phase 2 evidence, using the same
-  formula, term, mechanism-rationale, reader-blockage, claim, and source checks as the reviewer prompt.
-
-Reserve enough of the remaining task budget for fallback checks, writing, and the report. The parent cutoff
-protects delivery; it is not a kill deadline for a reviewer that is still making progress. Use a no-progress
-threshold only when the mechanism exposes a meaningful liveness signal. With an opaque provider, stop awaiting
-at the cutoff and defer. Cancel only after the reference's confirmed-stall conditions, and never retry while the
-original attempt is still unknown or cancellation is unconfirmed.
+- The parent cutoff stops parent waiting only; it does not prove provider failure or cancel the provider.
+- Opaque, empty, or late client observations become `unknown`/`deferred`, never provider failure or cancellation.
+- Cancellation requires provider-side stall evidence and termination confirmation; a clean result still requires a
+  complete match for the exact attempt and note revision.
+- Reserve time for fallback and reporting; never retry while the original attempt is `unknown`, `active`, or
+  `cancel-requested`.
 
 #### 7B. Review prompts
 
-**Clarity reviewer:**
-
-```text
-axis: clarity
-attempt_id: <attempt-id>
-note_revision: <note-revision>
-note_path: <vault-path>/<area>/<filename>.md
-
-You are a junior engineer learning this topic. Treat your own prior knowledge of this topic as near-zero and judge whether the note alone lets you follow along. Report only concrete findings and quote the exact passage for each:
-- C1: every symbol in a formula/equation that is never defined;
-- C2: every material technical term used before it is defined, anchored to a defining vault position, or used as a common English fixture;
-- C3: any sentence containing 3 or more unexplained material technical terms;
-- C4: any mechanism or behavior stated without explaining why it is designed that way;
-- C5: the single section where a reader is most likely to get stuck and the missing prerequisite.
-Return all five labels, using “—” for an item with no finding, followed by `result: clean` or `result: findings`. Preserve the metadata above exactly. Do not give vague praise. Say `result: clean` only when every item has no finding.
-```
-
-**Accuracy reviewer:**
-
-```text
-axis: accuracy
-attempt_id: <attempt-id>
-note_revision: <note-revision>
-note_path: <vault-path>/<area>/<filename>.md
-
-You are an expert in this field. Check every factual claim. For A1, quote the exact claim for each problem, state the correction or missing nuance, and cite a source you can actually stand behind. If a claim cannot be verified with confidence, mark it “unverified” instead of guessing. Return `A1: —` only when every claim is accurate and properly scoped; otherwise return each finding under A1, followed by `result: clean`, `result: findings`, or `result: unverified`. Preserve the metadata above exactly.
-```
+Read `references/review-lifecycle.md` §8 and use the matching clarity or accuracy prompt verbatim. Substitute the
+resolved absolute note path, `attempt_id`, and `note_revision`; never pass an unresolved placeholder.
 
 #### 7C. Adjudicate, revise, and stop
 
@@ -382,31 +345,20 @@ unbounded review rounds.
 
 ### Phase 8: Report the result
 
-Report in Chinese and include only sections with content:
+Read `references/review-lifecycle.md` §7 for write states and delivery labels. Report in Chinese and include only
+sections with content:
 
 ```text
 ✅ 笔记已创建/更新: path/to/Title.md（N 轮修订）
 
-Use the success line only for `write_status=written` or `updated` **and a passing final self-check**. For
-`not_written`, use instead:
-
-📝 笔记内容已生成但未写入: [reason]. 内容已在下方给出，可复制到新笔记。
-
-For `possibly_partial`, use instead:
-
-⚠️ 文件状态不确定，未宣称交付: [path/reason]. 先确认文件内容，再决定是否恢复或重写。
+Use the success line only for `written/updated` plus a passing final self-check. For `not_written`, say the note
+was generated but not written and include the content; for `possibly_partial`, say the file state is uncertain and
+do not claim delivery.
 
 **回答** — only if the user asked an explicit question: give the direct verdict in 1–3 sentences.
 
-**审查状态** — report facts, not inferred success:
-- `written/updated` + both valid reviewer results clean + self-check pass + no open items → `双轴审查通过`.
-- `written/updated` + missing axes manually checked + self-check pass + no open items → `已交付；部分审查由人工复核`.
-- `written/updated` + unresolved or unverified items → `已交付；存在未决项`.
-- `written/updated` + self-check failed → `文件已写入；自检未通过，未宣称交付`.
-- `unchanged` → `更新未写入；原文件已保留`，或说明草稿已完成人工复核；不得称为交付。
-- `not_written` → `内容未写入；未执行路径审查`，或说明草稿已完成人工复核；不得称为交付。
-- `possibly_partial` → `文件状态不确定；未宣称交付`.
-- Parent cutoff is `deferred`, not `canceled-confirmed`; a cancel request without confirmation is `取消请求未确认`.
+**审查状态** — use the exact delivery matrix in the reference; report facts, not inferred success. In particular,
+`deferred` is a parent wait boundary, not `canceled-confirmed`, and an unconfirmed cancel request stays uncertain.
 
 **标签说明**: [brief factual reason]
 
@@ -441,60 +393,13 @@ unwritten; continue with fallbacks.
 
 ## §3 Edge cases
 
-| Situation | Response |
-| --- | --- |
-| Plain question with no shared understanding | Answer directly; create no note and skip mandatory note research. |
-| Very little technical material | Build a focused note from research; report additions, not a conversation trace in the note. |
-| Broad but coherent topic | Choose a sensible boundary and state it in the report; do not block on clarification. |
-| Unrelated topics | Split into separate notes or ask which topic to prioritize if splitting would destroy coherence. |
-| Existing same-topic note | Update in place by default; create a new angle only with a report justification. |
-| Research unavailable or weak | Keep only the verified core; mark omitted claims under `未核实`. |
-| Review provider slow or unavailable | Protect the parent workflow with a wait budget, defer rather than falsely pass, run fallback checks, and report the actual state. |
-| File write blocked | Show the complete note content and say it is ready to copy; do not claim creation. |
-| Input contains code | Preserve code exactly where possible, use syntax fences, and verify the code separately when feasible. |
-| Mixed Chinese and English | Chinese prose; preserve conventional English terms, code, identifiers, URLs, and quoted material. |
-| User requests another note language | Follow that explicit request and keep the rest of the workflow. |
-| User gives a title, path, or filename | Honor it for a new note or explicitly requested new angle; the same-topic update rule still wins otherwise. Preserve existing metadata when updating. |
+Apply the phase-specific rule instead of inventing a shortcut: answer-only and scope routing follow Phase 0;
+weak research keeps only the verified core; slow or opaque review defers and falls back; uncertain writes are not
+claimed as delivery. Preserve code, conventional English, explicit language, and explicit path/metadata requests
+under the rules already given in Phases 1, 4, 5, and 6.
 
 ## §4 Final self-check
 
-Run this once before the first reviewer and after every revision, then run it one final time before the Phase 8
-report. Fix any failure first. If a write failed, run content checks against the draft, mark path/file checks as
-not applicable, and do not claim that a file was delivered.
-
-### Artifact checks
-
-- [ ] Scope matches the user's material; unrelated topics were split or excluded.
-- [ ] Prose is in the requested language; code, formulas, names, and conventional technical terms are preserved appropriately.
-- [ ] No conversation framing appears in the note body.
-- [ ] Material claims are supported by the evidence ledger; unverified claims are removed or qualified.
-- [ ] Important current, quantitative, surprising, or operational claims retain nearby source links or footnotes;
-  stable claims may omit citations only when that is deliberate. Each retained source directly supports the nearby
-  claim rather than merely discussing the same topic.
-- [ ] The note teaches cause, mechanism, trade-offs, and boundary conditions rather than listing slogans.
-- [ ] New-note frontmatter has 3–5 specific tags and a quoted Chinese summary; updates preserved unrelated properties.
-- [ ] No duplicate title, forced introduction/conclusion, table of contents, or reference dump was added.
-- [ ] Existing same-topic decision and output path are correct; for `written/updated`, read-back confirms the
-  file; for `unchanged/not_written/possibly_partial`, delivery is not claimed and the state is reported.
-
-### Vault and Markdown checks
-
-- [ ] Central wikilinks point to real notes and exact defining headings/blocks; each target position was read and
-  actually defines the concept rather than merely mentioning it; no guessed anchors or invented links. The
-  deterministic wikilink gate exits 0, and no target is ambiguous.
-- [ ] Any new block ID is unique, placed correctly, and reported under `库内修改`.
-- [ ] Callouts and diagrams pass the removal test and add clarity rather than decoration. If the diagram candidate
-  from Phase 1 fails that test, omission is correct; if it passes, the diagram is present.
-- [ ] Any Mermaid block follows `references/mermaid.md` and renders or passes a syntax-oriented preflight check.
-- [ ] If Mermaid rendering was unavailable, the report says `Mermaid 渲染未验证` (`render-unverified`) and the
-  note retains a textual explanation of the diagram's relationship.
-- [ ] Humanizer patterns were checked through `humanizer-zh` or its manual fallback.
-- [ ] Long parentheticals and nested paired em dashes were removed when they suspend the sentence.
-
-### Review and delivery checks
-
-- [ ] Each reviewer has an honest final state; `deferred`, `failed`, `cancel-requested`, and `canceled-confirmed` are not reported as passes.
-- [ ] No reviewer was canceled solely because its wall-clock duration was long.
-- [ ] Every missing review axis received the correct fallback self-check.
-- [ ] The review round cap and shared parent budget were respected; no unbounded rerun occurred.
-- [ ] Revision count, corrections, unresolved claims, vault mutations, and review status are accurately reported.
+Read `references/final-checklist.md` and run it before the first reviewer, after every revision, and once before
+the Phase 8 report. Fix failures first; if writing failed, apply content checks to the draft but do not claim a
+delivered file.
