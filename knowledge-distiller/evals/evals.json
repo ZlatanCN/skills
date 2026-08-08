@@ -4,33 +4,38 @@
     {
       "id": 0,
       "prompt": "/knowledge-distiller TCP拥塞控制 I've been thinking about TCP congestion control. So basically TCP has this mechanism where it starts by sending like 1 packet, then 2, then 4 — doubling each time until there's a loss. That's slow start. When loss happens, it cuts in half and then starts increasing more slowly (additive increase). I think modern TCP uses something called cubic which is better for high-bandwidth networks because it uses a cubic function instead of linear. Also there's something called BBR from Google that's even better because it measures bandwidth instead of using loss. The whole point is to be fair to other connections. Is my understanding roughly right? Also I heard QUIC does all this at the application layer instead of in the kernel. Am I on the right track?",
-      "expected_output": "A Chinese Obsidian note about TCP congestion control (slow start, AIMD, CUBIC, BBR, QUIC) with frontmatter, callouts, and wikilinks",
+      "expected_output": "A Chinese Obsidian note about TCP congestion control (slow start, AIMD, CUBIC, BBR, QUIC) with correct frontmatter and only the callouts/wikilinks that pass their clarity and anchor tests",
       "files": [],
       "expectations": [
         "Note stays focused on TCP congestion control mechanisms, not general networking",
-        "Title is derived from content (not a verbatim copy of the topic parameter)",
+        "Title is a descriptive phrase that summarizes the core topic rather than an arbitrary or unrelated name",
         "Key concepts are explained correctly; any user errors are silently corrected",
-        "Note body is entirely in Chinese; terminology follows the skill's decision tree — inline 中文（English）gloss for first mentions, vault-defined terms wikilinked rather than re-explained, common English terms (API, GPU) used as-is",
+        "Expository prose is in Chinese; code, formulas, protocol names, URLs, citations, and conventional English technical terms remain in their proper form",
         "Note contains no second-person conversational references (你说的, 你列的, etc.)",
         "Frontmatter has 3-5 tags (PascalCase where applicable, brand names keep official casing) and a quoted Chinese summary",
         "No 'Introduction' or 'Conclusion' sections in the note",
-        "Wikilinks point to real existing vault notes; zero is acceptable only when the vault has no related notes (never invent links)"
+        "Any cross-note wikilinks point to real notes and exact defining headings/blocks; zero is acceptable when no related note exists, and links are never invented",
+        "Every cross-note wikilink is anchored to a real heading or block; bare whole-note links are not emitted",
+        "Time-sensitive, quantitative, surprising, or operational claims have nearby sources or explicit qualifications"
       ]
     },
     {
       "id": 1,
       "prompt": "/knowledge-distiller 容器运行时栈 So I'm trying to understand Docker's architecture. Docker uses containerd under the hood to manage containers, and containerd uses runc to actually run them. The Docker daemon is this big API server that handles everything — building images, managing containers, networking, volumes. I think containerd is the industry standard now since Kubernetes uses it directly, you don't even need Docker anymore. But what I don't get is: what does containerd actually do that Docker doesn't? Is it just a stripped-down Docker? And what's this nerdctl thing I keep hearing about? Also, is there something newer than runc now? I heard about youki or something written in Rust.",
-      "expected_output": "A Chinese Obsidian note about the container runtime stack (Docker, containerd, runc, youki, nerdctl) with proper architecture explanation",
+      "expected_output": "A Chinese Obsidian note about the container runtime stack (Docker, containerd, runc, youki, nerdctl) with proper architecture explanation and evidence for current behavior",
       "files": [],
       "expectations": [
         "Note stays focused on container runtime layer architecture (Docker/containerd/runc/youki/nerdctl)",
-        "Title is derived from content, not just the topic parameter verbatim",
+        "Title is a descriptive phrase that summarizes the core architecture rather than an arbitrary or unrelated name",
         "Architectural layering is correct and up to date",
-        "Note body is entirely in Chinese; terminology follows the skill's decision tree — inline 中文（English）gloss for first mentions, vault-defined terms wikilinked rather than re-explained, common English terms (API, GPU) used as-is",
+        "Expository prose is in Chinese; code, formulas, protocol names, URLs, citations, and conventional English technical terms remain in their proper form",
         "Note contains no second-person conversational references",
         "Frontmatter has 3-5 tags (PascalCase where applicable, brand names keep official casing) and a quoted Chinese summary",
         "No 'Introduction' or 'Conclusion' sections",
-        "Wikilinks point to real existing vault notes; zero is acceptable only when the vault has no related notes (never invent links)"
+        "Any cross-note wikilinks point to real notes and exact defining headings/blocks; zero is acceptable when no related note exists, and links are never invented",
+        "Every cross-note wikilink is anchored to a real heading or block; bare whole-note links are not emitted",
+        "If a Mermaid diagram is included, it uses the static safe subset in references/mermaid.md; no interactive directives, raw HTML, or unverified styling",
+        "Time-sensitive, quantitative, surprising, or operational claims have nearby sources or explicit qualifications"
       ]
     },
     {
@@ -42,51 +47,101 @@
         "Skill handles missing /skill prefix gracefully — produces a quality note without explicit topic parameter",
         "Note is about microservices adoption, distributed monoliths, CI/CD dependencies, modular monolith approach",
         "Note contains no second-person conversational references",
-        "Note body is entirely in Chinese; terminology follows the skill's decision tree — inline 中文（English）gloss for first mentions, vault-defined terms wikilinked rather than re-explained, common English terms (API, GPU) used as-is",
+        "Expository prose is in Chinese; code, formulas, protocol names, URLs, citations, and conventional English technical terms remain in their proper form",
         "Frontmatter has 3-5 tags (PascalCase where applicable, brand names keep official casing) and a quoted Chinese summary",
         "No 'Introduction' or 'Conclusion' sections",
-        "Wikilinks point to real existing vault notes; zero is acceptable only when the vault has no related notes (never invent links)",
-        "Note adds web-researched depth beyond user's own analysis (team size, org structure, Conway's Law, real examples)"
+        "Any cross-note wikilinks point to real notes and exact defining headings/blocks; zero is acceptable when no related note exists, and links are never invented",
+        "Every cross-note wikilink is anchored to a real heading or block; bare whole-note links are not emitted",
+        "Note adds relevant research-backed context beyond the input where useful, with sources for time-sensitive or non-obvious claims",
+        "Time-sensitive, quantitative, surprising, or operational claims have nearby sources or explicit qualifications"
       ]
     },
     {
       "id": 3,
       "prompt": "/knowledge-distiller 长上下文的注意力稀释 我在想为什么长上下文会让模型表现变差。我的理解是：Transformer 的注意力是 O(n²) 的，上下文越长，注意力被摊得越薄，模型对中间位置的记忆就越差，这就是 Lost in the Middle 现象；还有人说上下文越长信息召回越差，叫 context rot。缓解手段我想到的是：提示词只放高信号内容、系统提示词要精炼、需要时才加载而不是一股脑把资料塞进上下文。但我不确定注意力稀释本身是不是根本没法消除，只能靠把上下文做短？",
-      "expected_output": "A Chinese Obsidian note about long-context attention dilution (Lost in the Middle, context rot) and mitigation strategies, linking to the existing LLM agent series notes at specific sections",
+      "expected_output": "A Chinese Obsidian note about long-context attention dilution (Lost in the Middle, context rot) and mitigation strategies, with anchored links when relevant vault definitions exist",
       "files": [],
       "expectations": [
         "New note (not an in-place update of an existing series note) on long-context attention dilution / context rot",
         "Every cross-note wikilink is anchored to a specific position ([[Note#Heading|alias]] or [[Note#^block-id|alias]]); zero bare whole-note links",
         "Each #Heading anchor text exists as a real heading in the target note",
-        "At least 2 cross-note wikilinks connecting to the LLM agent series notes (01-05 in 02 - Area/AI/)",
+        "When relevant LLM agent notes exist in the scanned vault, use anchored links to their actual defining positions; if absent, do not invent links",
         "Link aliases name the concept, not the note number",
-        "Note body is entirely in Chinese; terminology follows the skill's decision tree — inline 中文（English）gloss for first mentions, vault-defined terms wikilinked rather than re-explained, common English terms (API, GPU) used as-is",
+        "Expository prose is in Chinese; code, formulas, protocol names, URLs, citations, and conventional English technical terms remain in their proper form",
         "Note contains no second-person conversational references",
         "Frontmatter has 3-5 tags (PascalCase where applicable) and a quoted Chinese summary",
         "No 'Introduction' or 'Conclusion' sections",
         "No invented links — every target note exists in the vault",
         "Concepts already defined in the LLM series notes are linked to their defining position, not re-explained inline",
-        "Common English terms (token, softmax, LLM) are used as-is or with an established Chinese name — no invented translations like 词元"
+        "Common English terms (token, softmax, LLM) are used as-is or with an established Chinese name — no invented translations like 词元",
+        "Time-sensitive, quantitative, surprising, or operational claims have nearby sources or explicit qualifications"
       ]
     },
     {
       "id": 4,
       "prompt": "/knowledge-distiller 模型为什么会幻觉 我在想 LLM 为什么会有幻觉（hallucination）。我的理解是：训练目标就是预测下一个 token，不是求真；训练数据里有错误和偏见；生成时模型会自信地编造，长上下文里埋在中间的细节尤其容易丢失导致编造。工程上的缓解有 RAG 检索增强、给模型工具去查证、还有 harness 层的验证与纠错。但我搞不清的是：为什么多给上下文能减少幻觉？幻觉是不是只能缓解、不能根除？系统提示词里写「不要编造」到底有没有用？",
-      "expected_output": "A Chinese Obsidian note about LLM hallucination causes and mitigations (RAG, tools, harness verification), linking to the existing LLM agent series notes at specific sections",
+      "expected_output": "A Chinese Obsidian note about LLM hallucination causes and mitigations (RAG, tools, harness verification), with anchored links when relevant vault definitions exist",
       "files": [],
       "expectations": [
         "New note (not an in-place update of an existing series note) on hallucination mechanisms and mitigation",
         "Every cross-note wikilink is anchored to a specific position ([[Note#Heading|alias]] or [[Note#^block-id|alias]]); zero bare whole-note links",
         "Each #Heading anchor text exists as a real heading in the target note",
-        "At least 2 cross-note wikilinks connecting to the LLM agent series notes (01-05 in 02 - Area/AI/)",
+        "When relevant LLM agent notes exist in the scanned vault, use anchored links to their actual defining positions; if absent, do not invent links",
         "Link aliases name the concept, not the note number",
-        "Note body is entirely in Chinese; terminology follows the skill's decision tree — inline 中文（English）gloss for first mentions, vault-defined terms wikilinked rather than re-explained, common English terms (API, GPU) used as-is",
+        "Expository prose is in Chinese; code, formulas, protocol names, URLs, citations, and conventional English technical terms remain in their proper form",
         "Note contains no second-person conversational references",
         "Frontmatter has 3-5 tags (PascalCase where applicable) and a quoted Chinese summary",
         "No 'Introduction' or 'Conclusion' sections",
         "No invented links — every target note exists in the vault",
         "Concepts already defined in the LLM series notes are linked to their defining position, not re-explained inline",
-        "Common English terms (token, softmax, LLM) are used as-is or with an established Chinese name — no invented translations like 词元"
+        "Common English terms (token, softmax, LLM) are used as-is or with an established Chinese name — no invented translations like 词元",
+        "Time-sensitive, quantitative, surprising, or operational claims have nearby sources or explicit qualifications"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "什么是幂等性？请用两三句话直接解释一下，不需要创建笔记。",
+      "expected_output": "A direct conversational answer, with no note file created and no distillation workflow",
+      "files": [],
+      "expectations": [
+        "Answers the factual question directly in Chinese",
+        "Does not create or claim to create an Obsidian note",
+        "Does not perform mandatory note-research, vault-scan, or reviewer workflow"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "请把下面这段关于分布式系统故障排查的理解整理成一篇中文 Obsidian 笔记，并做一次深度准确性审查：我认为线上故障通常不是单个服务坏了，而是超时、重试和队列积压互相放大，最后形成级联故障。审查可能需要很久；只有确认 provider 确实卡住或无响应才取消 reviewer。客户端只是暂时等不到状态时，不要把它称为 provider 失败或已取消；如果父任务停止等待，请区分 deferred、unknown 和 canceled-confirmed，并在必要时做人工 fallback。不要把审查时间长本身当成卡住。",
+      "expected_output": "A Chinese Obsidian note explaining cascading failures and a truthful Phase 8 report that preserves the distinction between parent waiting, provider liveness, cancellation confirmation, and manual fallback",
+      "files": [],
+      "expectations": [
+        "Note stays focused on cascading failure mechanisms, timeout/retry amplification, and queue buildup",
+        "The report does not infer provider failure or cancellation from wall-clock duration alone",
+        "Opaque or late reviewer state is distinguished from confirmed cancellation, and incomplete review is not reported as clean",
+        "If a reviewer result is unavailable, the report uses the documented manual fallback or an honest unresolved state",
+        "Expository prose is in Chinese; code, protocol names, URLs, citations, and conventional English technical terms remain in their proper form",
+        "Frontmatter and anchored wikilinks follow the current skill rules when a note is written",
+        "The execution log persists cycle and attempt identity together with note revision and note path before reviewer waiting",
+        "Each missing reviewer axis records parent cutoff, provider operation identity or opacity, observability, and transition evidence",
+        "An opaque client-only observation becomes unknown/deferred without cancellation unless provider-side stall evidence exists",
+        "Late results remain attached to their original attempt and revision, and the review loop has a finite boundary"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "/knowledge-distiller 长上下文的注意力稀释：请整理 Lost in the Middle、Context Rot 以及按需加载、压缩、检索等缓解策略。写作前请连接已有 vault 定义，但 vault 中存在几个标题非常相似的 Agent 状态栏和上下文笔记。任何 wikilink 都必须来自实际扫描到的文件名和实际 heading；如果无法唯一解析，就不要猜，删除链接并在报告中说明缺口。写完后做最终自检，不能把链接存在性当作语义审查通过。",
+      "expected_output": "A Chinese Obsidian note whose internal links are mechanically resolvable and semantically justified, with an honest self-check/report",
+      "files": [],
+      "expectations": [
+        "Every emitted wikilink has an exact heading or block anchor",
+        "Every emitted wikilink target resolves to an existing, unique vault note",
+        "Every emitted heading or block anchor exists in its resolved target",
+        "The note omits or reports unresolved/ambiguous vault connections instead of guessing",
+        "The report does not claim a passing self-check when the mechanical link gate fails",
+        "The note remains focused on long-context failure modes and mitigation strategies",
+        "The execution log records both the checker self-test and the actual-vault checker result",
+        "The report treats mechanical link validity and semantic link justification as separate checks",
+        "Unavailable external reviewers are reported as manual fallback rather than as dual-reviewer approval"
       ]
     }
   ]

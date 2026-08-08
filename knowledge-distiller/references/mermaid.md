@@ -1,74 +1,123 @@
-# Mermaid Diagram Conventions for Knowledge Notes
+# Mermaid Reference for Knowledge Notes
 
-A diagram in a knowledge note compresses a structural or temporal relationship that prose would take paragraphs to convey. These conventions keep every diagram render-safe in both Obsidian themes, terminology-consistent with the note, and glanceable. A diagram that fails any of the three does not belong in the note (Phase 5's 5D removal test).
+Read this reference only when a diagram materially improves the note. A diagram is a compressed explanation,
+not a decoration or a requirement to satisfy. If the same relationship is clearer in two short sentences, skip
+the diagram.
 
-## Choose the diagram type by what you are showing
+## 1. Choose the diagram by the question
 
-| The note is showing | Use |
-|---|---|
-| Architecture, layering, data flow, protocol flow | `flowchart` |
-| Interaction order between components | `sequenceDiagram` |
-| A system's states and the transitions between them | `stateDiagram-v2` |
+| Question the reader needs answered | Diagram |
+| --- | --- |
+| What components, layers, or data paths exist? | `flowchart` |
+| What happens first, next, and in response to what? | `sequenceDiagram` |
+| What states exist and what causes transitions? | `stateDiagram-v2` |
 
-`flowchart` is the modern keyword; `graph` is its legacy alias, kept only for backward compatibility. Always write `flowchart`.
+Prefer one primary question per diagram. A diagram may combine inseparable boundaries and flows when that makes
+the system easier to understand. Split it when unrelated concerns, crossings, or detail density make the reader
+lose the main relationship. Use `TB` for a top-down hierarchy, `LR` for a left-to-right pipeline, and whichever
+direction keeps the smallest useful diagram readable.
 
-## Render safely in both themes
+## 2. Keep syntax and labels safe
 
-Obsidian bundles Mermaid with the light theme and fakes dark mode by applying a CSS `invert()` filter to the rendered SVG. A hardcoded `fill:` / `stroke:` / `color:` reads correctly in one theme, but the other theme applies the `invert()` filter, so the same color lands wrong there. Rely on the theme's default Mermaid rendering — it adapts automatically.
+Use a fenced block with the correct diagram type:
 
-## One concept per diagram
-
-A reader takes in a diagram as a single unit. If it needs labels explaining what it shows, or you catch yourself mixing layers with message order, split it. Each diagram teaches exactly one relationship.
-
-## Node shape carries the type, never color
-
-- Rectangle — process or service (the default)
-- Cylinder `[(…)]` — database or storage
-- Diamond `{…}` — decision
-- `subgraph` — a boundary or grouping, not a node
-
-Shape alone must convey the role, because color is unreliable across themes.
-
-## Labels follow the note's terminology (§2 of SKILL.md)
-
-A diagram is part of the note, so its labels obey the same terminology rules as the body: gloss `中文（English）` on first mention when Chinese is what people say (branch 2), or use the English term as-is when that is the common usage (branch 3 — `API`, `RAG`). One difference: a wikilink inside a diagram block surfaces as literal text, not a resolved link, so branch 1's link-to-definition rule never applies — diagrams use branches 2/3 only, and a label must match the exact term the surrounding prose uses, never a fresh variant.
-
-No emoji in labels. Emoji renders inconsistently across platforms and reads as icons, not identifiers.
-
-## Examples
-
-### Flowchart — architecture with a database
-
+````markdown
 ```mermaid
 flowchart TB
-    User["用户（User）"] --> Gateway["API 网关"]
-    Gateway --> Auth["认证服务（Auth Service）"]
-    Gateway --> API["API 服务"]
-    API --> DB[("数据库（PostgreSQL）")]
-    API --> Backend{缓存命中?}
-    Backend -- 是 --> DB
-    Backend -- 否 --> Upstream["上游服务"]
+    A["开始"] --> B["结束"]
 ```
+````
 
-### Flowchart — grouping with subgraphs
+Rules:
 
+- Use stable ASCII identifiers for nodes (`Gateway`, `DB`, `Decision`); put Chinese and punctuation in quoted
+  display labels (`Gateway["API 网关"]`).
+- Quote labels containing punctuation, brackets, parentheses, question marks, colons, or arrows. This keeps
+  prose separate from Mermaid syntax and reduces parser ambiguity.
+- Do not use `end` as an unquoted node ID or label. Mermaid treats it specially in flowcharts; use a different
+  identifier or quote/capitalize the label.
+- Avoid an unspaced lowercase `o` or `x` immediately after a flowchart connector; Mermaid can interpret those
+  forms as circle or cross edges. Add a space or capitalize the character when that text is intentional.
+- Keep edge labels short. If an edge needs a paragraph of explanation, move that explanation into prose.
+- Prefer basic nodes, edges, subgraphs, participants, and state transitions. Avoid experimental syntax when a
+  simpler construct conveys the same relationship.
+- Keep diagrams static in ordinary knowledge notes: do not use `click`, callbacks, external URLs, raw HTML,
+  `%%{init}%%`, `config` directives, or embedded JavaScript. These features make the note dependent on renderer
+  settings and can turn content into an interaction surface.
+- Do not use emoji. Do not rely on color alone. Omit custom colors and CSS by default; if a local convention
+  requires them, verify contrast in both light and dark reading views and preserve the same distinction with
+  labels or shapes.
+- Define and link concepts in the surrounding prose. Do not put raw `[[wikilink]]` text inside a label. If a
+  diagram genuinely needs in-graph navigation, use Obsidian's `class NodeId internal-link;` convention only in
+  a `flowchart`, only after verifying the target Obsidian renderer's node-to-note mapping, and only when the node
+  ID resolves to the intended note. Do not use this convention in `sequenceDiagram` or `stateDiagram-v2`; use a
+  normal Markdown wikilink in the surrounding prose instead. If the mapping is uncertain, omit the in-graph
+  link. This is an advanced navigation exception, not the definition mechanism.
+
+Node shape communicates role in a flowchart:
+
+- rectangle `A["..."]` — process, service, or ordinary step;
+- cylinder `DB[("...")]` — database or persistent storage;
+- diamond `D{"..."}` — decision;
+- `subgraph` — a boundary or grouping, not a component.
+
+Do not assign a shape merely for visual variety. If role does not matter, use the rectangle.
+
+## 3. Keep terminology readable
+
+The surrounding prose owns definitions. Introduce or link the important term before the diagram, then use the
+same short label in the diagram. Do not turn a node into a glossary entry by putting a long bilingual definition
+inside it. Preserve conventional English names such as `API`, `RAG`, and `LLM` when that is how engineers write
+them.
+
+The diagram should be understandable without color. Its nodes, arrows, edge labels, and grouping must carry the
+meaning on their own.
+
+## 4. Preflight before delivery
+
+Check every diagram:
+
+- [ ] It answers one concrete structural or temporal question.
+- [ ] Removing it would make the explanation less clear or materially longer.
+- [ ] The diagram type matches the question.
+- [ ] Node IDs are stable and simple; display labels are quoted where needed.
+- [ ] There is no unquoted `end`, accidental reserved syntax, emoji, or theme-specific style; color is not the
+  sole encoding and any custom colors passed the both-theme check.
+- [ ] There is no `click`, callback, external URL, raw HTML, `%%{init}%%`, `config`, or embedded JavaScript.
+- [ ] Shape semantics are consistent and edge labels are short.
+- [ ] Important terms are defined or linked in nearby prose, not hidden in the diagram.
+- [ ] It is small enough to scan; split it if the reader must trace too many crossings or unrelated branches.
+- [ ] A Mermaid parser or Obsidian reading view was used when available. If no renderer is available, mark the
+  diagram `render-unverified` in the Phase 8 report and keep a one-sentence textual explanation in the note.
+
+Obsidian bundles its own Mermaid version. Prefer the basic syntax in this reference rather than assuming that the
+latest Mermaid documentation and the installed Obsidian renderer support the same features. If a feature-specific
+syntax is necessary, check the target renderer and consult the relevant official page for [flowcharts](https://mermaid.js.org/syntax/flowchart.html),
+[sequence diagrams](https://mermaid.js.org/syntax/sequenceDiagram.html), or [state diagrams](https://mermaid.js.org/syntax/stateDiagram.html).
+
+Every diagram needs a one-sentence textual explanation in nearby prose. For a complex diagram, also add Mermaid's
+`accTitle` and `accDescr` when the target renderer supports them. The prose is the fallback for readers who cannot
+see or render the diagram.
+
+## 5. Safe examples
+
+### Flowchart — architecture or data flow
+
+````markdown
 ```mermaid
 flowchart TB
-    subgraph Frontend["前端"]
-        Web["Web App"]
-        Mobile["Mobile App"]
-    end
-    subgraph Backend["后端"]
-        Gateway["API 网关"]
-        Service["Service"]
-    end
-    Web --> Gateway
-    Mobile --> Gateway
-    Gateway --> Service
+    User["用户"] --> Gateway["API 网关"]
+    Gateway --> Service["应用服务"]
+    Service --> DB[("数据库")]
+    Service --> Decision{"缓存命中？"}
+    Decision -->|是| Cache[("缓存")]
+    Decision -->|否| Upstream["上游服务"]
 ```
+````
 
 ### Sequence diagram — interaction order
 
+````markdown
 ```mermaid
 sequenceDiagram
     participant C as 客户端
@@ -79,14 +128,19 @@ sequenceDiagram
     A-->>G: 通过
     G-->>C: 响应
 ```
+````
 
-### State diagram — states and transitions
+### State diagram — state transitions
 
+````markdown
 ```mermaid
 stateDiagram-v2
-    [*] --> 慢启动
-    慢启动 --> 拥塞避免: 达到 ssthresh
-    拥塞避免 --> 快速恢复: 3 个重复 ACK
-    快速恢复 --> 拥塞避免: 新 ACK
-    快速恢复 --> [*]
+    state "慢启动" as SlowStart
+    state "拥塞避免" as CongestionAvoidance
+    state "快速恢复" as FastRecovery
+    [*] --> SlowStart
+    SlowStart --> CongestionAvoidance: 达到阈值
+    CongestionAvoidance --> FastRecovery: 检测到丢包
+    FastRecovery --> CongestionAvoidance: 收到新确认
 ```
+````
