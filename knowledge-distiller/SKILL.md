@@ -8,8 +8,8 @@ description: >
   topic. This even applies when they have not asked for a note: it is for exactly the moment after they have
   thought through something complex, are unsure whether part of their understanding is correct, or dump a
   block of raw thoughts that need structure and fact-checking.
-  Do NOT use for polishing or rephrasing existing text (humanizer-zh) or for general vault/note operations
-  (obsidian-cli, obsidian-markdown).
+  Do NOT use for polishing or rephrasing existing text (that is humanizer-zh's job) or for general vault
+  operations (obsidian-cli).
 ---
 
 # Knowledge Distiller
@@ -20,10 +20,7 @@ You are a senior engineer writing a note for your future self. Take the user's r
 
 This skill references other skills for extended capabilities. Missing ones degrade gracefully — the agent falls back to built-in tools — but installing them improves the experience:
 
-- `web-access` — web search and page reading (fallback: the environment's built-in search and URL-reading tools)
-- `obsidian-cli` — vault scanning and file creation (fallback: grep/glob + direct file write)
 - `humanizer-zh` — AI writing pattern detection, recommended (fallback: manual checklist)
-- `defuddle` — clean content extraction from URLs (fallback: built-in URL reading)
 - `obsidian-markdown` — Obsidian syntax reference (fallback: rules in this skill)
 
 If you don't have these, the skill still works — just with degraded capabilities.
@@ -86,9 +83,9 @@ bash "<script-path>"
 ```
 
 - Exit **0** → `state.json` exists. The user has already been asked about missing skills. Skip Phase 0. Proceed to Phase 1.
-- Exit **1** → first (or fresh) invocation. Unavailable skills are expected — the agent has fallbacks for all of them (each fallback is listed in the Prerequisites section). Check availability of each of the 5 skills there through your environment's skill mechanism (e.g. a `skill://` URI read, a `skill()` call, or a file probe — whichever exists here): `web-access`, `obsidian-cli`, `humanizer-zh`, `defuddle`, `obsidian-markdown`. Record each as available/missing.
+- Exit **1** → first (or fresh) invocation. Unavailable skills are expected — the agent has fallbacks for all of them (each fallback is listed in the Prerequisites section). Check availability of each of the 2 skills there through your environment's skill mechanism (e.g. a `skill://` URI read, a `skill()` call, or a file probe — whichever exists here): `humanizer-zh`, `obsidian-markdown`. Record each as available/missing.
 
-- If **all 5 are available** → write state immediately (nothing to install, suppress future checks): `bash "<script-path>" write`
+- If **all 2 are available** → write state immediately (nothing to install, suppress future checks): `bash "<script-path>" write`
 - If **any are missing** → record which ones. Do NOT write state yet — Phase 8 will ask the user what to do.
 
 ### Phase 1: Analyze Input
@@ -104,9 +101,7 @@ Parse the input to identify:
 
 ### Phase 2: Web Research (Mandatory)
 
-**Always research.** Technical topics evolve. Load the `web-access` skill through your environment's skill mechanism (see Prerequisites) — it handles search, page reading, authentication, and dynamic content. Do not use built-in search or fetch tools directly while web-access is available.
-
-If web-access is not available, fall back to the environment's built-in search and URL-reading tools. Do not defer to the fallback preemptively — try web-access first.
+**Always research.** Technical topics evolve. Use the environment's built-in search and URL-reading tools directly — the sources this skill needs (official docs, RFCs, well-known blog posts) are public static content, so no browser or session machinery is required. Only reach for a browser-capable skill when content is genuinely unreachable without one (login-walled or JS-rendered pages), which is rare here.
 
 Search for:
 1. **Current state** — new versions, deprecations, paradigm shifts
@@ -116,7 +111,7 @@ Search for:
 
 Use 2-4 targeted search queries for broad discovery, then stop — discovery has diminishing returns and burns budget. Verifying a specific claim you intend to write is NOT bound by that cap, but batch it: one authoritative source per claim, confirm, move on. If a claim can't be verified with reasonable effort, don't assert it — drop it, or move it to Phase 8's 未核实 section. Prioritize official documentation and respected community sources.
 
-When research yields a specific URL worth reading in full (a blog post, RFC section, or documentation page), use `web-access` to load it. If web-access is unavailable, try `defuddle` (via your environment's skill mechanism) — it extracts cleaner markdown than raw page fetching for content-heavy pages. If defuddle is also unavailable, use the environment's built-in URL reading directly.
+When research yields a specific URL worth reading in full (a blog post, RFC section, or documentation page), load it with the environment's URL-reading tool — its built-in reader yields clean markdown directly.
 
 ### Phase 3: Adversarial Review Log
 
@@ -137,7 +132,7 @@ This log keeps one format and maps 1:1 onto the Phase 8 修正记录 — the rep
 
 Before composing, scan the vault for existing notes to link to:
 1. Identify 3-5 key concepts in the topic (these become the main linking targets), and note every other term the note will likely use — §2 branch 1 resolves each one at composition time
-2. Search the vault for matching notes — load `obsidian-cli` via your environment's skill mechanism for tag/property-based searches. If obsidian-cli is unavailable, use grep/glob alone. Complement with grep/glob for full-text and filename matching in either case.
+2. Search the vault with the environment's own tools: grep across files (including YAML frontmatter for tags/properties), glob for filenames.
 3. Read any MOC files in the relevant area to understand organizational logic
 4. Read related notes to gauge depth, terminology, and which wikilinks already exist
 
@@ -241,20 +236,12 @@ Callouts are how a note becomes **scannable** — a reader skimming it months la
 
 ### Phase 6: Write the File
 
-1. Determine the correct vault directory from the Phase 4 scan: the concept belongs in the area whose notes it connects to. Follow that area's naming convention — numbered prefixes (e.g. `06. ` in `02 - Area/AI/`) continue with the next number; descriptive filenames otherwise. If no existing area fits, follow the vault's top-level structure; don't invent a parallel convention.
-2. Load the `obsidian-cli` skill via your environment's skill mechanism and use `obsidian create` as the primary method. Fall back to direct file write if the CLI is unavailable.
-
-   Primary — obsidian-cli (an external CLI, so its exact syntax stands):
-   ```
-   obsidian create name="Title" path="<vault-path>/<area>/<filename>.md" content="..." silent
-   ```
-   Fallback — direct write: use your environment's file-writing tool to write the content to `<vault-path>/<area>/<filename>.md`.
+1. Determine the correct vault directory from the Phase 4 scan: the concept belongs in the area whose notes it connects to. Follow that area's naming convention — numbered prefixes (e.g. `06. ` in `02 - Area/AI/`) continue with the next number; descriptive filenames otherwise. If no existing area fits, follow the vault's top-level structure; don't invent a parallel convention. If the user specified a title, path, or filename, honor that instead (see §4).
+2. Write the file directly with your environment's file-writing tool — the note is a plain markdown file on disk and Obsidian watches filesystem changes; no external CLI is needed.
 
 The vault path is the workspace root. The filename IS the title — no `# Title` in the body.
 
-**Updating in place** (same-topic collision from Phase 4): read the existing file, integrate the new content and corrections, and write it back to the SAME path with the SAME filename — `obsidian create` with the same path (overwrite), or your environment's file-edit tools. Never create a duplicate.
-
-**Very long content** — the CLI has argument-length limits, and `$(cat file)` does not help (it still expands onto the command line). For long notes, skip the CLI and write the file directly with your environment's file-write tool, then verify it landed in the right place. Use the CLI for short notes only.
+**Updating in place** (same-topic collision from Phase 4): read the existing file, integrate the new content and corrections, and write it back to the SAME path with the SAME filename using your file-edit tools. Never create a duplicate.
 
 ### Phase 7: Content Review Cycle
 
@@ -291,10 +278,12 @@ Collect both results. Give each reviewer a bounded waiting window (a few minutes
 
 ### Phase 8: Report to User (in Chinese)
 
-After the note is created (or updated in place), report the factual sections below — include each section only when it has content, and never evaluate the user's input quality, understanding, or correctness. Report only what was done:
+After the note is created (or updated in place), report the sections below — include each section only when it has content. Never volunteer evaluation of the user's input; report only what was done. Exception: if the user asked an explicit question about their understanding, answer it directly in 回答 — answering a question is not unsolicited evaluation.
 
 ```
 ✅ 笔记已创建: path/to/Title.md (Phase 7 双轴审查通过，N 轮修订)
+
+**回答** — only when the user asked an explicit question: 1-3 sentences, direct verdict (「你的理解大方向正确，两处偏差见修正记录」 / 「核心机制理解对了，但一个前提是错的，见修正记录」). The note is the full answer; this is the summary the user can act on immediately.
 
 **标签说明**: [brief, factual explanation of tag choices]
 
@@ -340,13 +329,15 @@ After the report, if Phase 0 recorded missing skills and `state.json` has not be
 | Scenario | Response |
 |----------|----------|
 | User provides very little content | Build out the note via web research. Report what was added under Phase 8 额外补充 — never inside the note (5A's standalone-voice rule). The output note should still be substantial. |
-| User is confident but wrong | Correct silently with clear evidence. The Phase 8 修正记录 states facts (原文/修正为/来源/为什么) — never evaluate the user's input. |
+| User is confident but wrong | Correct silently with clear evidence. The Phase 8 修正记录 states facts (原文/修正为/来源/为什么) — never volunteer evaluation (the explicit-question 回答 exception in Phase 8 still applies). |
 | Conflicting search results | Present both sides. Use `> [!question]` to frame the disagreement. Explain why they differ. |
 | Broad topic with no focus | Ask: "You mentioned [topic] — is there a specific aspect you're exploring, or do you want a general overview?" |
+| Input covers multiple unrelated topics | Split into one note per topic; if that fragments the effort, ask which to prioritize. Never merge unrelated topics into one note. |
+| User specifies a title, path, or filename | Honor it — it overrides Phase 6's naming conventions. Frontmatter still follows 5B unless the user specified fields. |
 | Plain question, no shared understanding | Answer directly in conversation; do NOT create a note. The skill exists to distill the user's own understanding, not to answer questions from scratch. |
 | Vault has no related notes for this topic | Zero wikilinks is correct — never invent links to non-existent notes. Mention the gap in 延伸建议. |
 | Web research unavailable or finds nothing authoritative | Write only what you can verify; mark the rest in Phase 8's 未核实 section instead of asserting it in the note. |
-| Obsidian CLI and direct write both unavailable | Display full note content in conversation: "📝 Note content ready to copy. Paste this into a new note." |
+| File write fails or is blocked (readonly sandbox, permissions) | Display full note content in the response: "📝 Note content ready to copy. Paste this into a new note." |
 | Input contains code | Include with proper syntax highlighting. Verify it works (mentally or with tools). |
 | Mixed Chinese/English input | Normalize to Chinese. Terminology follows §2's decision tree: vault-defined terms wikilinked, first mentions glossed `中文（English）`, common English terms (`API`, `GPU`) used as-is. |
 | User explicitly wants the note in another language | Comply — an explicit request overrides §2's Chinese mandate; keep everything else intact. |
@@ -367,6 +358,6 @@ Run these checks after all content revisions are final. If any check fails, fix 
 - [ ] Obsidian features used meaningfully (not gratuitously)?
 - [ ] Callouts present, matching the signal-mapping table? (Zero callouts is a red flag unless 5D's removal test says to skip them. If a section's gotcha or key insight sits in plain prose, it belongs in a callout. Per §1, when this check fights a section's natural structure, the deeper goal it serves — teaching deeply and clearly — wins.)
 - [ ] Mermaid diagram included if the topic has architecture, protocol, flow, or state dimensions? (Phase 1 flagged if yes — check that it was acted on.)
-- [ ] Mermaid diagram (if any) follows `references/mermaid.md` — no hardcoded colors, no emoji labels, one concept per diagram, labels follow §2's terminology tree?
+- [ ] Mermaid diagram (if any) follows `references/mermaid.md` — no hardcoded colors, no emoji labels, one concept per diagram, node shapes carry roles (cylinder=database/storage, diamond=decision), labels follow §2's terminology tree?
 - [ ] If an existing note covers the same topic, was the update-vs-create decision made explicitly (and reported in Phase 8 if a new note was created)?
 - [ ] File placed in correct directory and successfully created?
