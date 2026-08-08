@@ -18,9 +18,15 @@
 #   * missing CHANGELOG.md              -> created with the new section as head
 #   * SKILL.md without a `version:`    -> left untouched (never invented)
 #   * `version:` only inside frontmatter -> bumped; body occurrences untouched
+#   * SKILL.md version matches neither $PREV nor $NEW -> release refused
+#     (single-repo versioning: the repo version IS every skill's version;
+#     a drifted SKILL.md is never silently overwritten)
 #   * no git remote                     -> tag/commit still done, push skipped
 #   * no `gh` CLI / not authenticated   -> release creation skipped, hint shown
 #   * push failure                        -> tag and commit stay local, message notes it
+#   * release assets: every versioned skill dir (contains frontmatter `version:`)
+#     packed from git-tracked files as <skill>-<TAG>.tar.gz and attached —
+#     untracked dev artifacts (state.json, workspace dirs, ...) never ship.
 #
 # Safety invariants:
 #   * refuses to run in a dirty worktree (unless --allow-dirty)
@@ -227,6 +233,28 @@ _skill_has_version() { # 1 if frontmatter <fm==1> contains a version: key (read-
     END { exit found ? 0 : 1 }
   ' "$1"
 }
+_skill_get_version() { # print the frontmatter version: value, unquoted (read-only)
+  awk '
+    /^---$/ { fm++; next }
+    fm == 1 && /^[[:space:]]*version:/ {
+      sub(/^[[:space:]]*version:[[:space:]]*/, "")
+      gsub(/["'"'"']/, "")
+      print
+      exit
+    }
+  ' "$1"
+}
+version_drift() { # print "file: current → NEW" for versioned skills whose
+  # version matches neither the last release ($PREV) nor this one ($NEW) —
+  # i.e. a manual edit that no tag accounts for. Bump target stays $NEW.
+  local f cur
+  for f in "${SKILL_FILES[@]:-}"; do
+    cur="$(_skill_get_version "$f")"
+    if [[ -n "$cur" && "$cur" != "$NEW" && "$cur" != "${PREV#v}" ]]; then
+      printf '%s: %s → %s\n' "$f" "$cur" "$NEW"
+    fi
+  done
+}
 scan_skills() { # fill SKILL_FILES without writing (used by dry-run and real run)
   local f
   SKILL_FILES=()
@@ -268,10 +296,13 @@ dry_print() { # render the release plan as a boxed panel (dry-run + real run)
   local sk="$( [ ${#SKILL_FILES[@]} -gt 0 ] && echo "${SKILL_FILES[*]}" || echo '(无版本字段，跳过)' )"
   local cl="$([ -f "$CHANGELOG" ] && echo "更新 $CHANGELOG" || echo "新建 $CHANGELOG")"
   local ncm="$([[ "$PREV" != "(none)" ]] && git rev-list --count "$PREV..HEAD" 2>/dev/null || echo 0)"
+  local drift="$(version_drift)"
   panel "发布计划" <<EOF
 分支:      $BRANCH
 版本:      $PREV → $TAG
 SKILL.md:  $sk
+一致性:    ${drift:-与 $PREV/$NEW 一致}
+附件:      ${#SKILL_FILES[@]} 个 skill 包（*$TAG.tar.gz，git 跟踪内容）
 CHANGELOG: $cl
 变更:      $ncm 个提交
 EOF
@@ -301,6 +332,14 @@ dry_print
 
 [[ $DRY -eq 1 ]] && { ok "dry run 结束 — 未做任何改动"; exit 0; }
 confirm
+
+step "检查版本一致性"
+if drift="$(version_drift)" && [[ -n "$drift" ]]; then
+  fail "SKILL.md 版本与本次发布（${NEW}）不一致，拒绝覆盖："
+  printf '%s\n' "$drift" | sed 's/^/  │ /'
+  die "先把 SKILL.md 的 version 同步为 ${NEW}（或改用显式版本号），再重试"
+fi
+ok "版本一致性检查通过（SKILL.md 已同步 ${PREV} 或 ${NEW}）"
 
 step "写入 CHANGELOG"
 if [[ $NEXIST -eq 1 ]] && grep -Fq "## [$NEW] - " "$CHANGELOG" 2>/dev/null; then
@@ -348,12 +387,24 @@ if [[ $PUSHED -ne 1 ]]; then
 elif [[ "$ORIGIN" != *github.com* ]]; then
   skip "origin 不是 GitHub（${ORIGIN}）— 跳过 Release"
 elif command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  if gh release create "$TAG" --title "Release $NEW" --notes "$NOTES" 2>/dev/null; then
-    ok "已创建 GitHub Release $TAG"
+  BUILDDIR="$(mktemp -d)"
+  trap 'rm -rf "$BUILDDIR"' EXIT
+  ASSETS=(); ANAMES=()
+  for f in "${SKILL_FILES[@]:-}"; do
+    d="$(dirname "$f")"; name="$(basename "$d")"
+    pkg="$BUILDDIR/$name-$TAG.tar.gz"
+    if git ls-files -z -- "$d" | tar --null -T - -czf "$pkg"; then
+      ASSETS+=("$pkg"); ANAMES+=("$name-$TAG.tar.gz")
+    else
+      fail "打包 $name 失败 — 跳过该附件"
+    fi
+  done
+  if gh release create "$TAG" "${ASSETS[@]+"${ASSETS[@]}"}" --title "$TAG" --notes "$NOTES" 2>/dev/null; then
+    ok "已创建 GitHub Release $TAG${ANAMES[*]:+（附件: ${ANAMES[*]}）}"
     RELEASED=1
   else
     warn "gh release 创建失败（tag 已推送，可在 GitHub 页面手建）"
-    warn "手动创建: gh release create $TAG --title \"Release $NEW\" --notes \"$NOTES\""
+    warn "手动创建: gh release create $TAG --title \"$TAG\" --notes \"$NOTES\""
   fi
 else
   skip "未安装/未登录 gh CLI — 跳过 Release（可在 GitHub 页面手建）"
