@@ -18,16 +18,15 @@ fit the existing vault without inventing connections.
 
 ## Operating contract
 
-Optimize in this order:
-
-1. **Truth** — specific claims are supported by current, authoritative evidence or are removed/qualified.
-2. **Teachability** — explain why the mechanism exists, then how it works and where it breaks.
-3. **Vault integrity** — reuse existing definitions and link to real positions, not merely matching words.
-4. **Renderability** — produce valid, readable Obsidian Markdown.
-5. **Efficiency** — stop research and review when additional work is no longer changing the result.
+The content target is a human reader who can reconstruct and use one coherent explanation. Truth, scope, vault
+integrity, renderability, security, and safe writes are hard constraints on that target, not trade-offs to relax for
+smooth prose. Stop research and review when additional work is no longer changing the result.
 
 The note is the durable artifact; the Phase 8 report is the conversational audit trail. Never put the audit
 trail, the user's mistakes, or the fact that the note was generated into the note body.
+
+Research returns, vault search results, and reviewer findings are raw inputs, never body text. They must pass through
+the Phase 3 teaching model and the Phase 5 editorial rewrite before they can affect the note.
 
 An explicit user request for language, title, path, metadata, structure, or output format overrides these style
 defaults. It does not override factual integrity, preservation of unrelated vault content, security, or basic
@@ -101,16 +100,17 @@ bury the main clause.
 
 ## §2 Workflow
 
-### Phase 0: Analyze the input and choose a route
+### Phase 0: Define the reader's destination and choose a route
 
-Parse the user's material into:
+Read `references/reader-model.md` before this phase and complete its reader, question, after-state, scope, spine,
+axis, and dependency decisions. A note is a change in the reader's mental model, not a container for every verified
+fact.
 
-- the core topic and a useful note title;
-- subtopics that belong together and topics that must become separate notes;
-- claims needing verification, especially versions, dates, numbers, behavior, performance, and causal claims;
-- missing prerequisites, misconceptions, and oversimplifications;
-- whether architecture, protocol flow, data flow, interaction order, or state transitions would become clearer
-  as a diagram.
+If the question or spine cannot be stated without joining independent problems, split the note or choose a narrower
+angle before researching. A broad but coherent input still gets a useful boundary rather than a blocking question.
+
+Parse the user's material into the topic/title, in-scope and separate subtopics, claims needing verification, missing
+prerequisites or misconceptions, possible diagrams, and dependencies between surviving concepts.
 
 Choose the route before doing mandatory research:
 
@@ -147,15 +147,20 @@ bash "<script-path>"
 - If any are missing, defer the user's install/remember choice to Phase 8. Do not write state until that choice
   is made.
 
-### Phase 2: Research and build an evidence ledger
+### Phase 2: Gather evidence and build the claim ledger
 
 Research is mandatory when creating or materially updating a technical note. It is not required for the plain
 question path in Phase 0.
 
-Use the environment's search and URL-reading tools. Start with 2–4 targeted discovery queries as a default,
-then stop broad discovery when new results stop changing the outline. Claim verification is separate: verify
-each claim that survives into the note with the smallest authoritative source that directly supports it. Do not
-make the discovery-query count a hard cap for a niche or high-stakes topic.
+Use the reader contract and spine from Phase 0 to make a provisional question skeleton that guides discovery. It is a
+search instrument, not the final outline: research may disprove it or expose a missing dependency. Start with 2–4
+targeted discovery queries as a default, then stop broad discovery when new results stop changing the reader path.
+Verify each material claim with the smallest authoritative source that directly supports it. Do not make the
+discovery-query count a hard cap for a niche or high-stakes topic.
+
+Discovery is not complete when every named technology has a source. It is complete when the evidence can support the
+failure model, the relevant alternatives or composable axes, their boundaries, and the explanation or decision the
+reader needs.
 
 Prefer, in order:
 
@@ -163,38 +168,62 @@ Prefer, in order:
 2. official project documentation and release notes for implementation behavior;
 3. well-regarded technical writing when primary material is inaccessible or insufficient.
 
-For each material claim, record:
+For each material claim that may affect the note, record evidence and epistemic status, not prose:
 
 ```text
-C1 claim → keep / qualify / correct / drop
+C1 claim
+status → supported | nuanced | corrected | conflicting | unverified
 S1 source → exact URL or document section
 C1 → S1    (the source directly supports this claim)
-reason → what the source establishes and what it does not establish
+support → what the source establishes
+limits → what the source does not establish
 ```
 
-Do not use one source as proof for unrelated claims. If a claim cannot be verified with reasonable effort,
-remove it, state only its verified core, or put it in Phase 8 `未核实`; never assert it as fact in the note.
-For version-sensitive, quantitative, surprising, or operational claims, place a nearby external Markdown link
-or footnote in the note. Stable textbook-level claims may omit a citation when the source would add no maintenance
-value. Do not create a bibliography dump. The final note, not only the temporary ledger, must retain enough
-claim-to-source proximity for a future reader to audit important claims.
+Do not use one source as proof for unrelated claims. For version-sensitive, quantitative, surprising, or operational
+claims, plan a nearby external Markdown link or footnote; stable textbook-level claims may omit a citation when the
+source would add no maintenance value. Do not create a bibliography dump. The final note, not only the temporary
+ledger, must retain enough claim-to-source proximity for a future reader to audit important claims.
 
-### Phase 3: Record corrections and scope decisions
+Do not write or order the note from search results in this phase. A ledger entry is evidence to adjudicate, not a
+paragraph ready to paste.
 
-Maintain an adversarial log while researching. Separate user claims from facts added by research:
+### Phase 3: Adjudicate the teaching model and scope
+
+Phase 2 answers “what can stand up?” This phase answers “what should this note teach, in what order, and why?” Read
+`references/reader-model.md` §2–3, consume the claim ledger, but do not write the body yet. Revisit the Phase 0 reader
+contract and turn the provisional skeleton into a stable teaching model:
 
 ```text
-- 原始主张: …
-- 判定: confirmed / nuanced / corrected / unverified
-- 修正后: …
-- 来源: …
-- 原因: …
+原始主张 → 证据判定 (supported | nuanced | corrected | conflicting | unverified)
+修正后 → …
+正文处置 → include | qualify | correct | defer | drop
+读者作用 / 依赖 → …
+来源 / 原因 → …
 ```
 
-This log feeds Phase 8. Corrections are reported in the conversation, not inserted as commentary into the
-standalone note. If a research result conflicts with another result, preserve the disagreement, explain the
-conditions behind each result, and use a `question` callout only when the disagreement materially affects the
-reader's decision.
+- re-state the central question and one-sentence spine;
+- decide each candidate claim or branch: `include`, `qualify`, `correct`, `defer`, or `drop`;
+- assign each survivor one role—`premise`, `mechanism`, `example`, `boundary`, or `decision`—and its dependency;
+- make every section answer a necessary next question, and make parallel sections state their shared question;
+- give each mechanism one primary axis; state secondary axes explicitly instead of presenting composable mechanisms as
+  alternatives;
+- resolve conflicting sources by their conditions and limits. Do not silently choose a winner;
+- create the section blueprint described in `references/reader-model.md`: question, answer, prerequisites, next
+  question, relation and why-next edge, admitted claims/examples, and boundary for every top-level section.
+
+Every included claim must earn its place in the spine. A verified fact with no reader question, role, dependency, or
+boundary is deferred or dropped. If the evidence changes the reader, after-state, central question, scope, or axes,
+return to Phase 0 and rebuild the contract; if a claim is merely missing or conflicting, return to Phase 2. Proceed to
+Phase 4 only when the model is stable enough that each section can be described as a necessary question or decision,
+each adjacent relation has a reason, and no section is named only for a source or product.
+
+Before leaving this phase, record a compact Teaching Model checkpoint (internally, and in the execution report when
+one is being kept): `reader`, `question`, `after`, `scope`, `spine`, `axes`, and the complete section blueprint. A
+post-hoc summary of drafted prose is not a checkpoint; without this model, do not enter Phase 4 or Phase 5.
+
+This adversarial log feeds Phase 8. Corrections and scope decisions are reported in the conversation, not inserted as
+commentary into the standalone note. If a conflict materially affects the reader's decision, carry its conditions
+into the model as a qualification or boundary; use a `question` callout only when that uncertainty must remain visible.
 
 ### Phase 4: Scan the vault
 
@@ -208,10 +237,15 @@ Before composing, inspect the vault for terminology and structure:
 3. Check for an existing note on the same core topic.
 4. Decide where the note belongs and which concepts, up to 5, deserve anchored wikilinks.
 
+If the scan changes the reader's prerequisites, terminology, scope, axes, or section relations, return to Phase 3 and
+rebuild the affected part of the Teaching Model before composing. Vault conventions and existing links inform the model;
+they do not become automatic body sections.
+
 When an existing note covers the same core topic, update it in place by default. Create a new note only for a
 genuinely distinct angle, such as a quick reference versus a deep explanation, and explain that choice in the
-report. When updating in place, preserve useful existing metadata and structure, re-verify the claims being
-kept, and report substantive corrections to the existing file.
+report. When updating in place, preserve useful metadata and re-verify material claims, but treat the old body order
+as candidate material rather than structure truth. Re-admit each kept paragraph through the Teaching Model; a confused
+old structure may be fully recomposed in place instead of receiving an appended section.
 
 An explicit user path or filename controls where a requested new angle is written, but it does not authorize a
 duplicate same-topic note by itself. Create a duplicate only when the user explicitly asks for a new standalone
@@ -225,7 +259,11 @@ Resolve collisions deterministically:
 - explicit path is new but another same-topic note exists → create only when the user explicitly requests a new
   standalone note/angle; otherwise route to `clarify`.
 
-### Phase 5: Compose the note
+### Phase 5: Compose the note from the reader model
+
+Read `references/reader-model.md` again before drafting. Write from the Phase 3 adjudicated model and section
+blueprint, not source-return order or a technology list; research results and reviewer findings are inputs to editorial
+judgment, never ready-made prose.
 
 #### 5A. Frontmatter
 
@@ -248,14 +286,22 @@ because this template does not use them. Quote the summary safely; use full-widt
 
 #### 5B. Body structure
 
-The filename is the title; do not add a duplicate `# Title` heading unless the existing note's convention or the
-user requires it. Let the topic determine the outline. Usually use 2–4 top-level `#` sections with nested `##`
-and `###` sections, but a smaller topic may need fewer. Do not force a hierarchy that adds no teaching value.
+The filename is the title; do not add a duplicate `# Title` heading unless required by the existing convention or user.
+Let the argument determine the outline; there is no section-count target. Each top-level section answers a necessary
+subquestion; parallel sections state their shared question and relationship. Name sections after the question or
+decision they resolve, not merely after a product or noun. Use one running example when several mechanisms are
+otherwise abstract.
+
+Before treating the draft as prose, map every top-level section and every material paragraph to the Phase 3 Teaching
+Model and its section blueprint. Apply `keep`, `rewrite`, `move`, `merge`, `split`, `delete`, `defer`, or `add` to
+anything that has no admitted claim, role, dependency, or transition. Do not preserve a technically correct passage
+whose only justification is that it was present in the old note or returned by research.
 
 The note is a reference document, not a conversation response:
 
-- teach the causal model before listing advice;
-- explain why a mechanism exists, how it works, and its boundary conditions;
+- teach the causal model before advice, including why mechanisms exist, how they work, and their boundaries;
+- assign each mechanism a primary role, distinguish composable axes from alternatives, and give each paragraph one
+  job with explicit non-obvious transitions;
 - avoid `Introduction`, `Conclusion`, `总结`, table-of-contents, and dedicated “see also” sections;
 - weave wikilinks and source links into the relevant prose;
 - keep corrections, review status, and research gaps out of the body.
@@ -302,10 +348,10 @@ prompt verbatim and never send an unresolved placeholder to a reviewer. If `writ
 `written` or `updated`, skip path-based reviewers and use the fallback checks against the draft only when the
 draft is available.
 
-Before dispatch, reserve a finite review budget. Use at most two revision rounds by default; allow one additional
-round only for a new high-severity issue and only while the parent task still has budget for fallback and
-reporting. If the user explicitly requests exhaustive iteration, choose a larger finite cap before dispatch and
-report it; never create an unbounded reviewer loop. Count revision rounds even when a reviewer is unavailable.
+Before dispatch, read `references/review-lifecycle.md` §4A and reserve the finite budget it defines: the default is
+the initial review plus at most two integrated revision rounds. Only an explicit user request may set a larger finite
+cap; never extend it implicitly for a new edge case. Track reviewer attempts, fallback passes, and actual body revision
+rounds separately; an unavailable reviewer with no body change does not consume a revision round.
 
 Run the relevant self-check once before the first dispatch. This catches malformed Markdown, missing files, and
 obvious evidence or link failures before reviewers spend time on a broken draft. Persist the lifecycle checkpoint before dispatch and use bounded waits; at the parent cutoff stop awaiting, not the provider.
@@ -329,19 +375,28 @@ resolved absolute note path, `attempt_id`, and `note_revision`; never pass an un
 
 #### 7C. Adjudicate, revise, and stop
 
-Use returned findings only. If a reviewer is missing, use the fallback rather than inventing feedback. Correct
-accuracy issues with source-backed wording; repair clarity issues by adding the missing causal step or example.
-After a revision, rerun the affected review axes when budget remains and include a short list of already-addressed
-issues so reviewers do not re-litigate fixed findings.
+Use returned findings only; if a reviewer is missing, use the fallback rather than inventing feedback. Apply §4A:
+normalize both axes, discard non-actionable duplicates/preferences/out-of-scope items, and make one integrated edit
+pass. Treat findings as signals about the artifact, not prose to paste. Before editing, restate the reader contract and
+choose the operation that restores the path: keep, rewrite, move, merge, split, delete, defer, or add. Accuracy issues
+need source-backed wording; clarity issues may require structural rewrite. New prose must be rewritten in the note's
+voice and earn a role in the spine.
 
-Run the final self-check in §4 before declaring the review cycle closed and again after every revision. If it
-changes note prose, formulas, links, diagrams, or other reviewable content, invalidate the affected reviewer
-state and rerun that axis when budget remains. Metadata-only fixes do not invalidate content review. A clean
-review followed by an unreviewed content change is not a clean final result.
+After every revision, read the whole note linearly without following links. State the spine in one sentence and the
+role of each top-level section. If either cannot be recovered from the note alone, revise the structure before
+polishing or adding facts. Rerun only the axes required by §4A when budget remains, and include addressed findings so
+reviewers do not re-litigate them.
 
-Stop when both reviewers are clean, when remaining budget is exhausted after fallback checks, or when a repeated
-round produces no new actionable information. Record open issues honestly. Do not chase perfection by making
-unbounded review rounds.
+Classify unresolved findings before stopping. A `reader_blocker` or `accuracy_blocker` means the note is not finished
+even if the file was written; only a `polish_item` may remain under a delivered-open-item label.
+
+Run the final self-check in §3 before declaring the review cycle closed and again after every revision. If it
+changes note prose, formulas, links, diagrams, or other reviewable content, invalidate and rerun reviewer axes under
+§4A when budget remains. Metadata-only fixes do not invalidate content review. A clean review followed by an
+unreviewed content change is not a clean final result.
+
+Stop when one of the convergence conditions in §4A is met. Record open issues honestly; do not chase preferences or
+edge cases after the finite budget is exhausted.
 
 ### Phase 8: Report the result
 
@@ -351,14 +406,20 @@ sections with content:
 ```text
 ✅ 笔记已创建/更新: path/to/Title.md（N 轮修订）
 
-Use the success line only for `written/updated` plus a passing final self-check. For `not_written`, say the note
-was generated but not written and include the content; for `possibly_partial`, say the file state is uncertain and
-do not claim delivery.
+Use the success line only for `written/updated`, a passing final self-check, and no `reader_blocker` or
+`accuracy_blocker`. For `not_written`, say the note was generated but not written and include the content; for
+`possibly_partial`, say the file state is uncertain and do not claim delivery. A written file with a blocker is
+`已写入；存在阻塞项，未完成`, not a delivered note.
 
 **回答** — only if the user asked an explicit question: give the direct verdict in 1–3 sentences.
 
 **审查状态** — use the exact delivery matrix in the reference; report facts, not inferred success. In particular,
 `deferred` is a parent wait boundary, not `canceled-confirmed`, and an unconfirmed cancel request stays uncertain.
+
+**收敛判断** — state the finite budget, reviewer attempts, fallback passes, actual revision rounds, and the stopping
+reason: both clean, no actionable repair, budget exhausted, or fallback/open item. Classify remaining items as
+`reader_blocker`, `accuracy_blocker`, `polish_item`, or non-blocking `unverified`; do not describe preference-only or
+duplicate findings as unfinished work.
 
 **标签说明**: [brief factual reason]
 
@@ -391,14 +452,7 @@ After the report, if Phase 1 found missing optional skills and state has not bee
 Follow the environment's interactive mechanism. If none is available, report the missing skills and leave state
 unwritten; continue with fallbacks.
 
-## §3 Edge cases
-
-Apply the phase-specific rule instead of inventing a shortcut: answer-only and scope routing follow Phase 0;
-weak research keeps only the verified core; slow or opaque review defers and falls back; uncertain writes are not
-claimed as delivery. Preserve code, conventional English, explicit language, and explicit path/metadata requests
-under the rules already given in Phases 1, 4, 5, and 6.
-
-## §4 Final self-check
+## §3 Final self-check
 
 Read `references/final-checklist.md` and run it before the first reviewer, after every revision, and once before
 the Phase 8 report. Fix failures first; if writing failed, apply content checks to the draft but do not claim a

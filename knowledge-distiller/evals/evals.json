@@ -143,6 +143,37 @@
         "The report treats mechanical link validity and semantic link justification as separate checks",
         "Unavailable external reviewers are reported as manual fallback rather than as dual-reviewer approval"
       ]
+    },
+    {
+      "id": 8,
+      "prompt": "/knowledge-distiller 检索增强生成与知识库基础设施 我在理解 RAG：LLM 的参数知识不会自动更新，也不天然包含私有资料，所以要先从知识库检索，再把证据放进上下文让模型生成答案。现在我又看到分块、稠密检索、BM25、混合检索、重排序、Contextual Retrieval、RAPTOR、GraphRAG、OpenViking 和 Agentic RAG，但不知道它们到底是替代关系、组合关系，还是分别修复不同问题。请把它整理成一篇真正能让我学明白的中文 Obsidian 笔记，重点讲清楚扁平文本块会丢失什么信息、每种方法补回什么、代价是什么，以及应该如何选择；不要写成技术名词目录。",
+      "expected_output": "A Chinese Obsidian note that teaches one coherent RAG mental model, distinguishes composable axes from alternatives, and connects each advanced technique to a specific retrieval or context failure instead of listing products",
+      "files": [],
+      "expectations": [
+        "The note has one recoverable central question or thesis and a causal spine from RAG's purpose through failure modes to design choices",
+        "Chunking, dense/sparse/hybrid retrieval, reranking, contextual enrichment, hierarchical/graph/filesystem representations, and agentic orchestration are placed on distinct or explicitly composable axes",
+        "Each named technique is introduced because it addresses a concrete information or query failure and includes its relevant trade-off",
+        "The note does not present all named techniques as mutually exclusive alternatives or as an unconnected product catalog",
+        "A linear reader can explain why the next major section is necessary without following wikilinks",
+        "Every top-level section has a necessary question, answer, and transition; a section is not present merely because a source or product was found",
+        "If a comparison table groups methods from different axes, it gives each method an explicit primary role instead of hiding the axis conflict under one row",
+        "The note remains subject to the existing frontmatter, Chinese prose, evidence, anchored wikilink, and safe-review rules"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "/knowledge-distiller 请把下面这些研究返回整合成一篇笔记，而不是逐条粘贴：1. 混合检索把 dense embedding 和 BM25 结合，能同时覆盖语义改写和精确术语。2. RAPTOR 用聚类和递归摘要建立树状索引，适合主题概括但摘要可能遗漏事实。3. GraphRAG 抽取实体、关系和社区报告，适合多跳与全局问题，但抽取错误会传播。4. OpenViking 用目录、L0/L1/L2 和路径组织资源、记忆、技能，适合 Agent 按需浏览。5. Agentic RAG 让模型反复改写查询和调用检索工具，代价是更多延迟。要求重建解释顺序，删掉不服务主线的细节，并让读者明白这些方法如何组合。",
+      "expected_output": "A Chinese Obsidian note that editorially rewrites and reorders research fragments into a coherent explanation, explicitly rejecting mechanical append-only integration",
+      "files": [],
+      "expectations": [
+        "The output is rewritten as a unified explanation with transitions, not five research fragments pasted in their input order",
+        "The note states which methods operate on representation, retrieval, context navigation, or query orchestration and does not imply false replacement relationships",
+        "At least one explicit scope or pruning decision is visible through omission or synthesis of non-load-bearing details",
+        "The note explains a common failure model before introducing the named methods and ends with a usable selection or composition rule",
+        "Each surviving research fragment is rewritten into a section or paragraph role in the teaching model; unsupported or non-load-bearing fragments are omitted rather than appended",
+        "The note has a recoverable teach-back: one spine, the question answered by each major section, and what the reader can explain, predict, or choose afterward",
+        "The note passes the existing Chinese prose, frontmatter, evidence, anchored-link, and review lifecycle requirements"
+      ]
     }
   ]
 }

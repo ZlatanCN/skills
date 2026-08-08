@@ -7,6 +7,15 @@ can spawn reviewers or expose asynchronous provider requests.
 **Core invariant:** the parent wait budget is a scheduling boundary, not a subagent execution deadline. Reaching
 that boundary does not prove that the provider is stuck and does not authorize cancellation by itself.
 
+## Contents
+
+1. State separation and attempt identity (§1–2)
+2. Execution states and liveness evidence (§3–3A)
+3. Result protocol and convergence budget (§4–4A)
+4. Parent waiting and retries (§5)
+5. Fallback and delivery matrix (§6–7)
+6. Reviewer prompts (§8)
+
 ## 1. Keep four concerns separate
 
 Do not compress these into one `timeout` flag:
@@ -33,6 +42,7 @@ note_path      → absolute path the reviewer was instructed to read
 provider_operation_id → provider-side operation ID, when one exists
 observability  → opaque | client-only | provider-observed | provider-terminal
 parent_cutoff  → when the parent stops waiting for this cycle
+review_attempts / fallback_passes / revision_rounds → separate counters
 ```
 
 Resolve the note path before dispatch. Do not merge a late result into a newer revision or a new attempt. A late
@@ -108,26 +118,87 @@ the provider is healthy; it is refusing to claim a fact the observability bounda
 
 ## 4. Result protocol
 
-A reviewer is `clean` only if it returns a complete result for the exact `attempt_id` and `note_revision`:
+A reviewer is `clean` only if it returns the exact axis-specific result below for the exact `attempt_id` and
+`note_revision`:
+
+Clarity result:
 
 ```text
-axis: clarity | accuracy
+axis: clarity
 attempt_id: …
+note_revision: …
 note_path: …
-checklist:
-  clarity: C1 … C5, each finding or —
-  accuracy: A1, finding or —
+C1: …
+C2: …
+C3: …
+C4: …
+C5: …
+teach_back:
+  spine: …
+  section_roles: …
+  after_state: explain | predict | choose | not_reached, with a brief reason
+result: clean | findings | protocol_invalid
+```
+
+Accuracy result:
+
+```text
+axis: accuracy
+attempt_id: …
+note_revision: …
+note_path: …
+A1: …
+claims_checked: …
+source_coverage: complete | partial
+unverified: …
 result: clean | findings | unverified | protocol_invalid
 ```
 
-For clarity, the checklist items are C1–C5: undefined formula symbols; material terms used too early; sentences
-with three or more unexplained material terms; mechanisms without design rationale; and the likeliest reader
-blockage. For accuracy, the checklist is A1: inspect every factual claim and source support, marking uncertain
-claims `unverified`.
+For a clarity result, `C1`–`C5` and `teach_back` are required; `claims_checked`, `source_coverage`, and `unverified`
+are not applicable and may be omitted. The checklist items are undefined formula symbols; material terms used too early;
+sentences with three or more unexplained material terms; mechanisms without design rationale; and the end-to-end reader
+path (central question, section dependencies, scope, orphan material, and incomparable alternatives). For an accuracy
+result, `A1`, `claims_checked`, `source_coverage`, and `unverified` are required; `C1`–`C5` and `teach_back` are not
+applicable and may be omitted. `A1` inspects every factual claim and source support.
 
-`No issues` is valid only when every required checklist item is present and has no finding. Missing items,
-wrong path, wrong revision, vague praise, or inability to read the note means `protocol_invalid`, followed by the
-manual fallback. A reviewer that returns `protocol_invalid` is not clean.
+For the clarity axis, `teach_back` is required: it is a blind read of what the note actually lets a reader explain,
+predict, or choose, not a restatement of the author's intention. Compare it with the Phase 0 after-state; a polished
+spine that does not reach that after-state is an actionable clarity finding. For accuracy, `result: clean` additionally
+requires `source_coverage: complete` and `claims_checked` to cover every material claim; partial coverage is
+`unverified`, not clean. `No issues` is valid only when every required checklist item is present and has no finding.
+Missing items,
+wrong path, wrong revision, vague praise, incomplete claim/source coverage, or inability to read the note means
+`protocol_invalid`, followed by the manual fallback. A reviewer that returns `protocol_invalid` is not clean.
+
+## 4A. Convergence and revision budget
+
+Review is a bounded diagnosis loop, not an open-ended search for imperfections. Reserve the budget before dispatch:
+the default is the initial review plus at most two integrated revision rounds. Only an explicit user request may set a
+larger finite cap; a high-severity finding does not silently extend it. Track `review_attempts`, `fallback_passes`, and
+`revision_rounds` separately: reviewer waiting, an unavailable result, or a fallback with no body change does not
+consume a revision round. If a material non-blocking issue remains at the cap, deliver with an honest open item; a
+`reader_blocker` or `accuracy_blocker` stops delivery according to §7.
+
+Normalize both axes' returns before editing. A finding is `actionable` only when it has an exact passage or a structural
+locator (`before_heading`, `after_heading`, `missing_relation`), evidence or a concrete correction, and would materially
+change truth, the reader's model, scope, or a safety boundary. Duplicate,
+preference-only, out-of-scope, unsupported, or already-addressed findings are recorded and do not start a round.
+Hard-gate failures in truth, links, writes, permissions, or security remain self-check failures; the finite review
+budget never turns them into acceptable open items.
+
+Classify a remaining actionable finding as `reader_blocker` when the spine, after-state, section relation, prerequisite
+order, scope, or axis distinction is broken; classify it as `accuracy_blocker` when a material claim is false,
+unverified, or materially mis-scoped. Local wording, optional examples, and preferences are `polish_item` and may be
+reported without blocking delivery.
+
+Adjudicate the two axes together and make one integrated edit pass per round. Do not run one round per finding, paste
+reviewer prose, or ask a reviewer to rewrite the note. If no body change is made, do not increment `note_revision` or
+start another review. A structural change, deletion, reordering, or material claim correction reruns both axes; a truly
+local wording change reruns the affected axis, and uncertainty reruns both.
+
+Close the cycle when both valid results are clean, when fallback leaves no actionable repair within the budget, when a
+round produces no new actionable information, or when the budget is exhausted. A late result belongs to its original
+attempt and cannot reopen a closed revision.
 
 ## 5. Parent waiting and retries
 
@@ -156,12 +227,17 @@ Do not reopen a closed revision because a late result arrives.
 ## 6. Manual fallback
 
 For every axis that is not `completed` with a valid result, record `manual_checked` and perform the same checklist
-against the Phase 2 evidence. Manual checking can repair the note and can establish that delivery is reasonable;
+against the Phase 2 evidence and Phase 3 teaching model. Manual checking can repair the note and can establish that
+delivery is reasonable;
 it cannot become a reviewer `clean` result.
 
-If a repair changes note prose, formulas, links, or diagrams, increment `note_revision`, invalidate reviewer
-results for the changed axis, and start a new cycle only if the finite review budget allows it. Metadata-only
-changes do not invalidate content review.
+The fallback record must include the clarity teach-back (recovered spine, section roles, and reached after-state), the
+accuracy coverage (claims checked, source coverage, and unverified claims), each C1–C5/A1 outcome that applies, and any
+`reader_blocker`, `accuracy_blocker`, or `polish_item`. `manual_checked` without these observations is incomplete.
+
+If a repair changes note prose, formulas, links, or diagrams, increment `note_revision` and invalidate reviewer
+results according to §4A's local-versus-structural rule; start a new cycle only if the finite review budget allows it.
+Metadata-only changes do not invalidate content review.
 
 For any axis that is not a valid completed result, the Phase 8 report must include both `execution_state` and
 `observability`: what the parent observed, what the provider exposed (if anything), whether cancellation was
@@ -186,14 +262,16 @@ Use these final delivery labels:
 | --- | --- |
 | `written/updated` + self-check pass + both valid reviewer results clean + no open items | `双轴审查通过` |
 | `written/updated` + self-check pass + missing axes manually checked + no open items | `已交付；部分审查由人工复核` |
-| `written/updated` + self-check pass + unresolved or unverified items | `已交付；存在未决项` |
+| `written/updated` + self-check pass + only `polish_item` or non-blocking unverified items | `已交付；存在未决项` |
+| `written/updated` + self-check pass + any `reader_blocker` or `accuracy_blocker` | `已写入；存在阻塞项，未完成` |
 | `written/updated` + self-check failed | `文件已写入；自检未通过，未宣称交付` |
 | `unchanged` | `更新未写入；原文件已保留` |
 | `not_written` | `内容已生成但未写入` |
 | `possibly_partial` | `文件状态不确定，未宣称交付` |
 
 Only the first row may be called `双轴审查通过`. A clean reviewer result cannot override a failed self-check,
-an uncertain write, an open accuracy item, or a missing review axis.
+an uncertain write, an open accuracy blocker, a reader blocker, or a missing review axis. A written file with a blocker
+is not a delivered note.
 
 ## 8. Reviewer prompts
 
@@ -207,13 +285,21 @@ attempt_id: <attempt-id>
 note_revision: <note-revision>
 note_path: <vault-path>/<area>/<filename>.md
 
-You are a junior engineer learning this topic. Treat your own prior knowledge of this topic as near-zero and judge whether the note alone lets you follow along. Report only concrete findings and quote the exact passage for each:
+You are a human reader learning this topic. Treat your own prior knowledge as near-zero and judge whether the note
+alone lets you reconstruct and use one coherent model. First state the `teach_back`: the spine you recovered in one
+sentence, what question each top-level section answers, and what the reader can now explain, predict, or choose. Then
+report only concrete findings and quote the exact passage for each:
 - C1: every symbol in a formula/equation that is never defined;
 - C2: every material technical term used before it is defined, anchored to a defining vault position, or used as a common English fixture;
 - C3: any sentence containing 3 or more unexplained material technical terms;
 - C4: any mechanism or behavior stated without explaining why it is designed that way;
-- C5: the single section where a reader is most likely to get stuck and the missing prerequisite.
-Return all five labels, using “—” for an item with no finding, followed by `result: clean` or `result: findings`. Preserve the metadata above exactly. Do not give vague praise. Say `result: clean` only when every item has no finding.
+- C5: every end-to-end break: a missing central question or transition, a section that is not needed for the next
+  section, an orphan fact or branch, a comparison of different axes as alternatives, a prerequisite introduced after
+  its dependent idea, or an after-state the note does not actually enable. Quote the smallest passage that proves a
+  local break; for a missing edge between sections, give `before_heading`, `after_heading`, and the missing relation.
+Return the `teach_back`, all five labels using “—” for an item with no finding, followed by `result: clean` or
+`result: findings`. Preserve the metadata above exactly. Do not give vague praise. Say `result: clean` only when every
+item has no finding and the teach-back reaches the reader's usable model.
 ```
 
 ### Accuracy reviewer
@@ -224,5 +310,11 @@ attempt_id: <attempt-id>
 note_revision: <note-revision>
 note_path: <vault-path>/<area>/<filename>.md
 
-You are an expert in this field. Check every factual claim. For A1, quote the exact claim for each problem, state the correction or missing nuance, and cite a source you can actually stand behind. If a claim cannot be verified with confidence, mark it “unverified” instead of guessing. Return `A1: —` only when every claim is accurate and properly scoped; otherwise return each finding under A1, followed by `result: clean`, `result: findings`, or `result: unverified`. Preserve the metadata above exactly.
+You are an expert in this field. Check every factual claim, including claims in tables, callouts, diagrams, and
+examples. For A1, quote the exact claim for each problem, state the correction or missing nuance, and cite a source you
+can actually stand behind. Return `claims_checked: N` (or the checked claim IDs), `source_coverage: complete` only when
+the review covered every material claim and its needed source support, and list any `unverified` claims. If a claim
+cannot be verified with confidence, mark it “unverified” instead of guessing. Return `A1: —` and `result: clean` only
+when every claim is accurate, properly scoped, and covered; otherwise return each finding under A1, followed by
+`result: findings` or `result: unverified`. Preserve the metadata above exactly.
 ```
