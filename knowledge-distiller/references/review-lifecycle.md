@@ -1,281 +1,277 @@
 # Review Lifecycle for Knowledge Distiller
 
-This reference defines the review gate as a best-effort dependency. It protects the parent workflow from a slow
-or failed reviewer without treating a missing result as approval. Read it before Phase 7 whenever the environment
-can spawn reviewers or expose asynchronous provider requests.
+This reference defines the optional read-only review dependency. Review increases confidence; it never authorizes a
+write, repairs a failed hard gate, or turns missing evidence into approval. The parent workflow's canonical state
+model in `SKILL.md` is authoritative. This document supplies the event protocol, reviewer payloads, fallback, and
+delivery vocabulary that Phase 7 needs.
 
-**Core invariant:** the parent wait budget is a scheduling boundary, not a subagent execution deadline. Reaching
-that boundary does not prove that the provider is stuck and does not authorize cancellation by itself.
+## 1. The contract in one view
 
-## Contents
-
-1. State separation and attempt identity (§1–2)
-2. Execution states and liveness evidence (§3–3A)
-3. Result protocol and convergence budget (§4–4A)
-4. Parent waiting and retries (§5)
-5. Fallback and delivery matrix (§6–7)
-6. Reviewer prompts (§8)
-
-## 1. Keep four concerns separate
-
-Do not compress these into one `timeout` flag:
-
-1. **Write state** — whether the note was safely written or updated.
-2. **Self-check state** — whether the artifact passed local checks.
-3. **Reviewer execution state** — whether a reviewer is running, unknown, failed, deferred, or
-   `canceled-confirmed`.
-4. **Reviewer quality result** — whether that reviewer returned clean findings, actionable findings, or an
-   incomplete result.
-
-The final delivery state is a tuple of these values, not a guess derived from elapsed time.
-
-## 2. Identify every attempt
-
-For each review cycle, record internally:
+Every review axis is tracked as a tuple, not as one timeout or one `reviewer_state` field:
 
 ```text
-cycle_id       → one note revision and its review cycle
-axis           → clarity or accuracy
-attempt_id     → unique ID for this reviewer invocation
-note_revision  → revision number read by the attempt
-note_path      → absolute path the reviewer was instructed to read
-provider_operation_id → provider-side operation ID, when one exists
-observability  → opaque | client-only | provider-observed | provider-terminal
-parent_cutoff  → when the parent stops waiting for this cycle
-review_attempts / fallback_passes / revision_rounds → separate counters
+provider_execution_state → pending | active | completed | failed | unknown
+provider_liveness        → unobserved | healthy | suspected_stall | terminal
+parent_wait_state        → waiting | deferred | closed
+cancel_state             → not_requested | cancel_requested | canceled_confirmed | unknown
+quality_result           → clean | actionable | protocol_invalid | unavailable
 ```
 
-Resolve the note path before dispatch. Do not merge a late result into a newer revision or a new attempt. A late
-result belongs to its original `attempt_id`; if the cycle has already closed, record it as late and ignore it for
-the delivered artifact.
+Keep these concerns separate:
 
-Record the evidence behind every state transition, not only the state label: the parent event, provider event or
-heartbeat, status response, cancellation acknowledgement, and their timestamps or sequence IDs when available.
-If there is no provider-side evidence, say `observability: opaque` rather than filling the gap with elapsed time.
+1. `write_status`: whether the note transaction was safely written or updated;
+2. self-check gates: whether the exact artifact passed heading, link, evidence, and preservation checks;
+3. provider execution and liveness: what the provider did and what the parent can observe;
+4. reviewer quality: whether a valid result was returned and what it found;
+5. parent waiting and cancellation: what the parent stopped doing and whether provider termination was confirmed.
 
-Before dispatch, persist a durable review journal checkpoint with the cycle metadata, `state: pending`, and the
-observability boundary. Append each dispatch, wait, result, defer, cancellation request, and fallback transition
-before taking the next action. The final conversational report is not the only record: if the reviewer wait itself
-blocks, the journal must still prove what was known and what was not known.
+`deferred` means only that the parent stopped waiting. It never means provider failure, provider cancellation, or a
+quality pass. `manual_checked` is a fallback result, not `quality_result: clean`.
 
-## 3. Execution states
-
-Use these states exactly when the mechanism exposes enough information:
-
-| State | Meaning | Allowed parent action |
-| --- | --- | --- |
-| `pending` | attempt has not started | start it |
-| `active` | output, heartbeat, or tool progress is observable | wait |
-| `unknown` | request is in flight but liveness is opaque | wait until parent cutoff, then defer |
-| `completed` | final result returned | validate the result protocol |
-| `failed` | explicit unrecoverable failure | fallback; retry only under §5 |
-| `suspected-stall` | liveness evidence indicates recovery is unlikely | status check, then cancel if supported |
-| `deferred` | parent stopped awaiting this attempt | fallback; do not call it a pass |
-| `cancel-requested` | cancel was requested; termination is not confirmed | fallback; report uncertainty |
-| `canceled-confirmed` | the mechanism confirmed termination | fallback; do not call it a pass |
-
-State transitions:
+### 1.1 State transition rules
 
 ```text
-pending → active | failed
+pending → active | failed | unknown
 active → completed | failed | unknown
-unknown → completed | failed | suspected-stall | deferred
-suspected-stall → cancel-requested | deferred
-cancel-requested → canceled-confirmed | unknown
-active/unknown → deferred        (parent cutoff)
+unknown → completed | failed | suspected_stall | deferred
+suspected_stall → cancel_requested | deferred
+cancel_requested → canceled_confirmed | unknown
+active/unknown → deferred                 (parent cutoff; parent_wait_state changes)
+parent_wait_state: waiting/deferred → closed (report closure records the final event; execution state is preserved)
 ```
 
-Wall-clock duration alone never authorizes `suspected-stall` or cancellation. With an opaque provider, use
-`unknown` and later `deferred`; do not manufacture a liveness diagnosis.
+Wall-clock duration, a client timeout, an empty poll, a socket error, or a lost UI update is evidence about the
+client channel only. It may produce `unknown` and then `parent_wait_state: deferred`; it cannot produce `failed`,
+`suspected_stall`, or `canceled_confirmed` by itself.
 
-## 3A. Evidence boundary for liveness
+## 2. Identity and the durable event journal
 
-Separate observations by who can make them authoritative:
+Create a distinct identity for every review invocation:
 
-| Observation | What it proves | What it does not prove |
-|---|---|---|
-| Parent submitted a request | The client attempted dispatch | The provider accepted or is executing it |
-| Client poll/connection is waiting or timed out | The parent cannot observe a result now | Provider failure, provider termination, or cancellation |
-| Provider heartbeat, progress event, status response, or terminal event | Provider-side liveness or an explicit provider state | Quality of the review result |
-| Provider status explicitly says failed/stalled | A provider-reported execution failure | That a cancellation request has terminated the work |
-| Provider cancellation acknowledgement with the same operation ID | Provider-side termination is confirmed | That the review would have been low quality |
+```text
+cycle_id       → one note revision and its integrated review cycle
+axis           → clarity | accuracy
+attempt_id     → unique local identity for this reviewer invocation
+note_revision  → revision read by the attempt
+note_path      → resolved absolute path
+draft_hash     → immutable hash of the exact draft bytes
+client_dispatch_id  → local submission identity before provider acknowledgement
+provider_operation_id → provider identity when provider evidence supplies one
+```
 
-Treat a client-side timeout, socket error, empty poll, or lost UI update as an observation about the client
-channel only. It may transition `active` to `unknown` or let the parent choose `deferred`; it cannot by itself
-produce `failed`, `suspected-stall`, or `canceled-confirmed`.
+`attempt_id` remains stable for the invocation. `client_dispatch_id` and `provider_operation_id` are different fields;
+one never replaces the other. A late result belongs to its original attempt and revision. It cannot be merged into a
+newer revision or a new attempt.
 
-Use `suspected-stall` only when all of these are true:
+Before dispatch, append a durable checkpoint with `state: pending`, the exact path/revision/hash, the axis, the parent
+cutoff, and the observability boundary. `provider_operation_id` may be `pending` until the provider acknowledges the
+request. If no provider request will be made because the capability is unavailable, record the availability decision
+and manual fallback; do not invent a provider result or operation ID.
 
-1. the provider exposes an operation ID and a meaningful status/heartbeat mechanism;
-2. the mechanism previously provided provider-side liveness or an authoritative execution state;
-3. one status check or ping, performed after the no-progress threshold, reports an explicit stalled/failed
-   state or supplies a provider-side termination signal;
+Use an append-only journal. Append every dispatch, provider observation, parent wait, result, defer, retry, fallback,
+revision, cancellation request, cancellation acknowledgement, and close event. A record has this shape:
+
+```text
+{event_id, order, event_type, cycle_id, attempt_id, axis, note_path, note_revision, draft_hash,
+ client_dispatch_id, provider_operation_id, provider_execution_state, provider_liveness,
+ parent_wait_state, cancel_state, quality_result, state_before, state_after, observability,
+ evidence, observed_at}
+```
+
+`order` is monotonic. Acquire a single-writer lock around read-order-increment-append-flush. If the environment cannot
+durably append and flush the pre-dispatch event, do not dispatch an asynchronous reviewer; run the complete manual
+fallback and report `journal_unavailable`. If a post-dispatch append fails, do not relabel the provider as failed or
+canceled: set `provider_execution_state: unknown`, `quality_result: unavailable`, stop new dispatches, and report
+`delivery: review-uncertain`.
+
+Close the report under the same lock. First adjudicate every matching result observed before closure, then append a
+`report_closed` event with the final `cutoff_order`. A result observed after that event is `late_ignored`. If the close
+event cannot be durably flushed, report `report_close_uncertain` and do not claim a clean lifecycle.
+
+Accept a result only when `cycle_id`, `attempt_id`, `axis`, `note_path`, `note_revision`, and `draft_hash` match the
+local envelope. A mismatch, older revision, changed local hash, missing required metadata, or result after closure is
+`protocol_invalid`/`stale`/`late_ignored` as applicable; it cannot change findings, revisions, convergence, or delivery.
+
+## 3. What observations prove
+
+| Observation | It proves | It does not prove |
+| --- | --- | --- |
+| Parent submitted a request | The client attempted dispatch | Provider acceptance or execution |
+| Client poll/connection waits or times out | The parent cannot observe a result now | Provider failure, termination, or cancellation |
+| Provider heartbeat/progress/status/terminal event | Provider-side liveness or an explicit provider state | Review quality |
+| Provider explicitly reports failed/stalled | A provider-reported execution state | That a cancellation request terminated the work |
+| Provider cancellation acknowledgement with matching operation ID | Provider-side termination is confirmed | That the review would have been low quality |
+
+Set `provider_liveness: suspected_stall` only when all conditions hold:
+
+1. the provider exposes an operation ID and meaningful status/heartbeat mechanism;
+2. provider-side liveness was previously observable;
+3. one status check or ping after the no-progress threshold reports an explicit stalled/failed state or termination
+   signal; and
 4. no newer heartbeat, progress event, or terminal result contradicts that signal.
 
-If any condition is missing—especially when the provider is entirely opaque—do not cancel. Keep the attempt
-`unknown`, then mark the parent wait `deferred` at its cutoff and run manual fallback. This is not claiming that
-the provider is healthy; it is refusing to claim a fact the observability boundary cannot establish.
+Otherwise keep the attempt `unknown`, stop the parent at its cutoff with `parent_wait_state: deferred`, and use
+fallback. An opaque provider is not evidence of either health or failure.
 
-## 4. Result protocol
+### 3.1 Cancellation precedence
 
-A reviewer is `clean` only if it returns the exact axis-specific result below for the exact `attempt_id` and
-`note_revision`:
+Cancellation is a separate request and acknowledgement sequence:
 
-Clarity result:
+1. If a completed result event is ordered before the cancellation acknowledgement, accept and validate the completed
+   result; mark the acknowledgement `superseded` and do not set `canceled_confirmed`.
+2. If cancellation is confirmed first, a later completed payload for that attempt is a contradictory provider event;
+   mark `quality_result: protocol_invalid`, not clean.
+3. A client deadline or a request to cancel is never termination confirmation.
+4. Never retry while an attempt is `active`, `unknown`, or `cancel_requested`. A retry after an explicit transient
+   failure gets a new `attempt_id` and is allowed at most once.
+
+Legacy labels may occur in provider payloads, but they are mapped into the tuple above rather than stored as a second
+state machine:
+
+| Legacy label | Canonical mapping |
+| --- | --- |
+| `pending`, `queued` | `provider_execution_state: pending` |
+| `running`, `active` | `provider_execution_state: active` |
+| `completed` | `provider_execution_state: completed` |
+| `failed` | `provider_execution_state: failed`, `provider_liveness: terminal` |
+| `unknown` | `provider_execution_state: unknown` |
+| `deferred` | `parent_wait_state: deferred`; execution remains active or unknown |
+| `suspected-stall` | `provider_liveness: suspected_stall` |
+| `cancel-requested` | `cancel_state: cancel_requested` |
+| `canceled-confirmed` | `cancel_state: canceled_confirmed` |
+
+## 4. Reviewer result protocol
+
+The reviewer reads the exact artifact identified by the envelope. It does not rewrite the note. A result is valid only
+when it preserves the required metadata and uses the axis-specific fields below.
+
+### Clarity result
 
 ```text
 axis: clarity
-attempt_id: …
-note_revision: …
-note_path: …
-C1: …
-C2: …
-C3: …
-C4: …
-C5: …
+attempt_id: <attempt-id>
+note_revision: <note-revision>
+note_path: <absolute-note-path>
+C1: <finding or —>
+C2: <finding or —>
+C3: <finding or —>
+C4: <finding or —>
+C5: <finding or —>
 teach_back:
-  spine: …
-  section_roles: …
+  spine: <one sentence>
+  section_roles: <what each top-level section answers>
   after_state: explain | predict | choose | not_reached, with a brief reason
 result: clean | findings | protocol_invalid
 ```
 
-Accuracy result:
+The clarity checklist is: undefined formula symbols; material terms used too early; sentences with three or more
+unexplained material terms; mechanisms stated without design rationale; and breaks in the end-to-end reader path
+(central question, section dependencies, scope, orphan material, incomparable alternatives, prerequisites, heading
+tree, or after-state). `teach_back` is a blind reconstruction of what the note enables, not praise or author intent.
+
+### Accuracy result
 
 ```text
 axis: accuracy
-attempt_id: …
-note_revision: …
-note_path: …
-A1: …
-claims_checked: …
+attempt_id: <attempt-id>
+note_revision: <note-revision>
+note_path: <absolute-note-path>
+A1: <finding or —>
+claims_checked: <count or checked claim IDs>
 source_coverage: complete | partial
-unverified: …
+unverified: <claims or —>
 result: clean | findings | unverified | protocol_invalid
 ```
 
-For a clarity result, `C1`–`C5` and `teach_back` are required; `claims_checked`, `source_coverage`, and `unverified`
-are not applicable and may be omitted. The checklist items are undefined formula symbols; material terms used too early;
-sentences with three or more unexplained material terms; mechanisms without design rationale; and the end-to-end reader
-path (central question, section dependencies, scope, orphan material, and incomparable alternatives). For an accuracy
-result, `A1`, `claims_checked`, `source_coverage`, and `unverified` are required; `C1`–`C5` and `teach_back` are not
-applicable and may be omitted. `A1` inspects every factual claim and source support.
+The accuracy reviewer checks every material claim, including tables, callouts, diagrams, formulas, examples, and
+operational or quantitative language. `result: clean` requires `A1: —`, complete coverage, every material claim checked,
+and no unverified claim. Partial coverage is `unverified`, not clean. Missing metadata, vague praise, wrong path,
+wrong revision, or inability to read the artifact is `protocol_invalid`.
 
-For the clarity axis, `teach_back` is required: it is a blind read of what the note actually lets a reader explain,
-predict, or choose, not a restatement of the author's intention. Compare it with the Phase 0 after-state; a polished
-spine that does not reach that after-state is an actionable clarity finding. For accuracy, `result: clean` additionally
-requires `source_coverage: complete` and `claims_checked` to cover every material claim; partial coverage is
-`unverified`, not clean. `No issues` is valid only when every required checklist item is present and has no finding.
-Missing items,
-wrong path, wrong revision, vague praise, incomplete claim/source coverage, or inability to read the note means
-`protocol_invalid`, followed by the manual fallback. A reviewer that returns `protocol_invalid` is not clean.
+Normalize reviewer payloads before acting. A `clean` result with findings, partial coverage, or contradictory fields is
+`protocol_invalid`. Preferences, duplicates, unsupported requests, and out-of-scope comments are recorded but do not
+start a revision round.
 
-## 4A. Convergence and revision budget
+## 5. Parent waiting and bounded convergence
 
-Review is a bounded diagnosis loop, not an open-ended search for imperfections. Reserve the budget before dispatch:
-the default is the initial review plus at most two integrated revision rounds. Only an explicit user request may set a
-larger finite cap; a high-severity finding does not silently extend it. Track `review_attempts`, `fallback_passes`, and
-`revision_rounds` separately: reviewer waiting, an unavailable result, or a fallback with no body change does not
-consume a revision round. If a material non-blocking issue remains at the cap, deliver with an honest open item; a
-`reader_blocker` or `accuracy_blocker` stops delivery according to §7.
+Set a parent cutoff that leaves time for fallback checks, final writing, and reporting. Use bounded await segments that
+return before the cutoff; never make an opaque provider call with an unbounded wait.
 
-Normalize both axes' returns before editing. A finding is `actionable` only when it has an exact passage or a structural
-locator (`before_heading`, `after_heading`, `missing_relation`), evidence or a concrete correction, and would materially
-change truth, the reader's model, scope, or a safety boundary. Duplicate,
-preference-only, out-of-scope, unsupported, or already-addressed findings are recorded and do not start a round.
-Hard-gate failures in truth, links, writes, permissions, or security remain self-check failures; the finite review
-budget never turns them into acceptable open items.
+- `active` with provider progress → keep waiting until completion or cutoff;
+- `unknown` at cutoff → set `parent_wait_state: deferred`; do not claim provider failure;
+- explicit provider-side stall evidence → perform one status check, then request cancellation only if supported;
+- cancellation without provider acknowledgement → `cancel_state: unknown`, fallback, and report uncertainty;
+- explicit transient provider failure → retry at most once with a new attempt when duplicate review is safe;
+- any other unavailable axis → manual fallback; do not call it a reviewer pass.
 
-Classify a remaining actionable finding as `reader_blocker` when the spine, after-state, section relation, prerequisite
-order, scope, or axis distinction is broken; classify it as `accuracy_blocker` when a material claim is false,
-unverified, or materially mis-scoped. Local wording, optional examples, and preferences are `polish_item` and may be
-reported without blocking delivery.
+Reserve the convergence budget before dispatch: the initial review plus at most two integrated body-revision rounds.
+Track `review_attempts`, `fallback_passes`, and `revision_rounds` separately. Waiting, an unavailable result, or a
+fallback with no body change does not consume a revision round. Only an explicit user request may enlarge the finite
+cap.
 
-Adjudicate the two axes together and make one integrated edit pass per round. Do not run one round per finding, paste
-reviewer prose, or ask a reviewer to rewrite the note. If no body change is made, do not increment `note_revision` or
-start another review. A structural change, deletion, reordering, or material claim correction reruns both axes; a truly
-local wording change reruns the affected axis, and uncertainty reruns both.
+Normalize both axes together. An actionable finding needs an exact passage or structural locator, evidence or a
+concrete correction, and a material effect on truth, reader model, scope, or a safety boundary. Adjudicate clarity and
+accuracy findings in one integrated edit pass; do not paste reviewer prose or ask a reviewer to rewrite the note. A
+structural change, deletion, reordering, material claim correction, link, or diagram change reruns both axes. A truly
+local wording change may rerun only the affected axis; uncertainty reruns both.
 
-Close the cycle when both valid results are clean, when fallback leaves no actionable repair within the budget, when a
-round produces no new actionable information, or when the budget is exhausted. A late result belongs to its original
-attempt and cannot reopen a closed revision.
+Classify a remaining actionable finding as `reader_blocker` when the spine, after-state, section relation,
+prerequisite order, scope, or axis distinction is broken. Classify it as `accuracy_blocker` when a material claim is
+false, unverified, or materially mis-scoped. Local wording and optional examples are `polish_item`.
 
-## 5. Parent waiting and retries
-
-Set a parent cutoff that leaves time for fallback checks, final writing, and reporting. The cutoff protects the
-parent; it is not a kill deadline for a reviewer that is still making progress.
-
-Use bounded await segments that return before the parent cutoff; never make an opaque provider call with an
-unbounded wait. At the cutoff, persist `state: deferred`, stop awaiting in the parent, run manual fallback, and
-report the boundary. Do not send a cancellation request merely because the parent stopped awaiting; the provider
-may continue and can still produce a late result under its original `attempt_id`.
-
-- `active` with progress: keep waiting until cutoff or completion.
-- `unknown` at cutoff: mark `deferred`; do not claim provider failure.
-- No progress with a real liveness signal: perform one status check or ping. Only then may a confirmed stall be
-  canceled when the mechanism supports cancellation.
-- A status check that merely times out is still a client/channel observation, not the provider's cancellation
-  confirmation. If the provider does not answer with an authoritative state, remain `unknown`/`deferred`.
-- A client request deadline releases the client; it does not prove provider-side termination.
-- Never retry while the original attempt is `unknown`, `active`, or `cancel-requested`.
-- Retry at most once after an explicit transient failure, and only when the read-only review mechanism makes a
-  duplicate safe. Give the retry a new `attempt_id`.
-
-When the parent stops waiting, the current cycle can still receive a late result until the final report is closed.
-Do not reopen a closed revision because a late result arrives.
+After every content revision, read the whole note linearly, rerun required gates, increment `note_revision`, recompute
+`draft_hash`, invalidate prior results, and start a new cycle only if the budget permits. Close when both valid results
+are clean, fallback leaves no actionable repair, no new actionable information appears, or the finite budget is
+exhausted. A late result cannot reopen a closed revision.
 
 ## 6. Manual fallback
 
-For every axis that is not `completed` with a valid result, record `manual_checked` and perform the same checklist
-against the Phase 2 evidence and Phase 3 teaching model. Manual checking can repair the note and can establish that
-delivery is reasonable;
-it cannot become a reviewer `clean` result.
+For every axis that is not a valid completed result, record `manual_checked` and inspect the exact draft hash/revision.
+Fallback must cover the same contract:
 
-The fallback record must include the clarity teach-back (recovered spine, section roles, and reached after-state), the
-accuracy coverage (claims checked, source coverage, and unverified claims), each C1–C5/A1 outcome that applies, and any
-`reader_blocker`, `accuracy_blocker`, or `polish_item`. `manual_checked` without these observations is incomplete.
+- clarity: spine, section roles, after-state, C1–C5, scope, transitions, and heading tree;
+- accuracy: every material claim, source coverage, A1, unverified claims, and needed qualifications;
+- hard gates: write read-back, preservation, heading, mechanical link, semantic link, evidence, and render state.
 
-If a repair changes note prose, formulas, links, or diagrams, increment `note_revision` and invalidate reviewer
-results according to §4A's local-versus-structural rule; start a new cycle only if the finite review budget allows it.
-Metadata-only changes do not invalidate content review.
+`manual_checked` can repair the note and establish that delivery is reasonable. It cannot become reviewer `clean`. If a
+fallback repair changes prose, formulas, links, or diagrams, increment the revision/hash and invalidate results under
+§5. Metadata-only changes do not invalidate content review.
 
-For any axis that is not a valid completed result, the Phase 8 report must include both `execution_state` and
-`observability`: what the parent observed, what the provider exposed (if anything), whether cancellation was
-requested, and whether termination was confirmed. This makes `deferred`, `unknown`, and `canceled-confirmed`
-auditable rather than decorative labels.
+For every non-clean axis, the final report includes execution state, parent wait state, cancellation state,
+observability, attempt/revision/hash identity, fallback evidence, and any stale/late-ignored events.
 
 ## 7. Delivery matrix
 
-Use these write states:
+Write states:
 
 | `write_status` | Meaning |
 | --- | --- |
-| `written` | new file exists and read-back matches |
-| `updated` | existing file was updated and read-back matches |
-| `unchanged` | requested update failed, but the original file was restored or verified intact |
-| `not_written` | creation failed before a usable file existed |
-| `possibly_partial` | an update/create may have changed the file, but read-back or recovery is uncertain |
+| `written` | New file exists and read-back matches |
+| `updated` | Existing file was updated and read-back matches |
+| `unchanged` | Failed update was restored or verified intact |
+| `not_written` | No usable file was created |
+| `possibly_partial` | Replacement or read-back is uncertain |
 
-Use these final delivery labels:
+Use these final labels:
 
 | Conditions | Report label |
 | --- | --- |
-| `written/updated` + self-check pass + both valid reviewer results clean + no open items | `双轴审查通过` |
-| `written/updated` + self-check pass + missing axes manually checked + no open items | `已交付；部分审查由人工复核` |
-| `written/updated` + self-check pass + only `polish_item` or non-blocking unverified items | `已交付；存在未决项` |
-| `written/updated` + self-check pass + any `reader_blocker` or `accuracy_blocker` | `已写入；存在阻塞项，未完成` |
-| `written/updated` + self-check failed | `文件已写入；自检未通过，未宣称交付` |
-| `unchanged` | `更新未写入；原文件已保留` |
-| `not_written` | `内容已生成但未写入` |
-| `possibly_partial` | `文件状态不确定，未宣称交付` |
+| written/updated + hard gates pass + both valid reviewer results clean + no open items | `双轴审查通过` |
+| written/updated + hard gates pass + unavailable axes manually checked + no open items | `已交付；部分审查由人工复核` |
+| written/updated + hard gates pass + only polish/unverified non-blockers | `已交付；存在未决项` |
+| written/updated + reader/accuracy blocker | `已写入；存在阻塞项，未完成` |
+| written/updated + hard-gate failure | `文件已写入；自检未通过，未宣称交付` |
+| confirmed unchanged | `更新未写入；原文件已保留` |
+| not_written | `内容已生成但未写入` |
+| possibly_partial or journal/report closure uncertain | `已写入；审查状态不确定，未完成` or `未写入（审查不确定）` |
 
-Only the first row may be called `双轴审查通过`. A clean reviewer result cannot override a failed self-check,
-an uncertain write, an open accuracy blocker, a reader blocker, or a missing review axis. A written file with a blocker
-is not a delivered note.
+Only the first row may be called `双轴审查通过`. No reviewer result overrides a failed gate, uncertain write,
+missing axis, open blocker, stale identity, or uncertain journal closure.
 
-## 8. Reviewer prompts
+## 8. Verbatim reviewer prompts
 
-Use these prompts verbatim after substituting the resolved absolute `note_path`, `attempt_id`, and `note_revision`.
+Substitute only the resolved absolute path, `attempt_id`, and `note_revision`. The local envelope carries `cycle_id` and
+`draft_hash`; do not replace the required prompt fields with an unresolved placeholder.
 
 ### Clarity reviewer
 
