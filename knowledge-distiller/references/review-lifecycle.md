@@ -113,6 +113,12 @@ Set `provider_liveness: suspected_stall` only when all conditions hold:
 Otherwise keep the attempt `unknown`, stop the parent at its cutoff with `parent_wait_state: deferred`, and use
 fallback. An opaque provider is not evidence of either health or failure.
 
+An explicit provider `failed` event sets `provider_execution_state: failed` and `provider_liveness: terminal`. An
+explicit provider `stalled` event is different: after the §3 evidence checks, set
+`provider_liveness: suspected_stall` while execution remains `active` or `unknown`, then request cancellation if the
+mechanism supports it. Do not rewrite a stalled observation as provider failure merely because cancellation is
+available.
+
 ### 3.1 Cancellation precedence
 
 Cancellation is a separate request and acknowledgement sequence:
@@ -134,6 +140,7 @@ state machine:
 | `running`, `active` | `provider_execution_state: active` |
 | `completed` | `provider_execution_state: completed` |
 | `failed` | `provider_execution_state: failed`, `provider_liveness: terminal` |
+| `stalled` | `provider_liveness: suspected_stall`; execution remains `active` or `unknown` |
 | `unknown` | `provider_execution_state: unknown` |
 | `deferred` | `parent_wait_state: deferred`; execution remains active or unknown |
 | `suspected-stall` | `provider_liveness: suspected_stall` |
@@ -263,7 +270,9 @@ Use these final labels:
 | written/updated + hard-gate failure | `文件已写入；自检未通过，未宣称交付` |
 | confirmed unchanged | `更新未写入；原文件已保留` |
 | not_written | `内容已生成但未写入` |
-| possibly_partial or journal/report closure uncertain | `已写入；审查状态不确定，未完成` or `未写入（审查不确定）` |
+| possibly_partial | `文件状态不确定，未宣称交付` |
+| confirmed write + journal/report closure or review state uncertain | `已写入；审查状态不确定，未完成` |
+| no confirmed write + journal/report closure or review state uncertain | `未写入（审查不确定）` |
 
 Only the first row may be called `双轴审查通过`. No reviewer result overrides a failed gate, uncertain write,
 missing axis, open blocker, stale identity, or uncertain journal closure.
