@@ -199,7 +199,7 @@ Normalize reviewer payloads before acting. A `clean` result with findings, parti
 `protocol_invalid`. Preferences, duplicates, unsupported requests, and out-of-scope comments are recorded but do not
 start a revision round.
 
-## 5. Parent waiting and bounded convergence
+## 4A. Parent waiting and bounded convergence
 
 Set a parent cutoff that leaves time for fallback checks, final writing, and reporting. Use bounded await segments that
 return before the cutoff; never make an opaque provider call with an unbounded wait.
@@ -242,7 +242,7 @@ Fallback must cover the same contract:
 
 `manual_checked` can repair the note and establish that delivery is reasonable. It cannot become reviewer `clean`. If a
 fallback repair changes prose, formulas, links, or diagrams, increment the revision/hash and invalidate results under
-§5. Metadata-only changes do not invalidate content review.
+§4A. Metadata-only changes do not invalidate content review.
 
 For every non-clean axis, the final report includes execution state, parent wait state, cancellation state,
 observability, attempt/revision/hash identity, fallback evidence, and any stale/late-ignored events.
