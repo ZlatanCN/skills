@@ -1,2 +1,3 @@
 timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-08-09T22:20	baseline	knowledge-distiller	-	82.8	baseline	-	3/3 independent full_test runs; runtime_warn=0; strongest gaps are explicit checkpoints and a dedicated counterexample blacklist	full_test
+2026-08-09T22:26	bcd760a	knowledge-distiller	82.8	3-0 better	keep	检查点设计	3/3 paired judges preferred NEW; visible route, teaching-model, and write gates; no substantive regression	paired
