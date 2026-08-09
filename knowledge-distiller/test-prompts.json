@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "source_eval": 0,
+    "prompt": "/knowledge-distiller TCP拥塞控制 I've been thinking about TCP congestion control. So basically TCP has this mechanism where it starts by sending like 1 packet, then 2, then 4 — doubling each time until there's a loss. That's slow start. When loss happens, it cuts in half and then starts increasing more slowly (additive increase). I think modern TCP uses something called cubic which is better for high-bandwidth networks because it uses a cubic function instead of linear. Also there's something called BBR from Google that's even better because it measures bandwidth instead of using loss. The whole point is to be fair to other connections. Is my understanding roughly right? Also I heard QUIC does all this at the application layer instead of in the kernel. Am I on the right track?",
+    "expected": "生成一篇聚焦 TCP 拥塞控制的中文 Obsidian 笔记，纠正慢启动、AIMD、CUBIC、BBR 与 QUIC 分层关系，保留证据与边界，不臆造链接。"
+  },
+  {
+    "id": 2,
+    "source_eval": 8,
+    "prompt": "/knowledge-distiller 检索增强生成与知识库基础设施 我在理解 RAG：LLM 的参数知识不会自动更新，也不天然包含私有资料，所以要先从知识库检索，再把证据放进上下文让模型生成答案。现在我又看到分块、稠密检索、BM25、混合检索、重排序、Contextual Retrieval、RAPTOR、GraphRAG、OpenViking 和 Agentic RAG，但不知道它们到底是替代关系、组合关系，还是分别修复不同问题。请把它整理成一篇真正能让我学明白的中文 Obsidian 笔记，重点讲清楚扁平文本块会丢失什么信息、每种方法补回什么、代价是什么，以及应该如何选择；不要写成技术名词目录。",
+    "expected": "生成一篇有因果主线的中文 Obsidian 笔记，区分表示、检索/排序、上下文导航与查询编排等轴线，说明每种方法修复的失败模式、代价与组合规则，而不是产品名词清单。"
+  },
+  {
+    "id": 3,
+    "source_eval": 5,
+    "prompt": "什么是幂等性？请用两三句话直接解释一下，不需要创建笔记。",
+    "expected": "直接用中文回答幂等性的事实问题，不创建笔记，不执行研究、vault 扫描或 reviewer 流程。"
+  }
+]
