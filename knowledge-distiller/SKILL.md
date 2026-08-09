@@ -57,10 +57,10 @@ Each phase must fill or update its fields before the next phase starts:
 | 1 | extension capability status + fallback choice | setup state is unavailable and its effect is not reported |
 | 2 | claim ledger with direct evidence and limits | a material claim has no support, qualification, or explicit exclusion |
 | 3 | teaching model and section tree | a section has no reader question, role, dependency, or transition |
-| 4 | resolved vault root + collision decision + link ledger | a path, filename, anchor, or same-topic choice is ambiguous |
+| 4 | resolved vault root (or explicit `unavailable`) + collision decision + link ledger | a path, filename, anchor, or same-topic choice is ambiguous and unreported |
 | 5 | draft mapped to the teaching model | a paragraph, table, link, or diagram has no admitted role |
-| 6 | write transaction + read-back + mechanical gates | the write state or any hard self-check is uncertain |
-| 7 | review journal + valid results or complete manual fallback | reviewer identity, observability, or result completeness is unknown |
+| 6 | write transaction + read-back + gate state (`passed`, `failed`, or `unavailable`) | the write state is uncertain, a hard gate fails, or an unavailable gate has no manual equivalent |
+| 7 | review journal + valid results or complete manual fallback | an opaque/unknown attempt has no state evidence and no complete fallback record |
 | 8 | truthful delivery report | any blocker is hidden behind a success label |
 
 When a later phase changes the reader, scope, axes, or section relations, invalidate downstream fields and return to
