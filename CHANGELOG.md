@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.3.0] - 2026-08-10
+
+### 新增
+- feat(darwin-skill): 添加达尔文技能核心循环图和横幅资源
+
+### 修复
+- fix(knowledge-distiller): align wikilink path normalization
+- fix(knowledge-distiller): restore lifecycle reference anchor
+- fix(knowledge-distiller): disambiguate review terminal states
+- fix(knowledge-distiller): align state gates with fallbacks
+- fix(release): 检查并拒绝不一致的 SKILL.md 版本
+
+### 其他
+- knowledge-distiller: record absolute evaluation
+- chore(knowledge-distiller): record wikilink full test
+- optimize knowledge-distiller: align wikilink reference contract
+- chore(knowledge-distiller): record lifecycle full test
+- optimize knowledge-distiller: align review lifecycle contract
+- chore(knowledge-distiller): record checker contract evaluation
+- optimize knowledge-distiller: enforce canonical wikilink manifest
+- chore(knowledge-distiller): record real fixture full-test
+- chore(knowledge-distiller): record full-test triage score
+- chore(knowledge-distiller): record full refactor evaluation
+- optimize knowledge-distiller: refactor full execution contract
+- optimize knowledge-distiller: unify execution state and writes
+- chore(knowledge-distiller): add darwin result card
+- chore(knowledge-distiller): log blacklist optimization
+- optimize knowledge-distiller: add action blacklist
+- chore(knowledge-distiller): log checkpoint optimization
+- optimize knowledge-distiller: mark workflow checkpoints
+- chore(knowledge-distiller): record darwin baseline prompts
+
+
 ## [0.2.0] - 2026-08-08
 
 ### 新增
