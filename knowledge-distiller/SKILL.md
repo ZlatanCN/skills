@@ -98,6 +98,19 @@ multi-clause explanation, or substantial example into its own sentence or a call
 dashes in one clause. Preserve a single em dash when it expresses a clear contrast or apposition and does not
 bury the main clause.
 
+## 反例与危险动作黑名单
+
+以下动作一律禁止；命中后执行右列替代路径，不要用“看起来能工作”作为放行理由。
+
+| 不要做什么 | 为什么危险 | 替代路径 |
+| --- | --- | --- |
+| 把只有事实问题的消息强行写成笔记 | 会触发不必要的研究、扫描和写入副作用 | 走 `answer_only`，直接回答并停止 |
+| 把检索返回或 reviewer 原文逐条粘贴进正文 | 会让来源顺序取代 Teaching Model，破坏主线 | 先判定 claim 的角色，再经 Phase 3 和 Phase 5 重写 |
+| 凭搜索片段猜文件名、heading 或 wikilink | 相似标题可能指向错误位置，产生不可审计的引用 | 从实际文件和 heading 复制锚点；无法唯一解析就删除链接 |
+| 因为父任务等得久就称 reviewer 失败或已取消 | 墙上时间不能证明 provider 状态，报告会虚假变“干净” | 区分 `unknown`、`deferred` 和 `canceled-confirmed`，按证据走 fallback |
+| 在路径、同主题冲突或写状态未决时覆盖文件 | 可能误写、重复创建或丢失原有内容 | 触发 🛑 STOP · WRITE GATE，澄清或恢复后再写 |
+| 把机械 checker 通过当作语义审查通过 | 存在的链接不代表它定义了正确概念 | 分开记录机械 gate 与语义 link ledger / reviewer 判断 |
+
 ## §2 Workflow
 
 ### Phase 0: Define the reader's destination and choose a route
