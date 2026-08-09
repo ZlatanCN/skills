@@ -125,6 +125,15 @@ the boundary in the report rather than asking a blocking clarification question.
 multiple independent notes, run a separate full cycle for each topic; otherwise route unrelated topics to
 `clarify` instead of pretending one single-note cycle covers them.
 
+🔴 CHECKPOINT · ROUTE GATE
+
+Before leaving Phase 0, make the route explicit:
+
+- `answer_only` → 🛑 STOP this invocation. Do not run setup, research, vault scanning, writing, or review.
+- `clarify` → 🛑 STOP this invocation after asking the one concise question. Do not create a partial note.
+- `distill_note` → continue to Phase 1 only after the reader, question, after-state, scope, spine, axes, and
+  dependencies are recorded.
+
 ### Phase 1: Check extension skills
 
 Run this phase only after Phase 0 selects `distill_note`; `answer_only` and `clarify` must stop before this
@@ -222,6 +231,11 @@ Before leaving this phase, record a compact Teaching Model checkpoint (internall
 one is being kept): `reader`, `question`, `after`, `scope`, `spine`, `axes`, `heading_convention`, and the complete
 section tree. A post-hoc summary of drafted prose is not a checkpoint; without this model, do not enter Phase 4 or
 Phase 5.
+
+🔴 CHECKPOINT · TEACHING MODEL GATE
+
+🛑 STOP before Phase 4 if any section lacks a necessary question, answer, dependency, boundary, or `why_next` edge;
+return to Phase 0–3 and repair the model before scanning the vault or composing prose.
 
 This adversarial log feeds Phase 8. Corrections and scope decisions are reported in the conversation, not inserted as
 commentary into the standalone note. If a conflict materially affects the reader's decision, carry its conditions
@@ -328,6 +342,12 @@ it. Do not add diagrams or styling for decoration.
 
 Choose the directory and filename from the Phase 4 scan. Respect an explicit user path, title, or filename.
 Check for a filename collision before creating a new note. Write with the environment's file-editing tool:
+
+🛑 STOP · WRITE GATE
+
+Before any create or update, confirm the resolved note path, same-topic collision decision, intended write state,
+and preservation scope. If any one is unresolved, do not write; route to `clarify` or use the documented recovery
+fallback.
 
 - create a new file only after the path is resolved;
 - update the existing same-topic file at the same path;
