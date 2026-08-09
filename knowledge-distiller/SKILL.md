@@ -32,6 +32,41 @@ An explicit user request for language, title, path, metadata, structure, or outp
 defaults. It does not override factual integrity, preservation of unrelated vault content, security, or basic
 accessibility.
 
+## Execution state: one contract across all phases
+
+The workflow is a state machine, not a checklist of prose. For `distill_note`, maintain one execution record for the
+current invocation (in memory when no durable journal is available; in the review journal when Phase 7 requires one):
+
+```text
+route → answer_only | clarify | distill_note
+reader_contract → reader, question, after, scope, spine, axes, dependencies
+claim_ledger → claim ID, status, source, support, limits, body disposition
+teaching_model → section tree, roles, relations, transitions, heading convention
+vault_snapshot → resolved root, candidate notes, collision decision, exact link ledger
+draft → path, note revision, body map, self-check state
+write_transaction → original hash, temp/read-back state, final write_status
+review_journal → cycle/attempt IDs, reviewer states, observability, findings, fallbacks
+delivery → final label, blockers, corrections, vault mutations, open items
+```
+
+Each phase must fill or update its fields before the next phase starts:
+
+| Phase | Required output | Do not advance when |
+| --- | --- | --- |
+| 0 | route + reader contract | the central question, scope, or after-state is unresolved |
+| 1 | extension capability status + fallback choice | setup state is unavailable and its effect is not reported |
+| 2 | claim ledger with direct evidence and limits | a material claim has no support, qualification, or explicit exclusion |
+| 3 | teaching model and section tree | a section has no reader question, role, dependency, or transition |
+| 4 | resolved vault root + collision decision + link ledger | a path, filename, anchor, or same-topic choice is ambiguous |
+| 5 | draft mapped to the teaching model | a paragraph, table, link, or diagram has no admitted role |
+| 6 | write transaction + read-back + mechanical gates | the write state or any hard self-check is uncertain |
+| 7 | review journal + valid results or complete manual fallback | reviewer identity, observability, or result completeness is unknown |
+| 8 | truthful delivery report | any blocker is hidden behind a success label |
+
+When a later phase changes the reader, scope, axes, or section relations, invalidate downstream fields and return to
+the earliest affected phase. Never repair a stale draft while leaving its claim ledger, vault snapshot, or review
+revision attached to the old model.
+
 ## Prerequisites
 
 These extension skills improve the result but are optional:
@@ -159,7 +194,9 @@ exist, skip this phase and do not ask about extension state. If it exists, run:
 bash "<script-path>"
 ```
 
-- Exit `0`: `state.json` exists; skip the missing-skill check.
+- Exit `0`: `state.json` exists and suppresses the repeated install-choice prompt; it is not proof that an optional
+  skill is currently available. Before invoking an extension, verify that capability through the environment's skill
+  mechanism and use the documented fallback if it is absent.
 - Exit `1`: check `humanizer-zh` and `obsidian-markdown` through the environment's skill mechanism and record
   which are available.
 - Any other exit or execution error: treat setup state as unavailable, continue with fallbacks, do not write
@@ -258,7 +295,9 @@ into the model as a qualification or boundary; use a `question` callout only whe
 
 Before composing, inspect the vault for terminology and structure:
 
-1. Search Markdown files and filenames, while excluding `.git`, `.obsidian`, generated artifacts, and skill
+1. Resolve one absolute `vault_root`: use an explicit user-provided vault path first; otherwise use the runtime's
+   known workspace/vault root; if neither is available, mark `vault_root: unavailable` and do not emit cross-note
+   links. Search Markdown files and filenames under that root, while excluding `.git`, `.obsidian`, generated artifacts, and skill
    implementation files unless they are the subject of the note.
 2. Read relevant MOC files and enough of related notes to identify their actual defining headings or blocks.
    Record each planned link's exact relative path and anchor in the link ledger; search-result text is not a
@@ -366,6 +405,19 @@ fallback.
 - update the existing same-topic file at the same path;
 - preserve unrelated content and metadata;
 - verify that the file exists and contains the intended frontmatter and body before review.
+
+Treat a write as a transaction with explicit recovery, not as one opaque editor call:
+
+1. For an update, read the original bytes and record an original hash or an equivalent recovery handle.
+2. Write the draft to a temporary file in the same directory; do not replace the target yet.
+3. Read the temporary file back, run the heading and wikilink gates against that exact file, and confirm the intended
+   frontmatter/body boundary.
+4. Replace the target atomically when the environment supports it; otherwise use the safest available replacement
+   and record that atomicity was unavailable.
+5. Read the target back, rerun the required gates against the final path, and only then set `write_status` to
+   `written` or `updated`.
+6. If validation fails before replacement, discard the temporary file. If replacement may have happened but recovery
+   or read-back is uncertain, stop and report `possibly_partial`; never claim `unchanged` or successful delivery.
 
 After read-back, run the deterministic wikilink gate from `references/wikilinks.md` against the actual vault and
 the note path. Do not start review or report a passing self-check while that gate is failing. If a target is
