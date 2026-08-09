@@ -77,8 +77,10 @@ Rules:
    zero candidates fails; more than one candidate is ambiguous and fails.
 3. A path-qualified target matches one exact normalized relative POSIX path. It may pass even when that note's basename
    is duplicated, but the path itself must occur exactly once.
-4. A target containing `..`, an absolute path, a non-normalized component, an excluded file, a symlink, or a file outside
-   the manifest fails. Do not use a current-directory shortcut to bypass global basename ambiguity.
+4. Normalize an allowed leading `./` and backslash path separators to the canonical POSIX form before matching. A
+   target containing `..`, an absolute path, an empty or `.` component after that normalization, an excluded file, a
+   symlink, or a file outside the manifest fails. Do not use a current-directory shortcut to bypass global basename
+   ambiguity.
 5. A target with no `#anchor`, including `[[Note|alias]]`, is a bare whole-note link and fails. An alias changes display
    text only; it cannot hide a missing target or anchor.
 
