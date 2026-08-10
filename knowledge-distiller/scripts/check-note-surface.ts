@@ -111,34 +111,33 @@ function mermaidHeader(body: string): MermaidHeader {
 }
 
 function hasFlowchartEndRisk(body: string): boolean {
-  const unquotedBody = body
+  const syntaxBody = body
     .replaceAll(/"(?:\\.|[^"\\\r\n])*"/gu, "")
     .replaceAll(/`[^`\r\n]*`/gu, "");
-  const unquotedEdgeLabels = body.replaceAll(
-    /\|[^|\r\n]*["`][^|\r\n]*["`][^|\r\n]*\|/gu,
-    ""
-  );
   return (
-    /(?:\[|\(|\u007B)\s*end\s*(?:\]|\)|\})/u.test(body) ||
-    /(?:^|\s)end@\u007B/mu.test(unquotedBody) ||
+    /(?:\[|\(|\u007B)\s*end\s*(?:\]|\)|\})/u.test(syntaxBody) ||
+    /(?:^|\s)end@\u007B/mu.test(syntaxBody) ||
     /(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})\s*(?:\|[^|\r\n]*\|\s*)?end(?:\s|$|:)/mu.test(
-      body
+      syntaxBody
     ) ||
     /(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})\s*(?:\|[^|\r\n]*\|\s*)?end(?:\[|\(|\u007B|@\u007B)/mu.test(
-      body
+      syntaxBody
     ) ||
     /(?:^|\s)end(?:\[|\(|\u007B|@\u007B)[^\r\n]*\s+(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})/mu.test(
-      body
+      syntaxBody
     ) ||
     /(?:^|\s)end\s+(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})/mu.test(
-      body
+      syntaxBody
     ) ||
-    /\|[^|\r\n]*\bend\b[^|\r\n]*\|/mu.test(unquotedEdgeLabels)
+    /\|[^|\r\n]*\bend\b[^|\r\n]*\|/mu.test(syntaxBody)
   );
 }
 
 function hasSequenceEndRisk(body: string): boolean {
-  return /:\s*end(?:\s|$)/mu.test(body);
+  const syntaxBody = body
+    .replaceAll(/"(?:\\.|[^"\\\r\n])*"/gu, "")
+    .replaceAll(/`[^`\r\n]*`/gu, "");
+  return /^[ \t]*[^:\r\n]+:[^\r\n]*\bend\b/mu.test(syntaxBody);
 }
 
 function collectFenceFindings(
@@ -479,6 +478,7 @@ function selfTest(): number {
         '  B --> C["end"]',
         '  C --> D["end@{ shape: rect }"]',
         '  D --> E["contains end@{ shape: rect }"]',
+        '  E --> F["contains A --> end"]',
         "```",
         "",
         "```mermaid",
@@ -492,6 +492,7 @@ function selfTest(): number {
         "sequenceDiagram",
         "  alt 条件",
         "    A->>B: 继续",
+        '    B->>A: "contains: end"',
         "  end",
         "```",
         "",
