@@ -42,7 +42,7 @@ function check(fileInput: string, portable: boolean, strict: boolean): Evidence 
 
   for (let i = 0; i < surface.lines.length; i += 1) {
     const line = surface.lines[i];
-    if (/^\s*>\s*\[![A-Za-z0-9_-]+\][+-]?/.test(line)) {
+    if (/^\s*(?:>\s*)+\[![A-Za-z0-9_-]+\][+-]?/.test(line)) {
       const next = surface.lines[i + 1] ?? "";
       if (next.trim() && !/^\s*>/.test(next)) {
         findings.push(finding("callout-prefix-missing", strict ? "error" : "warning", "content immediately after a callout opener is missing the required > prefix", {
@@ -122,6 +122,9 @@ function selfTest(): number {
       "**结论** 与 `Fiber`。",
       "> [!warning]- 常见误解",
       "> 这是一条边界。",
+      "> [!question] 嵌套问题",
+      "> > [!info] 嵌套边界",
+      "> > 只覆盖 renderer。",
       "",
       "| A | B |",
       "|---|---|",
@@ -137,7 +140,8 @@ function selfTest(): number {
       "```",
       "",
     ].join("\n"), "utf8");
-    if (check(valid, true, true).gate !== "passed") throw new Error("valid surface should pass");
+    const validResult = check(valid, true, true);
+    if (validResult.gate !== "passed" || validResult.metrics.callouts !== 3) throw new Error("valid surface should pass, including nested callouts");
 
     const invalid = path.join(root, "invalid.md");
     fs.writeFileSync(invalid, [

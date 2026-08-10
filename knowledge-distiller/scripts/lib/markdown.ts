@@ -184,15 +184,15 @@ export function parseMarkdown(file: string): Surface {
       if (blockId) blockIds.push({ line: lineNumber, id: blockId[1] });
     }
 
-    const callout = line.match(/^\s*>\s*\[!([A-Za-z0-9_-]+)\]([+-]?)(?:[ \t]+(.*?))?\s*$/);
+    const callout = line.match(/^\s*((?:>\s*)+)\[!([A-Za-z0-9_-]+)\]([+-]?)(?:[ \t]+(.*?))?\s*$/);
     if (callout) {
-      const rawType = callout[1].toLowerCase();
+      const rawType = callout[2].toLowerCase();
       callouts.push({
         line: lineNumber,
         type: rawType,
-        fold: callout[2] === "+" ? "open" : callout[2] === "-" ? "closed" : "none",
-        title: (callout[3] ?? "").trim(),
-        depth: Math.max(0, quote.depth - 1),
+        fold: callout[3] === "+" ? "open" : callout[3] === "-" ? "closed" : "none",
+        title: (callout[4] ?? "").trim(),
+        depth: Math.max(0, (callout[1].match(/>/g)?.length ?? quote.depth) - 1),
       });
     }
 
