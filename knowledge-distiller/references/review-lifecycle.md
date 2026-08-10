@@ -4,6 +4,9 @@ This reference defines the optional read-only review dependency. Review increase
 write, repairs a failed hard gate, or turns missing evidence into approval. The parent workflow's canonical state
 model in `SKILL.md` is authoritative. This document supplies the event protocol, reviewer payloads, fallback, and
 delivery vocabulary that Phase 7 needs.
+The lifecycle semantics live here; `scripts/check-review-journal.ts` mechanically validates the event-stream invariants,
+and `scripts/check-delivery-report.ts` validates the final label against write/gate/review evidence. A checker pass does
+not replace this reference's reviewer and fallback requirements.
 
 ## 1. The contract in one view
 
@@ -14,7 +17,7 @@ provider_execution_state → pending | active | completed | failed | unknown
 provider_liveness        → unobserved | healthy | suspected_stall | terminal
 parent_wait_state        → waiting | deferred | closed
 cancel_state             → not_requested | cancel_requested | canceled_confirmed | unknown
-quality_result           → clean | actionable | protocol_invalid | unavailable
+quality_result           → clean | findings | unverified | protocol_invalid | unavailable
 ```
 
 Keep these concerns separate:

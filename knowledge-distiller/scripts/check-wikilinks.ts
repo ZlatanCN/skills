@@ -4,18 +4,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { evidence, exitForGate, finding, sha256, type Evidence } from "./lib/evidence.ts";
+import { key, maskInlineCode, parseMarkdown, type BlockId, type Heading } from "./lib/markdown.ts";
 
 type ErrorItem = { file: string; line: number; message: string };
-type Heading = { line: number; text: string; key: string };
-type BlockId = { line: number; id: string };
-type ParsedNote = {
-  visibleLines: Array<[number, string]>;
-  headings: Heading[];
-  blockIds: BlockId[];
-  parseErrors: ErrorItem[];
-};
 type Note = {
   relativePath: string;
   relativeKey: string;
@@ -39,8 +32,6 @@ type Manifest = {
 };
 
 const LINK_RE = /\[\[([^\]\n]+)\]\]/g;
-const HEADING_RE = /^(#{1,6})[ \t]+(.+?)\s*$/;
-const BLOCK_ID_RE = /(?:^|[ \t])\^([A-Za-z0-9_-]+)[ \t]*$/;
 const LEGAL_BLOCK_ID_RE = /^[A-Za-z0-9_-]+$/;
 const EXCLUDED_DIRS = new Set([
   ".git",
@@ -55,25 +46,15 @@ const EXCLUDED_DIRS = new Set([
 ]);
 const SKILL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-function normalizedWhitespace(value: string): string {
-  return value.normalize("NFKC").trim().replace(/\s+/g, " ");
-}
-
-function headingKey(value: string): string {
-  return normalizedWhitespace(value);
-}
-
 function filenameKey(value: string): string {
-  return normalizedWhitespace(value).toLowerCase();
+  return key(value).toLowerCase();
 }
 
 function relativeKey(relativePath: string): string {
   return relativePath.split(path.sep).join("/").normalize("NFKC");
 }
 
-function hashBytes(bytes: Buffer): string {
-  return createHash("sha256").update(bytes).digest("hex");
-}
+function hashBytes(bytes: Buffer): string { return sha256(bytes); }
 
 function inside(root: string, candidate: string): boolean {
   const relative = path.relative(root, candidate);
@@ -82,92 +63,6 @@ function inside(root: string, candidate: string): boolean {
 
 function samePath(left: string, right: string): boolean {
   return path.resolve(left) === path.resolve(right);
-}
-
-function maskInlineCode(line: string): string {
-  const output = [...line];
-  let codeRun = 0;
-  let index = 0;
-  while (index < line.length) {
-    if (line[index] === "`" && (index === 0 || line[index - 1] !== "\\")) {
-      let run = 1;
-      while (index + run < line.length && line[index + run] === "`") run += 1;
-      if (codeRun === 0) {
-        codeRun = run;
-        for (let offset = 0; offset < run; offset += 1) output[index + offset] = " ";
-      } else if (run === codeRun) {
-        for (let offset = 0; offset < run; offset += 1) output[index + offset] = " ";
-        codeRun = 0;
-      } else {
-        for (let offset = 0; offset < run; offset += 1) output[index + offset] = " ";
-      }
-      index += run;
-      continue;
-    }
-    if (codeRun > 0) output[index] = " ";
-    index += 1;
-  }
-  return output.join("");
-}
-
-function parseMarkdown(file: string): ParsedNote {
-  const lines = fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/);
-  const visibleLines: Array<[number, string]> = [];
-  const headings: Heading[] = [];
-  const blockIds: BlockId[] = [];
-  const parseErrors: ErrorItem[] = [];
-  let inFrontmatter = lines[0]?.trim() === "---";
-  let frontmatterClosed = !inFrontmatter;
-  let fenceChar = "";
-  let fenceLength = 0;
-
-  lines.forEach((rawLine: string, index: number) => {
-    const line = index === 0 ? rawLine.replace(/^\uFEFF/, "") : rawLine;
-    const lineNumber = index + 1;
-    const trimmed = line.trimStart();
-
-    if (inFrontmatter) {
-      if (lineNumber > 1 && (line.trim() === "---" || line.trim() === "...")) {
-        inFrontmatter = false;
-        frontmatterClosed = true;
-      }
-      return;
-    }
-
-    const fence = trimmed.match(/^(`{3,}|~{3,})/);
-    if (fence) {
-      const marker = fence[1][0];
-      const length = fence[1].length;
-      if (!fenceChar) {
-        fenceChar = marker;
-        fenceLength = length;
-      } else if (marker === fenceChar && length >= fenceLength) {
-        fenceChar = "";
-        fenceLength = 0;
-      }
-      return;
-    }
-    if (fenceChar) return;
-
-    const visible = maskInlineCode(line);
-    visibleLines.push([lineNumber, visible]);
-    const heading = visible.match(HEADING_RE);
-    if (heading) {
-      const text = heading[2].trim();
-      headings.push({ line: lineNumber, text, key: headingKey(text) });
-    } else {
-      const blockId = visible.match(BLOCK_ID_RE);
-      if (blockId) blockIds.push({ line: lineNumber, id: blockId[1] });
-    }
-  });
-
-  if (!frontmatterClosed) {
-    parseErrors.push({ file, line: 1, message: "unterminated YAML frontmatter" });
-  }
-  if (fenceChar) {
-    parseErrors.push({ file, line: lines.length, message: "unterminated fenced code block" });
-  }
-  return { visibleLines, headings, blockIds, parseErrors };
 }
 
 function noteFromFile(root: string, file: string): Note {
@@ -183,9 +78,9 @@ function noteFromFile(root: string, file: string): Note {
     basenameKey: filenameKey(basename),
     contentHash: hashBytes(bytes),
     headings: parsed.headings,
-    blockIds: parsed.blockIds,
-    parseErrors: parsed.parseErrors,
-    visibleLines: parsed.visibleLines,
+    blockIds: parsed.block_ids,
+    parseErrors: parsed.parse_errors.map((item) => ({ file, line: item.line, message: item.message })),
+    visibleLines: parsed.body_lines.map(([line, text]) => [line, maskInlineCode(text)]),
   };
 }
 
@@ -356,7 +251,7 @@ function checkFile(manifest: Manifest, suppliedFile: string): ErrorItem[] {
         continue;
       }
 
-      const wantedHeading = headingKey(anchor);
+      const wantedHeading = key(anchor);
       const matches = resolved.headings.filter((heading) => heading.key === wantedHeading);
       if (matches.length !== 1) {
         errors.push({
@@ -372,19 +267,25 @@ function checkFile(manifest: Manifest, suppliedFile: string): ErrorItem[] {
   return errors;
 }
 
-function summary(manifest: Manifest, checked: number, errors: ErrorItem[] = []): Record<string, unknown> {
-  return {
-    ok: manifest.scanStatus === "complete" && errors.length === 0,
-    checked,
-    root_realpath: manifest.rootRealpath,
-    scan_status: manifest.scanStatus,
-    manifest_hash: manifest.manifestHash,
-    note_count: manifest.notes.length,
-    duplicate_keys: manifest.duplicateKeys,
-    exclusions: manifest.exclusions,
-    scan_errors: manifest.errors,
-    errors,
-  };
+function summary(manifest: Manifest, requested: string[], errors: ErrorItem[] = []): Evidence {
+  const findings = [
+    ...manifest.errors.map((message) => finding("manifest-scan-incomplete", "error", message, { path: manifest.rootRealpath })),
+    ...errors.map((item) => finding("wikilink-invalid", "error", item.message, { path: item.file, line: item.line })),
+  ];
+  return evidence(
+    "check-wikilinks",
+    manifest.scanStatus === "complete" && errors.length === 0 ? "passed" : manifest.scanStatus === "complete" ? "failed" : "unavailable",
+    { vault_root: manifest.rootRealpath, files: requested },
+    {
+      checked: requested.length,
+      note_count: manifest.notes.length,
+      manifest_hash: manifest.manifestHash,
+      scan_status: manifest.scanStatus,
+      duplicate_keys: manifest.duplicateKeys,
+      exclusions: manifest.exclusions,
+    },
+    findings,
+  );
 }
 
 function printErrors(errors: ErrorItem[]): void {
@@ -428,7 +329,8 @@ function main(): number {
     if (!fs.existsSync(file) || !fs.statSync(file).isFile()) errors.push({ file, line: 0, message: "file does not exist" });
     else errors.push(...checkFile(manifest, file));
   }
-  if (json) console.log(JSON.stringify(summary(manifest, requested.length, errors), null, 2));
+  const result = summary(manifest, requested, errors);
+  if (json) console.log(JSON.stringify(result, null, 2));
   if (manifest.errors.length > 0) {
     if (!json) printErrors(manifest.errors.map((message) => ({ file: vault, line: 0, message })));
     return 2;
@@ -438,7 +340,7 @@ function main(): number {
     return 1;
   }
   if (!json) console.log(`OK: checked ${requested.length} note(s); manifest=${manifest.manifestHash}; all wikilinks resolve to unique anchored positions`);
-  return 0;
+  return exitForGate(result.gate);
 }
 
 function assertSelfTest(condition: boolean, message: string): void {

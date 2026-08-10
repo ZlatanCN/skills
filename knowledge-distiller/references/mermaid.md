@@ -1,5 +1,7 @@
 # Mermaid Reference for Knowledge Notes
 
+本文件负责 Mermaid 的教学取舍、语法约束和渲染 fallback；`check-note-surface.ts` 只机械拦截基本类型、危险指令和明显的保留字风险，不能证明图的因果关系正确或已经渲染成功。
+
 Read this reference only when a diagram materially improves the note. A diagram is a compressed explanation,
 not a decoration or a requirement to satisfy. If the same relationship is clearer in two short sentences, skip
 the diagram.

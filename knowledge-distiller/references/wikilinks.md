@@ -1,5 +1,7 @@
 # Wikilink Integrity Protocol
 
+本文件只定义 wikilink 的语义与唯一性规则。`check-wikilinks.ts` 负责其中的机械事实，`check-note.ts` 在写入前后汇总它；标题树、Markdown 表面、格式计划和审查 journal 由各自的 checker 负责。
+
 An Obsidian wikilink is a serialized identity, not decorative prose. The target file, anchor, and alias must be
 derived from the actual vault and validated after the exact note bytes are read back. This protocol has two separate
 gates:

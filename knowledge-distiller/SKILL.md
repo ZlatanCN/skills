@@ -50,6 +50,7 @@ draft           → path, note_revision, body map, format_plan, content hash, se
 write_tx        → original/final hash, temp state, atomicity, read-back, write_status
 review_journal  → cycle/attempt IDs, provider/parent/cancel states, events, findings, fallback
 delivery        → label, blockers, corrections, mutations, open items
+mechanical_evidence → checker JSON, exact input hashes, gate states, commands, versions, exit codes
 ```
 
 Use these status words literally. `complete`, `partial`, and `unavailable` describe evidence availability; `passed`,
@@ -288,7 +289,7 @@ bytes or meaning change after the scan, invalidate the link ledger and rescan.
 
 ## 6. Phase 5 — compose from the model
 
-Read `references/reader-model.md` and `references/obsidian-writing-style.md` again. Write from the adjudicated section tree, never in source-return order or as a
+Read `references/reader-model.md`, `references/obsidian-writing-style.md`, and `references/mechanical-gates.md` again. Write from the adjudicated section tree, never in source-return order or as a
 technology list. Map every top-level section, every material paragraph, and every retained format block to a claim,
 role, dependency, transition, boundary, and format decision. Use `keep`, `rewrite`, `move`, `merge`, `split`, `delete`,
 `defer`, or `add`; technically correct prose
@@ -297,6 +298,8 @@ without a current job in the spine is classified as `defer` by default, and is r
 For an existing note, classify every old format block—emphasis, callout, code, table, diagram, link, embed, or footnote—
 with the same operation and a reader-model reason. Deleting a format block only because its plain-text content remains is
 not sufficient; if its visual or navigational function is lost, preserve or redesign it.
+Create the machine-readable `knowledge-distiller.format-plan.v1` described in `references/mechanical-gates.md`; prose
+in the execution record is not a substitute for its hash and line coverage.
 
 ### 6A. Language and terminology
 
@@ -368,23 +371,26 @@ success.
 
 ### 7A. Gate evidence
 
-Keep these states separate:
+Read `references/mechanical-gates.md` before relying on any checker. Run every checker self-test once per invocation and
+retain its command, version, exit code and timestamp; then run the aggregate gate against the exact temporary and final
+bytes:
 
-```text
-checker_self_test   → passed | failed | unavailable
-actual_vault_check  → passed | failed | unavailable
-mechanical_link_gate→ passed | failed | unavailable
-semantic_link_gate  → passed | failed | unavailable
-heading_gate        → passed | failed | unavailable
+```bash
+node scripts/check-note.ts \
+  --file "<note-path>" \
+  --vault-root "<vault-root>" \
+  --format-plan "<format-plan-json>" \
+  --strict --portable --json
 ```
 
-Run the checker self-tests before relying on them, recording command, version/commit, exit code, and timestamp. Then
-run `node scripts/check-wikilinks.ts --vault-root "<vault-root>" --file "<note-path>"` and
-`node scripts/check-heading-tree.ts --strict --file "<note-path>"` against the exact temp and final path as applicable.
-A self-test is not an actual-vault pass. The canonical-manifest duplicate scan and semantic link audit are independent
-of the bundled checker; if the checker does not enforce global filename/heading/block uniqueness, perform that scan
-separately and record its evidence rather than attributing the stronger guarantee to the script. If a checker is
-unavailable, record the manual equivalent; an unavailable gate with no equivalent blocks clean delivery.
+For an update, append `--original "<original-path>" --preservation "<preservation-json>"`; for a new note do not
+invent a preservation record.
+
+This aggregate owns the five note-local gates and emits one evidence envelope. `check-wikilinks.ts` remains available
+for focused diagnostics, but do not attribute the aggregate result to a checker that was not run. `passed` is a
+mechanical pass only; semantic link audit, claim evidence, preservation meaning and render success remain separate.
+An unavailable child checker is `unavailable`, not an empty successful result; without a complete equivalent it blocks
+clean delivery.
 
 After final read-back, re-read every semantic link target and compare its recorded excerpt/content fingerprint and
 definition. If any target changed, invalidate the snapshot/link ledger and repeat Phase 4. A mechanically valid but
@@ -407,6 +413,15 @@ operation ID as a replacement for `attempt_id`. If the journal is unavailable, d
 manual fallback and report `journal_unavailable`. A client submission proves neither provider acceptance nor
 completion.
 
+Validate the JSONL before dispatch, after every append, and before closure:
+
+```bash
+node scripts/check-review-journal.ts --journal "<review-journal.jsonl>" --json
+```
+
+The checker verifies event identity, monotonic order, legal transitions, contradictory clean results and the close/
+late-result boundary. It does not decide whether a reviewer finding is factually correct.
+
 Keep these dimensions independent:
 
 ```text
@@ -414,7 +429,7 @@ provider_execution_state → pending | active | completed | failed | unknown
 provider_liveness       → unobserved | healthy | suspected_stall | terminal
 parent_wait_state        → waiting | deferred | closed
 cancel_state             → not_requested | cancel_requested | canceled_confirmed | unknown
-quality_result           → clean | actionable | protocol_invalid | unavailable
+quality_result           → clean | findings | unverified | protocol_invalid | unavailable
 ```
 
 `deferred` records only that the parent stopped waiting. Opaque or empty observations remain `unknown`. A provider's
@@ -504,6 +519,14 @@ or a documented fallback/open item—never chase preferences or invent edge-case
 
 Read `references/review-lifecycle.md` §7 for its write-state vocabulary, using the stricter state contract above when
 an example is ambiguous. Report in Chinese and include only sections with content:
+
+Before presenting the report, materialize its machine-readable `knowledge-distiller.delivery.v1` record and run:
+
+```bash
+node scripts/check-delivery-report.ts --report "<delivery-json>" --json
+```
+
+The checker is the final anti-overclaim gate. A prose label cannot override its failed or unavailable result.
 
 ```text
 ✅ 笔记已创建/更新: <absolute-or-vault-relative-path>（N 轮修订）

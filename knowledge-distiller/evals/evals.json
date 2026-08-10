@@ -188,7 +188,7 @@
         "A version boundary, common misconception, teaching-model limitation, or concrete analogy uses a callout only when the block adds a findability function, with a type, title, and removal-test rationale",
         "Code blocks, tables, links, diagrams, footnotes, embeds, or other Markdown features appear only when their declared reader role justifies them, and no decorative format quota is invented",
         "The note preserves the analogy and boundary conditions instead of flattening every block into ordinary prose",
-        "The final report records format_plan evidence and treats clarity/accuracy reviewer results or manual fallback states truthfully",
+        "The final report records a hash-bound knowledge-distiller.format-plan.v1 and check-note mechanical evidence, while treating clarity/accuracy reviewer results or manual fallback states truthfully",
         "The output satisfies the existing frontmatter, Chinese prose, evidence, anchored-link, heading, safe-write, and review lifecycle requirements"
       ]
     }

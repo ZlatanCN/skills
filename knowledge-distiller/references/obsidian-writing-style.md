@@ -162,15 +162,16 @@ Callout 可以只有标题而没有正文；标题中可以使用用户可读的
 
 ## 5. 一次格式审查
 
-在 draft 阶段建立 `format_plan`，至少记录：
+在 draft 阶段建立机器可读的 `knowledge-distiller.format-plan.v1`，字段、逐行覆盖规则和调用方式以
+`references/mechanical-gates.md` §2.1 为准。这里保留的是语义要求：
 
-```text
-emphasis_targets       → 哪些结论/差异需要粗体或其他行内强调
-callout_candidates     → 候选块、类型、标题、读者作用、保留/改为正文的决定
-code_table_diagram_map → 每个代码块/表格/图解决什么问题
-link_surface           → wikilink、外链、脚注的作用和边界
-render_risks           → 嵌套、长表格、Mermaid、特殊 Markdown 的风险
-```
+- `emphasis_targets` 说明哪些结论/差异需要粗体或其他行内强调；
+- `callout_candidates` 说明候选块的类型、标题、读者作用、保留/改为正文的决定；
+- `code_table_diagram_map` 说明每个代码块/表格/图解决什么问题；
+- `link_surface` 说明 wikilink、外链、脚注的作用和边界；
+- `render_risks` 说明嵌套、长表格、Mermaid、特殊 Markdown 的风险。
+
+运行 `node scripts/check-note.ts --strict --portable --json`，让代码验证 hash、字段和实际格式表面的逐行覆盖；代码通过只代表“没有漏记”，不代表格式选择一定有教学价值。
 
 最终检查至少覆盖：
 
@@ -185,6 +186,6 @@ clarity reviewer 检查格式是否帮助读者恢复主线、找到重点和区
 
 ## 6. 权威性与冲突处理
 
-本文件是 `knowledge-distiller` 的格式语义来源。`SKILL.md` 只规定读取本文件和满足格式检查的硬门；`references/final-checklist.md` 只保留可执行的最终检查项；`references/mermaid.md` 负责 Mermaid 的专门语法和渲染约束。
+本文件是 `knowledge-distiller` 的格式语义来源。`SKILL.md` 只规定读取本文件和满足格式检查的硬门；`references/mechanical-gates.md` 负责脚本职责与机器证据契约；`references/final-checklist.md` 只保留可执行的最终检查项；`references/mermaid.md` 负责 Mermaid 的专门语法和渲染约束。
 
 如果格式规范与用户明确要求冲突，遵守用户要求；如果格式偏好与事实、范围、vault 完整性或可渲染性冲突，遵守后者，并在报告中说明未采用的格式方案。

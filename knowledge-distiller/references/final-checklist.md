@@ -1,37 +1,40 @@
 # Final Self-Check
 
-Run this checklist once before the first reviewer, after every revision, and once before the Phase 8 report. If
-the file was not safely written, check the draft but mark path/file checks not applicable and do not claim delivery.
+Run this checklist once before the first reviewer, after every body revision, and before the Phase 8 report. If the
+file was not safely written, inspect the exact draft but do not claim delivery.
 
-- Scope and route match the user's material; unrelated topics were split or excluded.
-- The reader contract has one central question, one-sentence spine, explicit scope boundary, and a useful after-state;
-  every top-level section answers a necessary subquestion, with dependencies or parallel relationships made explicit;
-  each adjacent section relation has a reason the reader can understand.
-- A linear read without following links recovers the spine and the role of each section; no paragraph or comparison is
-  an orphan, a false alternative, or a mechanically appended research/reviewer return; every material paragraph maps to
-  a section role in the Teaching Model.
-- The heading tree matches the Teaching Model: the title convention is explicit, heading levels encode parent/child
-  relations, parallel chapters are siblings, no level is skipped, and no substantive chapter is the sole parent of
-  unrelated major sections. `check-heading-tree.ts --strict` passes.
-- Each comparison uses one coherent axis; a cross-axis mechanism has an explicit primary and secondary role.
-- Language, terminology, formulas, code, and conversation-boundary rules are satisfied.
-- Material claims have direct evidence; unverified claims are removed or qualified, with important current or
-  quantitative claims retaining nearby sources.
-- The note teaches cause, mechanism, trade-offs, and boundary conditions without a duplicate title, forced
-  Introduction/Conclusion, table of contents, or bibliography dump.
-- New-note frontmatter and update-preservation rules are satisfied.
-- Existing same-topic choice and output path are correct; `write_status` and read-back prove the claimed file state,
-  while uncertain recovery is reported as `possibly_partial`.
-- The semantic link ledger is sound, the deterministic wikilink gate passes, and every link has an exact unique target
-  position; new block IDs are unique and reported.
-- `references/obsidian-writing-style.md` was read; the `format_plan` has a decision for every retained callout,
-  code block, table, diagram, emphasis target and link surface, and records render risks. Core conclusions are
-  findable, callouts and diagrams pass its removal test, and original explanatory examples were not removed without
-  a reader-model reason. Mermaid follows `references/mermaid.md`, and unavailable rendering is reported as
-  `Mermaid 渲染未验证` with a prose fallback.
-- Sentence-level cleanup (and `humanizer-zh` when available) was used only to repair concrete reading obstacles; it
-  is not treated as evidence that the reader model is coherent.
-- Reviewer states, provider evidence, fallback checks, actionable-finding ledger, finite convergence budget, late
-  results, blocker classification, and cancellation claims are truthful; no wall-clock duration was treated as provider
-  failure. A `reader_blocker` or `accuracy_blocker` prevents delivery even when the file was written.
-- The Phase 8 report accurately states revisions, corrections, unresolved claims, vault mutations, and delivery state.
+## 1. Let the scripts decide mechanical facts
+
+For a written note, retain the JSON from:
+
+```bash
+node scripts/check-note.ts \
+  --file "$NOTE_PATH" \
+  --vault-root "$VAULT_ROOT" \
+  --format-plan "$FORMAT_PLAN_JSON" \
+  --strict --portable --json
+```
+
+The checker owns frontmatter/fence/table/callout/Mermaid surface syntax, heading structure, anchored wikilink
+resolution and format-plan coverage. Its `passed` state does not establish truth, semantic link value, reader path or
+render success. See `references/mechanical-gates.md` for the evidence contract and limits.
+
+For review and delivery, retain the JSON from `check-review-journal.ts` and `check-delivery-report.ts`. A self-test is
+not an actual-note pass, and a checker marked `unavailable` must remain unavailable in the report.
+
+## 2. Keep the semantic gates human-readable
+
+- Scope, route, central question, spine, after-state and section dependencies still match the reader contract.
+- Linear reading recovers the teaching model; no paragraph, comparison, link or research return is orphaned or a false
+  alternative.
+- Claims have direct evidence and explicit limits; unverified central claims are qualified, deferred or removed.
+- The note teaches cause, mechanism, trade-offs and boundaries without a duplicate title, forced Introduction/Conclusion,
+  table of contents or bibliography dump.
+- `references/obsidian-writing-style.md` and, when relevant, `references/mermaid.md` were read. Callouts, emphasis,
+  tables, code, diagrams, links and footnotes have a reader function; removal tests support retained blocks; Mermaid
+  rendering unavailable is reported as `Mermaid 渲染未验证` with nearby prose fallback.
+- Preservation scope, existing-note mutations, frontmatter, read-back, write status and recovery state are truthful.
+- Clarity/accuracy findings are identity-bound to the exact revision and hash; fallback is labeled `manual_checked`,
+  late results stay `late_ignored`, and reader/accuracy blockers prevent a success label.
+- The Phase 8 report states revisions, corrections, unresolved claims, vault mutations, open items and the final label
+  without upgrading a mechanical pass into a semantic or reviewer pass.
