@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.0] - 2026-08-11
+
+### 重构
+- refactor(lifecycle): 优化分布式系统故障审查状态区分和交付报告
+
+### 其他
+- simplify knowledge-distiller audit surface
+- fix knowledge-distiller correction trace leakage
+
+
 ## [0.4.4] - 2026-08-10
 
 ### 修复
