@@ -290,6 +290,13 @@ attempt_id: <attempt-id>
 note_revision: <note-revision>
 note_path: <vault-path>/<area>/<filename>.md
 
+Read `references/obsidian-writing-style.md` before reviewing the note. Treat its format roles as part of the reader
+contract, not as a request to use every Markdown feature. In addition to C1–C5 below, inspect whether the visual
+hierarchy lets a near-zero-prior reader find the spine, core conclusions, boundaries, examples, and decisions. For every
+retained or removed emphasis/callout/diagram that materially affects the path, report the exact passage and the lost
+or gained reader function. Apply the reference's callout removal test; do not reward decorative blocks or penalize an
+intentionally plain passage whose reader role remains easy to recover.
+
 You are a human reader learning this topic. Treat your own prior knowledge as near-zero and judge whether the note
 alone lets you reconstruct and use one coherent model. First state the `teach_back`: the spine you recovered in one
 sentence, what question each top-level section answers, and what the reader can now explain, predict, or choose. Then
@@ -316,6 +323,12 @@ axis: accuracy
 attempt_id: <attempt-id>
 note_revision: <note-revision>
 note_path: <vault-path>/<area>/<filename>.md
+
+Read `references/obsidian-writing-style.md` before reviewing the note. Treat every callout, emphasized phrase,
+code block, table, diagram, link, footnote, embed, and example as part of the factual artifact. Check that each format
+feature uses valid portable syntax for the declared vault/runtime; mark custom CSS/plugin-dependent syntax as
+unverified unless the capability is evidenced. Do not require a feature merely for variety, but do check that a
+material boundary, qualification, or example was not hidden or deleted by flattening it into ordinary prose.
 
 You are an expert in this field. Check every factual claim, including claims in tables, callouts, diagrams, and
 examples. For A1, quote the exact claim for each problem, state the correction or missing nuance, and cite a source you

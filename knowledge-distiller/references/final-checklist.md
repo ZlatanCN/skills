@@ -24,10 +24,10 @@ the file was not safely written, check the draft but mark path/file checks not a
   while uncertain recovery is reported as `possibly_partial`.
 - The semantic link ledger is sound, the deterministic wikilink gate passes, and every link has an exact unique target
   position; new block IDs are unique and reported.
-- `references/obsidian-writing-style.md` was read; the format plan is intentional, core conclusions are findable,
-  callouts and diagrams pass its removal test, and original explanatory examples were not removed without a
-  reader-model reason. Mermaid follows `references/mermaid.md`, and unavailable rendering is reported as
-  `Mermaid 渲染未验证` with a prose fallback.
+- `references/obsidian-writing-style.md` was read; the `format_plan` has a decision for every retained callout,
+  diagram, table and emphasis target, core conclusions are findable, callouts and diagrams pass its removal test,
+  and original explanatory examples were not removed without a reader-model reason. Mermaid follows
+  `references/mermaid.md`, and unavailable rendering is reported as `Mermaid 渲染未验证` with a prose fallback.
 - Sentence-level cleanup (and `humanizer-zh` when available) was used only to repair concrete reading obstacles; it
   is not treated as evidence that the reader model is coherent.
 - Reviewer states, provider evidence, fallback checks, actionable-finding ledger, finite convergence budget, late

@@ -335,9 +335,9 @@ Teach the causal model before advice: why mechanisms exist, how they work, what 
 Give each paragraph one job and make non-obvious transitions explicit. Avoid `Introduction`, `Conclusion`, `总结`,
 table-of-contents, and dedicated “see also” sections. Use a running example when it reduces abstraction. The complete
 format policy, including emphasis, callouts, Markdown surface, code, diagrams, links, and removal tests, is defined
-only in `references/obsidian-writing-style.md`; do not duplicate its detailed rules here. Use Mermaid only for a
-structural or temporal relationship that prose explains less clearly; read `references/mermaid.md` first, keep it small,
-and report `Mermaid 渲染未验证` if it cannot be parsed/rendered in the environment.
+only in `references/obsidian-writing-style.md`; do not duplicate its detailed rules here. Mermaid syntax, diagram
+scope, rendering and fallback rules are defined only in `references/mermaid.md`; read that reference before drawing and
+report its required `Mermaid 渲染未验证` status when rendering is unavailable.
 
 ## 7. Phase 6 — fail-closed write transaction and verification
 
