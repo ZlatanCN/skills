@@ -83,7 +83,8 @@ node scripts/check-note.ts \
 审查 journal 由 `references/review-lifecycle.md` 定义生命周期语义，由 `check-review-journal.ts` 机械验证：
 
 ```bash
-node scripts/check-review-journal.ts --journal "$JOURNAL" --json
+node scripts/check-review-journal.ts --journal "$JOURNAL" --allow-open --json
+# before report_closed, omit --allow-open
 ```
 
 脚本验证 JSONL 可解析、`event_id` 唯一、`order` 单调、cycle/attempt/path/revision/hash/axis 身份不漂移、dispatch/provider identity、observability、evidence 字段存在、状态转移合法、枚举值合法、`clean` 具备 complete coverage/claims/after-state 且不得与 findings/partial/unverified 矛盾、`report_closed` 唯一且 cutoff 有效；空 journal 失败，关闭后的结果只能标记为 `late_ignored`。它不判断 reviewer 的事实判断是否正确，也不把 parent timeout 推断成 provider failure。
@@ -96,7 +97,7 @@ node scripts/check-review-journal.ts --journal "$JOURNAL" --json
 node scripts/check-delivery-report.ts --report "$DELIVERY_JSON" --json
 ```
 
-`knowledge-distiller.delivery.v1` 至少包含 `write_status`、完整的 `hard_gates`（`write_readback`、`preservation`、`heading`、`mechanical_link`、`semantic_link`、`evidence`、`render`）、clarity/accuracy 的 `quality_result`、journal 状态、open blockers 和最终 `label`。脚本验证：
+`knowledge-distiller.delivery.v1` 至少包含 `write_status`、完整的 `hard_gates`（`write_readback`、`preservation`、`heading`、`mechanical_link`、`semantic_link`、`evidence`、`render`；新笔记的 preservation 可为 `not_applicable`）、clarity/accuracy 的 `quality_result`、journal 状态、open blockers 和最终 `label`。脚本验证：
 
 - `双轴审查通过` 必须同时拥有 confirmed write、所有 hard gates 通过、两个合法 clean 结果、已关闭 journal 且无 blocker；
 - hard gate 失败/不可用、审查不确定、写入可能部分完成或存在 reader/accuracy blocker 时，不得使用成功标签；

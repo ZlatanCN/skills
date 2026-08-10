@@ -7,7 +7,7 @@ import * as os from "node:os";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { parseMarkdown } from "./lib/markdown.ts";
-import { evidence, exitForGate, fileHash, finding, type Evidence, type Finding } from "./lib/evidence.ts";
+import { evidence, exitForGate, fileHash, finding, isRecord, type Evidence, type Finding } from "./lib/evidence.ts";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,6 +19,13 @@ function runChecker(script: string, args: string[], input?: string): ChildRun {
   const stdout = child.stdout ?? "";
   try {
     const parsed = JSON.parse(stdout) as Evidence;
+    if (!isRecord(parsed) || !new Set(["passed", "failed", "unavailable"]).has(String(parsed.gate)) || !Array.isArray(parsed.findings)) {
+      return {
+        status: child.status,
+        stderr: child.stderr ?? "",
+        result: evidence("check-note", "unavailable", { script, args }, {}, [finding("checker-envelope-invalid", "error", "child checker returned a malformed evidence envelope", { evidence: { stdout, stderr: child.stderr ?? "" } })]),
+      };
+    }
     if (child.status !== exitForGate(parsed.gate)) {
       return {
         status: child.status,

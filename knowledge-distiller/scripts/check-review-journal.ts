@@ -14,7 +14,7 @@ const QUALITY_RESULTS = new Set(["clean", "findings", "unverified", "protocol_in
 const ALLOWED_TRANSITIONS: Record<string, Set<string>> = {
   pending: new Set(["pending", "active", "failed", "unknown"]),
   active: new Set(["active", "completed", "failed", "unknown", "deferred"]),
-  unknown: new Set(["unknown", "completed", "failed", "suspected_stall", "deferred", "cancel_requested"]),
+  unknown: new Set(["unknown", "completed", "failed", "suspected_stall", "deferred", "cancel_requested", "closed"]),
   suspected_stall: new Set(["suspected_stall", "cancel_requested", "deferred"]),
   cancel_requested: new Set(["cancel_requested", "canceled_confirmed", "unknown"]),
   completed: new Set(["completed", "closed"]),
@@ -48,7 +48,7 @@ function readEvents(file: string, findings: Finding[]): Array<Record<string, unk
   return events;
 }
 
-function check(fileInput: string): Evidence {
+function check(fileInput: string, allowOpen = false): Evidence {
   const file = path.resolve(fileInput);
   const findings: Finding[] = [];
   const events = readEvents(file, findings);
@@ -103,12 +103,19 @@ function check(fileInput: string): Evidence {
       if (!(typeof event.claims_checked === "number" && event.claims_checked > 0) && !nonBlank(event.claims_checked)) findings.push(finding("journal-clean-claims-missing", "error", "quality_result=clean requires claims_checked", { line }));
       if (!nonBlank(event.after_state) && !nonBlank(event.reader_after_state) && !nonBlank(event.teach_back)) findings.push(finding("journal-clean-after-state-missing", "error", "quality_result=clean requires reader after-state evidence", { line }));
       if (!nonBlank(event.provider_operation_id) && !nonBlank(event.client_dispatch_id)) findings.push(finding("journal-clean-identity-missing", "error", "quality_result=clean requires reviewer identity evidence", { line }));
+      if (axis === "clarity") {
+        for (const label of ["C1", "C2", "C3", "C4", "C5", "teach_back"]) if (!present(event[label])) findings.push(finding("journal-clarity-contract-missing", "error", `quality_result=clean requires ${label}`, { line }));
+      }
+      if (axis === "accuracy") {
+        for (const label of ["A1"]) if (!present(event[label])) findings.push(finding("journal-accuracy-contract-missing", "error", `quality_result=clean requires ${label}`, { line }));
+      }
     }
     if (eventType === "report_closed") {
       if (closeIndex >= 0) findings.push(finding("journal-close-duplicate", "error", "review report may have only one report_closed event", { line }));
       closeIndex = index;
       if (!Number.isInteger(event.cutoff_order)) findings.push(finding("journal-cutoff-missing", "error", "report_closed requires an integer cutoff_order", { line }));
       else cutoffOrder = Number(event.cutoff_order);
+      if (event.state_after !== "closed" || event.parent_wait_state !== "closed") findings.push(finding("journal-close-state-invalid", "error", "report_closed must end in state_after=closed and parent_wait_state=closed", { line }));
     }
   });
 
@@ -119,7 +126,7 @@ function check(fileInput: string): Evidence {
       if (index > closeIndex && event.event_type !== "late_ignored" && event.state_after !== "late_ignored") findings.push(finding("journal-event-after-close", "error", "only late_ignored events may follow report_closed", { line: index + 1 }));
     });
   }
-  if (events.length > 0 && closeIndex < 0) findings.push(finding("journal-not-closed", "warning", "journal has no report_closed event yet"));
+  if (events.length > 0 && closeIndex < 0) findings.push(finding("journal-not-closed", allowOpen ? "warning" : "error", "journal has no report_closed event yet; use --allow-open only while the lifecycle is still running"));
 
   const errors = findings.filter((item) => item.severity === "error");
   return evidence("check-review-journal", errors.length === 0 ? "passed" : "failed", { path: file }, {
@@ -137,6 +144,10 @@ function nonBlank(value: unknown): boolean {
   return value !== undefined && value !== null;
 }
 
+function present(value: unknown): boolean {
+  return value !== undefined && value !== null && (typeof value !== "string" || value.trim().length > 0);
+}
+
 function selfTest(): number {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "knowledge-distiller-review-journal-"));
   try {
@@ -144,7 +155,7 @@ function selfTest(): number {
     const base = { cycle_id: "cycle-1", attempt_id: "attempt-1", axis: "clarity", note_path: "/tmp/Note.md", note_revision: 1, draft_hash: "a".repeat(64), client_dispatch_id: "dispatch-1", provider_operation_id: "provider-1", observed_at: "2026-08-10T00:00:00Z", observability: "provider-status", evidence: { source: "self-test" }, provider_execution_state: "pending", provider_liveness: "unobserved", parent_wait_state: "waiting", cancel_state: "not_requested", quality_result: "unavailable" };
     const events = [
       { ...base, event_id: "e1", order: 1, event_type: "dispatch", state_before: "pending", state_after: "active" },
-      { ...base, event_id: "e2", order: 2, event_type: "result", state_before: "active", state_after: "completed", provider_execution_state: "completed", provider_liveness: "terminal", quality_result: "clean", findings: [], source_coverage: "complete", claims_checked: 3, after_state: "explain", unverified: "—" },
+      { ...base, event_id: "e2", order: 2, event_type: "result", state_before: "active", state_after: "completed", provider_execution_state: "completed", provider_liveness: "terminal", quality_result: "clean", findings: [], source_coverage: "complete", claims_checked: 3, after_state: "explain", teach_back: "reader can explain the model", C1: "—", C2: "—", C3: "—", C4: "—", C5: "—", unverified: "—" },
       { ...base, event_id: "e3", order: 3, event_type: "report_closed", state_before: "completed", state_after: "closed", parent_wait_state: "closed", cutoff_order: 2 },
     ];
     fs.writeFileSync(file, events.map((event) => JSON.stringify(event)).join("\n") + "\n", "utf8");
@@ -164,18 +175,19 @@ function main(): number {
   const args = process.argv.slice(2);
   if (args.includes("--self-test")) return selfTest();
   const json = args.includes("--json");
+  const allowOpen = args.includes("--allow-open");
   let journal = "";
   for (let i = 0; i < args.length; i += 1) {
     if (args[i] === "--journal") journal = args[++i] ?? "";
-    else if (!["--json", "--help", "-h"].includes(args[i])) throw new Error(`unknown argument: ${args[i]}`);
+    else if (!["--json", "--allow-open", "--help", "-h"].includes(args[i])) throw new Error(`unknown argument: ${args[i]}`);
   }
   if (args.includes("--help") || args.includes("-h")) {
-    console.log("usage: node scripts/check-review-journal.ts --journal JOURNAL.jsonl [--json]");
+    console.log("usage: node scripts/check-review-journal.ts --journal JOURNAL.jsonl [--allow-open] [--json]");
     console.log("       node scripts/check-review-journal.ts --self-test");
     return 0;
   }
   if (!journal) throw new Error("usage: node scripts/check-review-journal.ts --journal JOURNAL.jsonl");
-  const result = check(journal);
+  const result = check(journal, allowOpen);
   if (json) console.log(JSON.stringify(result, null, 2));
   else if (result.gate === "passed") console.log("OK: review journal is identity-safe and transition-valid");
   else result.findings.filter((item) => item.severity === "error").forEach((item) => console.error(`ERROR ${item.path ?? ""}:${item.line ?? 0}: ${item.message}`));

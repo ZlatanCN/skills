@@ -7,10 +7,24 @@ import * as os from "node:os";
 import { evidence, exitForGate, finding, isRecord, readJsonInput, nonEmptyString, type Evidence, type Finding } from "./lib/evidence.ts";
 
 const WRITE_STATES = new Set(["written", "updated", "unchanged", "not_written", "possibly_partial"]);
-const GATES = new Set(["passed", "failed", "unavailable"]);
+const GATES = new Set(["passed", "failed", "unavailable", "not_applicable"]);
 const REVIEW_RESULTS = new Set(["clean", "findings", "unverified", "protocol_invalid", "unavailable"]);
 const REQUIRED_HARD_GATES = ["write_readback", "preservation", "heading", "mechanical_link", "semantic_link", "evidence", "render"];
 const SUCCESS_LABELS = new Set(["双轴审查通过", "已交付；部分审查由人工复核", "已交付；存在未决项"]);
+const DELIVERY_LABELS = new Set([
+  "双轴审查通过",
+  "已交付；部分审查由人工复核",
+  "已交付；存在未决项",
+  "已写入；存在阻塞项，未完成",
+  "文件已写入；自检未通过，未宣称交付",
+  "更新未写入；原文件已保留",
+  "内容已生成但未写入",
+  "文件状态不确定，未宣称交付",
+  "已写入；审查状态不确定，未完成",
+  "未写入（审查不确定）",
+  "未写入（仅草稿）",
+  "未写入（阻塞）",
+]);
 
 function check(input: string): Evidence {
   const findings: Finding[] = [];
@@ -27,6 +41,7 @@ function check(input: string): Evidence {
   }
   if (report.schema_version !== "knowledge-distiller.delivery.v1") findings.push(finding("delivery-version-invalid", "error", "schema_version must be knowledge-distiller.delivery.v1"));
   if (!nonEmptyString(report.label)) findings.push(finding("delivery-label-missing", "error", "label is required"));
+  else if (!DELIVERY_LABELS.has(String(report.label))) findings.push(finding("delivery-label-invalid", "error", "label is not in the canonical delivery matrix"));
   if (!WRITE_STATES.has(String(report.write_status))) findings.push(finding("delivery-write-state-invalid", "error", "write_status is not a canonical delivery state"));
   if (!nonEmptyString(report.note_path) && report.write_status !== "not_written") findings.push(finding("delivery-note-path-missing", "error", "note_path is required for a written or uncertain artifact"));
 
@@ -51,6 +66,15 @@ function check(input: string): Evidence {
     const result = String(axis?.quality_result ?? "");
     if (!REVIEW_RESULTS.has(result)) findings.push(finding("delivery-review-result-invalid", "error", `review.${name}.quality_result is missing or unsupported`));
     else results[name] = result;
+    if (result === "clean") {
+      for (const field of ["attempt_id", "observability", "source_coverage", "claims_checked", "after_state", "draft_hash"]) {
+        if (!nonEmptyString(axis?.[field]) && !(typeof axis?.[field] === "number" && Number(axis[field]) > 0)) findings.push(finding("delivery-clean-metadata-missing", "error", `review.${name}.${field} is required for quality_result=clean`));
+      }
+      if (axis?.source_coverage !== "complete") findings.push(finding("delivery-clean-coverage-invalid", "error", `review.${name}.source_coverage must be complete for quality_result=clean`));
+      if (typeof axis?.draft_hash !== "string" || !/^[a-f0-9]{64}$/i.test(axis.draft_hash)) findings.push(finding("delivery-clean-hash-invalid", "error", `review.${name}.draft_hash must be SHA-256 for quality_result=clean`));
+      const labels = name === "clarity" ? ["C1", "C2", "C3", "C4", "C5", "teach_back"] : ["A1"];
+      for (const field of labels) if (!nonEmptyString(axis?.[field])) findings.push(finding("delivery-clean-review-contract-missing", "error", `review.${name}.${field} is required for quality_result=clean`));
+    }
   }
   const manualFallback = review?.manual_fallback === true;
   for (const name of resultNames) {
@@ -61,6 +85,7 @@ function check(input: string): Evidence {
   if (!journal) findings.push(finding("delivery-journal-missing", "error", "review.journal must be an object"));
   if (journal && journal.gate !== "passed" && journal.gate !== "failed" && journal.gate !== "unavailable") findings.push(finding("delivery-journal-gate-invalid", "error", "review.journal.gate must be passed, failed, or unavailable"));
   if (journal?.gate === "passed" && journal.closed !== true) findings.push(finding("delivery-journal-open", "error", "a passed review journal must be closed"));
+  if (journal?.gate === "passed" && (!(typeof journal.events === "number" && journal.events > 0) || !(typeof journal.cutoff_order === "number" && journal.cutoff_order > 0))) findings.push(finding("delivery-journal-evidence-missing", "error", "a passed review journal must include positive events and cutoff_order"));
 
   const blockers = Array.isArray(report.open_blockers) ? report.open_blockers : [];
   const openItems = Array.isArray(report.open_items) ? report.open_items : [];
@@ -70,7 +95,7 @@ function check(input: string): Evidence {
 
   const label = String(report.label ?? "");
   const written = report.write_status === "written" || report.write_status === "updated";
-  const allHardPassed = gateValues.length > 0 && gateValues.every((value) => value === "passed");
+  const allHardPassed = gateValues.length > 0 && gateValues.every((value) => value === "passed" || value === "not_applicable");
   const bothClean = results.clarity === "clean" && results.accuracy === "clean";
   const journalClosed = journal?.gate === "passed" && journal.closed === true;
   const hasBlocker = blockers.length > 0 || openItems.some((item) => isRecord(item) && ["reader_blocker", "accuracy_blocker"].includes(String(item.classification)));
@@ -114,14 +139,25 @@ function selfTest(): number {
       write_status: "updated",
       note_path: "/tmp/Note.md",
       hard_gates: { write_readback: "passed", preservation: "passed", heading: "passed", mechanical_link: "passed", semantic_link: "passed", evidence: "passed", render: "passed" },
-      review: { clarity: { quality_result: "clean" }, accuracy: { quality_result: "clean" }, journal: { gate: "passed", closed: true, events: 3 } },
+      review: {
+        clarity: { quality_result: "clean", attempt_id: "clarity-1", observability: "provider", source_coverage: "complete", claims_checked: 3, after_state: "explain", draft_hash: "a".repeat(64), C1: "—", C2: "—", C3: "—", C4: "—", C5: "—", teach_back: "reader can explain" },
+        accuracy: { quality_result: "clean", attempt_id: "accuracy-1", observability: "provider", source_coverage: "complete", claims_checked: 3, after_state: "explain", draft_hash: "a".repeat(64), A1: "—" },
+        journal: { gate: "passed", closed: true, events: 3, cutoff_order: 2 },
+      },
       open_blockers: [],
       open_items: [],
     };
     fs.writeFileSync(file, JSON.stringify(report), "utf8");
     if (check(file).gate !== "passed") throw new Error("valid delivery report should pass");
+    fs.writeFileSync(file, JSON.stringify({
+      ...report,
+      review: { clarity: { quality_result: "clean" }, accuracy: { quality_result: "clean" }, journal: { gate: "passed", closed: true, events: 3, cutoff_order: 2 } },
+    }), "utf8");
+    if (check(file).gate !== "failed") throw new Error("clean axes without reviewer metadata should fail");
     fs.writeFileSync(file, JSON.stringify({ ...report, hard_gates: { bogus: "passed" } }), "utf8");
     if (check(file).gate !== "failed") throw new Error("incomplete hard-gate set should fail");
+    fs.writeFileSync(file, JSON.stringify({ ...report, label: "假的通过标签" }), "utf8");
+    if (check(file).gate !== "failed") throw new Error("unknown delivery label should fail");
     fs.writeFileSync(file, JSON.stringify({
       ...report,
       label: "已交付；部分审查由人工复核",

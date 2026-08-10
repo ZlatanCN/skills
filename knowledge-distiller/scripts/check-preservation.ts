@@ -62,8 +62,8 @@ function rangeCovers(unit: Record<string, unknown>, hunk: Hunk): boolean {
   const oe = Number(unit.original_end ?? 0);
   const di = Number(unit.draft_start ?? 0);
   const de = Number(unit.draft_end ?? 0);
-  const originalCovered = hunk.original_start === 0 ? oi === 0 && oe === 0 : oi <= hunk.original_start && oe >= hunk.original_end;
-  const draftCovered = hunk.draft_start === 0 ? di === 0 && de === 0 : di <= hunk.draft_start && de >= hunk.draft_end;
+  const originalCovered = oi === hunk.original_start && oe === hunk.original_end;
+  const draftCovered = di === hunk.draft_start && de === hunk.draft_end;
   return originalCovered && draftCovered;
 }
 

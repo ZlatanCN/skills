@@ -429,6 +429,8 @@ function selfTest(): number {
 try {
   process.exitCode = main();
 } catch (error) {
-  console.error(`ERROR: ${(error as Error).message}`);
+  if (process.argv.includes("--json")) {
+    console.log(JSON.stringify(evidence("check-wikilinks", "unavailable", { args: process.argv.slice(2) }, {}, [finding("checker-invocation-invalid", "error", (error as Error).message)]), null, 2));
+  } else console.error(`ERROR: ${(error as Error).message}`);
   process.exitCode = 2;
 }

@@ -414,10 +414,12 @@ operation ID as a replacement for `attempt_id`. If the journal is unavailable, d
 manual fallback and report `journal_unavailable`. A client submission proves neither provider acceptance nor
 completion.
 
-Validate the JSONL before dispatch, after every append, and before closure:
+Validate the open JSONL before dispatch and after every append with `--allow-open`; run the same command without that
+flag before closure:
 
 ```bash
-node scripts/check-review-journal.ts --journal "<review-journal.jsonl>" --json
+node scripts/check-review-journal.ts --journal "<review-journal.jsonl>" --allow-open --json
+# before report_closed: omit --allow-open
 ```
 
 The checker verifies event identity, monotonic order, legal transitions, contradictory clean results and the close/
