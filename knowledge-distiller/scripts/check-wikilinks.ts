@@ -59,10 +59,6 @@ function relativeKey(relativePath: string): string {
   return relativePath.split(path.sep).join("/").normalize("NFKC");
 }
 
-function hashBytes(bytes: Buffer): string {
-  return sha256(bytes);
-}
-
 function inside(root: string, candidate: string): boolean {
   const relative = path.relative(root, candidate);
   return (
@@ -84,7 +80,7 @@ function noteFromFile(root: string, file: string): Note {
     basename,
     basenameKey: filenameKey(basename),
     blockIds: parsed.block_ids,
-    contentHash: hashBytes(bytes),
+    contentHash: sha256(bytes),
     headings: parsed.headings,
     parseErrors: parsed.parse_errors.map((item) => ({
       file,
@@ -199,7 +195,7 @@ function scanManifest(rootInput: string, includeSkillDir = false): Manifest {
     duplicateKeys,
     errors,
     exclusions: [...EXCLUDED_DIRS].toSorted(),
-    manifestHash: hashBytes(Buffer.from(canonical, "utf-8")),
+    manifestHash: sha256(Buffer.from(canonical, "utf-8")),
     notes,
     rootRealpath,
     scanStatus: errors.length === 0 ? "complete" : "partial",

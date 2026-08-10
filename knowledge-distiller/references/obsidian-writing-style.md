@@ -171,7 +171,7 @@ Callout 可以只有标题而没有正文；标题中可以使用用户可读的
 - `link_surface` 说明 wikilink、外链、脚注的作用和边界；
 - `render_risks` 说明嵌套、长表格、Mermaid、特殊 Markdown 的风险。
 
-运行 `node scripts/check-note.ts --strict --portable --json`，让代码验证 hash、字段和实际格式表面的逐行覆盖；代码通过只代表“没有漏记”，不代表格式选择一定有教学价值。
+运行 `references/mechanical-gates.md` §2 的 canonical `check-note.ts` 命令，让代码验证 hash、字段和实际格式表面的逐行覆盖；代码通过只代表“没有漏记”，不代表格式选择一定有教学价值。
 
 最终检查至少覆盖：
 

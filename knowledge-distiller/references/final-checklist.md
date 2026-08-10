@@ -5,15 +5,8 @@ file was not safely written, inspect the exact draft but do not claim delivery.
 
 ## 1. Let the scripts decide mechanical facts
 
-For a written note, retain the JSON from:
-
-```bash
-node scripts/check-note.ts \
-  --file "$NOTE_PATH" \
-  --vault-root "$VAULT_ROOT" \
-  --format-plan "$FORMAT_PLAN_JSON" \
-  --strict --portable --json
-```
+For a written note, retain the JSON from the canonical `check-note.ts` command in
+`references/mechanical-gates.md` §2.
 
 The checker owns frontmatter/fence/table/callout/Mermaid surface syntax, heading structure, anchored wikilink
 resolution and format-plan coverage. Its `passed` state does not establish truth, semantic link value, reader path or

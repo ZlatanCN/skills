@@ -89,6 +89,15 @@ export function exitForGate(gate: Gate): number {
   return 2;
 }
 
+export function runMain(main: () => number): void {
+  try {
+    process.exitCode = main();
+  } catch (error) {
+    console.error(`ERROR: ${(error as Error).message}`);
+    process.exitCode = 2;
+  }
+}
+
 export function readJsonInput(input: string): unknown {
   return JSON.parse(
     input === "-"

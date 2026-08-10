@@ -5,7 +5,13 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import path from "node:path";
 
-import { evidence, exitForGate, finding, isRecord } from "./lib/evidence.ts";
+import {
+  evidence,
+  exitForGate,
+  finding,
+  isRecord,
+  runMain,
+} from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
 
 const EXECUTION_STATES = new Set([
@@ -884,9 +890,4 @@ function runCli(): number {
   return main();
 }
 
-try {
-  process.exitCode = runCli();
-} catch (error) {
-  console.error(`ERROR: ${(error as Error).message}`);
-  process.exitCode = 2;
-}
+runMain(runCli);

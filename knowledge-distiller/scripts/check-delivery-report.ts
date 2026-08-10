@@ -14,6 +14,7 @@ import {
   isRecord,
   readJsonInput,
   nonEmptyString,
+  runMain,
 } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
 
@@ -441,18 +442,21 @@ function bindPassedJournal(
         "a passed review journal must include its SHA-256"
       )
     );
-  } else if (fileHash(journalPath) !== journal.sha256) {
-    findings.push(
-      finding(
-        "delivery-journal-hash-mismatch",
-        "error",
-        "journal.sha256 does not match the evidence file",
-        {
-          evidence: { actual: fileHash(journalPath), declared: journal.sha256 },
-          path: journalPath,
-        }
-      )
-    );
+  } else {
+    const actualHash = fileHash(journalPath);
+    if (actualHash !== journal.sha256) {
+      findings.push(
+        finding(
+          "delivery-journal-hash-mismatch",
+          "error",
+          "journal.sha256 does not match the evidence file",
+          {
+            evidence: { actual: actualHash, declared: journal.sha256 },
+            path: journalPath,
+          }
+        )
+      );
+    }
   }
   const checked = runJournalChecker(journalPath, findings);
   validateJournalSummary(journal, checked, journalPath, findings);
@@ -515,7 +519,8 @@ function validateWrittenArtifact(
     );
     return;
   }
-  if (fileHash(notePath) !== report.final_hash) {
+  const actualHash = fileHash(notePath);
+  if (actualHash !== report.final_hash) {
     findings.push(
       finding(
         "delivery-final-hash-mismatch",
@@ -523,7 +528,7 @@ function validateWrittenArtifact(
         "final_hash does not match the written note bytes",
         {
           evidence: {
-            actual: fileHash(notePath),
+            actual: actualHash,
             declared: report.final_hash,
           },
           path: notePath,
@@ -1598,9 +1603,4 @@ function main(): number {
   return exitForGate(result.gate);
 }
 
-try {
-  process.exitCode = main();
-} catch (error) {
-  console.error(`ERROR: ${(error as Error).message}`);
-  process.exitCode = 2;
-}
+runMain(main);

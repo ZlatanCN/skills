@@ -5,7 +5,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import path from "node:path";
 
-import { evidence, exitForGate, finding } from "./lib/evidence.ts";
+import { evidence, exitForGate, finding, runMain } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
 import { frontmatterTitle, parseMarkdown } from "./lib/markdown.ts";
 import type { Heading } from "./lib/markdown.ts";
@@ -248,9 +248,4 @@ function main(): number {
   return exitForGate(merged.gate);
 }
 
-try {
-  process.exitCode = main();
-} catch (error) {
-  console.error(`ERROR: ${(error as Error).message}`);
-  process.exitCode = 2;
-}
+runMain(main);

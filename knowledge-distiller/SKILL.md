@@ -372,16 +372,8 @@ success.
 ### 7A. Gate evidence
 
 Read `references/mechanical-gates.md` before relying on any checker. Run every checker self-test once per invocation and
-retain its command, version, exit code and timestamp; then run the aggregate gate against the exact temporary and final
-bytes:
-
-```bash
-node scripts/check-note.ts \
-  --file "<note-path>" \
-  --vault-root "<vault-root>" \
-  --format-plan "<format-plan-json>" \
-  --strict --portable --json
-```
+retain its command, version, exit code and timestamp; then run the canonical aggregate command defined in that reference
+against the exact temporary and final bytes.
 
 For an update, append `--original "<original-path>" --preservation "<preservation-json>"`; for a new note do not
 invent a preservation record.

@@ -12,6 +12,7 @@ import {
   finding,
   isRecord,
   readJsonInput,
+  runMain,
   nonEmptyString,
 } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
@@ -578,9 +579,4 @@ function main(): number {
   return exitForGate(result.gate);
 }
 
-try {
-  process.exitCode = main();
-} catch (error) {
-  console.error(`ERROR: ${(error as Error).message}`);
-  process.exitCode = 2;
-}
+runMain(main);
