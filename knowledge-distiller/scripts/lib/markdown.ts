@@ -42,8 +42,8 @@ export const CALLOUT_TYPES: Record<string, string[]> = {
   quote: ["cite"],
 };
 
-export const CALLOUT_ALIASES = new Map(
-  Object.entries(CALLOUT_TYPES).flatMap(([type, aliases]) => [[type, type], ...aliases.map((alias) => [alias, type])]),
+export const CALLOUT_ALIASES = new Map<string, string>(
+  Object.entries(CALLOUT_TYPES).flatMap(([type, aliases]) => [[type, type] as [string, string], ...aliases.map((alias): [string, string] => [alias, type])]),
 );
 
 export function normalize(value: string): string {

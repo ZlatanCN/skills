@@ -29,6 +29,25 @@ const DELIVERY_LABELS = new Set([
 ]);
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
+type MutableDeliveryReport = {
+  schema_version: string;
+  label: string;
+  write_status: string;
+  note_path: string;
+  hard_gates: Record<string, string>;
+  review: {
+    clarity: Record<string, unknown>;
+    accuracy: Record<string, unknown>;
+    journal: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+  open_blockers: unknown[];
+  open_items: unknown[];
+  artifact_kind: string;
+  final_hash: string;
+  [key: string]: unknown;
+};
+
 function readJournalEvents(file: string): Array<Record<string, unknown>> {
   return fs.readFileSync(file, "utf8").split(/\r?\n/).filter((line) => line.trim()).map((line) => JSON.parse(line) as Record<string, unknown>);
 }
@@ -199,11 +218,11 @@ function check(input: string): Evidence {
 
   if (journal) bindPassedJournal(journal, report, results, findings);
   bindCreationProbe(report, findings);
-  if (report.hard_gates && report.hard_gates.preservation === "not_applicable" && report.artifact_kind !== "new_note") {
+  if (gateObject?.preservation === "not_applicable" && report.artifact_kind !== "new_note") {
     findings.push(finding("delivery-preservation-not-applicable-invalid", "error", "preservation=not_applicable is valid only for a new_note artifact"));
   }
-  if (written && report.hard_gates && report.hard_gates.write_readback !== "passed") findings.push(finding("delivery-write-readback-required", "error", "a written or updated artifact must have write_readback=passed"));
-  if (report.artifact_kind === "new_note" && report.hard_gates && report.hard_gates.preservation === "passed") {
+  if (written && gateObject?.write_readback !== "passed") findings.push(finding("delivery-write-readback-required", "error", "a written or updated artifact must have write_readback=passed"));
+  if (report.artifact_kind === "new_note" && gateObject?.preservation === "passed") {
     findings.push(finding("delivery-new-note-preservation-misclassified", "error", "a new_note should report preservation=not_applicable, not a fabricated update check"));
   }
 
@@ -214,7 +233,9 @@ function check(input: string): Evidence {
   if (written && !allHardPassed && SUCCESS_LABELS.has(label)) findings.push(finding("delivery-gate-overclaim", "error", "a success delivery label cannot hide failed or unavailable hard gates"));
   if (reviewUncertain && SUCCESS_LABELS.has(label)) findings.push(finding("delivery-review-overclaim", "error", "an uncertain review state cannot use a success delivery label"));
   if (hasBlocker && SUCCESS_LABELS.has(label)) findings.push(finding("delivery-blocker-overclaim", "error", "reader/accuracy blockers cannot use a success delivery label"));
-  if (label === "已交付；部分审查由人工复核" && !(manualFallback && journal?.gate === "unavailable" && results.clarity === "unavailable" && results.accuracy === "unavailable" && review?.clarity?.fallback === "manual_checked" && review?.accuracy?.fallback === "manual_checked" && !hasBlocker)) {
+  const clarityManualFallback = isRecord(review?.clarity) && review.clarity.fallback === "manual_checked";
+  const accuracyManualFallback = isRecord(review?.accuracy) && review.accuracy.fallback === "manual_checked";
+  if (label === "已交付；部分审查由人工复核" && !(manualFallback && journal?.gate === "unavailable" && results.clarity === "unavailable" && results.accuracy === "unavailable" && clarityManualFallback && accuracyManualFallback && !hasBlocker)) {
     findings.push(finding("delivery-manual-fallback-overclaim", "error", "partial manual-review delivery requires explicit manual_checked fallback for both unavailable axes"));
   }
   if (label === "已交付；存在未决项" && openItems.some((item) => isRecord(item) && ["reader_blocker", "accuracy_blocker"].includes(String(item.classification)))) {
@@ -239,7 +260,7 @@ function selfTest(): number {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "knowledge-distiller-delivery-"));
   try {
     const file = path.join(root, "report.json");
-    const report = {
+    const report: MutableDeliveryReport = {
       schema_version: "knowledge-distiller.delivery.v1",
       label: "双轴审查通过",
       write_status: "updated",
