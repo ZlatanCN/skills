@@ -43,10 +43,10 @@ route, write_policy
 reader_contract → reader, question, after, scope, spine, axes, dependencies
 setup           → state check, optional capabilities, fallback
 research        → status, sources, claim ledger, gaps
-teaching_model  → section tree, roles, relations, transitions, heading convention
+teaching_model  → section tree, roles, relations, transitions, heading convention, format_policy
 vault_snapshot  → root/scan status, manifest, candidates, collision decision, link ledger
 target          → requested path, canonical path, scope, containment, symlink check
-draft           → path, note_revision, body map, content hash, self-check state
+draft           → path, note_revision, body map, format_plan, content hash, self-check state
 write_tx        → original/final hash, temp state, atomicity, read-back, write_status
 review_journal  → cycle/attempt IDs, provider/parent/cancel states, events, findings, fallback
 delivery        → label, blockers, corrections, mutations, open items
@@ -176,7 +176,8 @@ after-state, return to Phase 0; if it only lacks or conflicts with evidence, rep
 
 ## 4. Phase 3 — teaching model and section tree
 
-Read `references/reader-model.md` §2–3. Convert the ledger into an adjudicated teaching model before composing:
+Read `references/reader-model.md` §2–3 and `references/obsidian-writing-style.md` §1–3. Convert the ledger into an
+adjudicated teaching model and format policy before composing:
 
 ```text
 原始主张 → 证据判定 → 修正后主张 → 正文处置
@@ -190,8 +191,8 @@ label secondary composable axes instead of presenting them as alternatives. Reso
 not silent preference.
 
 The complete section blueprint must contain, for every node: question, answer, prerequisites, admitted claims/examples,
-role, relation, boundary, parent, children, `why_next`, and heading level. The tree expresses the intended teaching
-model; a post-hoc summary of drafted prose is not a checkpoint.
+role, relation, boundary, parent, children, `why_next`, heading level, and any required emphasis/callout/diagram
+candidate. The tree expresses the intended teaching model; a post-hoc summary of drafted prose is not a checkpoint.
 
 🔴 CHECKPOINT · TEACHING MODEL GATE
 
@@ -287,7 +288,7 @@ bytes or meaning change after the scan, invalidate the link ledger and rescan.
 
 ## 6. Phase 5 — compose from the model
 
-Read `references/reader-model.md` again. Write from the adjudicated section tree, never in source-return order or as a
+Read `references/reader-model.md` and `references/obsidian-writing-style.md` again. Write from the adjudicated section tree, never in source-return order or as a
 technology list. Map every top-level section and every material paragraph to a claim, role, dependency, transition,
 and boundary. Use `keep`, `rewrite`, `move`, `merge`, `split`, `delete`, `defer`, or `add`; technically correct prose
 without a current job in the spine is classified as `defer` by default, and is removed only through the explicit
@@ -332,13 +333,11 @@ after the question or decision they resolve, not merely a product or noun.
 
 Teach the causal model before advice: why mechanisms exist, how they work, what they compose with, and where they stop.
 Give each paragraph one job and make non-obvious transitions explicit. Avoid `Introduction`, `Conclusion`, `总结`,
-table-of-contents, and dedicated “see also” sections. Use a running example when it reduces abstraction.
-
-Use callouts only when they make a misconception, trade-off, uncertainty, or example materially easier to find. Keep
-the main clause easy to follow; use a short parenthetical for a gloss, move multi-clause definitions into their own
-sentence, and never nest paired em dashes. Use Mermaid only for a structural or temporal relationship that prose
-explains less clearly; read `references/mermaid.md`
-first, keep it small, and report `Mermaid 渲染未验证` if it cannot be parsed/rendered in the environment.
+table-of-contents, and dedicated “see also” sections. Use a running example when it reduces abstraction. The complete
+format policy, including emphasis, callouts, Markdown surface, code, diagrams, links, and removal tests, is defined
+only in `references/obsidian-writing-style.md`; do not duplicate its detailed rules here. Use Mermaid only for a
+structural or temporal relationship that prose explains less clearly; read `references/mermaid.md` first, keep it small,
+and report `Mermaid 渲染未验证` if it cannot be parsed/rendered in the environment.
 
 ## 7. Phase 6 — fail-closed write transaction and verification
 
@@ -389,8 +388,9 @@ semantically unknown link is not clean.
 
 ## 8. Phase 7 — review as an evidence-bound event stream
 
-Review improves confidence but does not authorize an unsafe write. Spawn the two read-only reviewers in parallel when
-the environment supports it, using the exact prompts in `references/review-lifecycle.md` §8. Substitute the resolved
+Review improves confidence but does not authorize an unsafe write. Read `references/obsidian-writing-style.md` §5–6,
+then spawn the two read-only reviewers in parallel when the environment supports it, using the exact prompts in
+`references/review-lifecycle.md` §8. Substitute the resolved
 absolute path and metadata; never pass an unresolved placeholder. If the write status is not `written`/`updated`, use
 only the draft fallback and no path-based reviewer.
 
