@@ -77,6 +77,60 @@ export const CALLOUT_ALIASES = new Map<string, string>(
   ])
 );
 
+export const SUPPORTED_MERMAID_TYPES = [
+  "flowchart",
+  "graph",
+  "swimlane-beta",
+  "sequenceDiagram",
+  "classDiagram",
+  "classDiagram-v2",
+  "stateDiagram",
+  "stateDiagram-v2",
+  "erDiagram",
+  "mindmap",
+  "timeline",
+  "gantt",
+  "journey",
+  "quadrantChart",
+  "pie",
+  "xychart",
+  "xychart-beta",
+  "sankey",
+  "sankey-beta",
+  "requirementDiagram",
+  "gitGraph",
+  "C4Context",
+  "C4Container",
+  "C4Component",
+  "C4Dynamic",
+  "C4Deployment",
+  "architecture-beta",
+  "block",
+  "block-beta",
+  "packet",
+  "packet-beta",
+  "kanban",
+  "radar-beta",
+  "treemap-beta",
+  "venn-beta",
+  "eventmodeling",
+  "ishikawa-beta",
+  "wardley-beta",
+  "cynefin-beta",
+  "treeView-beta",
+  "zenuml",
+  "railroad-diagram",
+  "railroad-ebnf",
+  "railroad-abnf",
+  "railroad-peg",
+  "flowchart-elk",
+  "info",
+] as const;
+
+export const SUPPORTED_MERMAID_TYPE_SET = new Set<string>(
+  SUPPORTED_MERMAID_TYPES
+);
+
 export function normalize(value: string): string {
   return value
     .trim()

@@ -2,10 +2,15 @@
 // Node 24+ runs this TypeScript directly with its built-in type stripping.
 
 import * as fs from "node:fs";
-import * as os from "node:os";
 import path from "node:path";
 
-import { evidence, exitForGate, finding, runMain } from "./lib/evidence.ts";
+import {
+  evidence,
+  exitForGate,
+  finding,
+  runMain,
+  withTempDir,
+} from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
 import { frontmatterTitle, parseMarkdown } from "./lib/markdown.ts";
 import type { Heading } from "./lib/markdown.ts";
@@ -155,10 +160,7 @@ function check(fileInput: string, strict: boolean): Evidence {
   );
 }
 function selfTest(): number {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), "knowledge-distiller-heading-")
-  );
-  try {
+  return withTempDir("knowledge-distiller-heading-", (root) => {
     const cases: [string, boolean][] = [
       ["---\ntitle: Good\n---\n# Good\n## Chapter\n### Detail\n", true],
       [
@@ -182,9 +184,7 @@ function selfTest(): number {
     }
     console.log("heading-tree checker self-test: PASS");
     return 0;
-  } finally {
-    fs.rmSync(root, { force: true, recursive: true });
-  }
+  });
 }
 
 function main(): number {

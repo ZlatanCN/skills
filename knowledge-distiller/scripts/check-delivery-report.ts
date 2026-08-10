@@ -3,7 +3,6 @@
 
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import path from "node:path";
 
 import {
@@ -15,6 +14,7 @@ import {
   readJsonInput,
   nonEmptyString,
   runMain,
+  withTempDir,
 } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
 
@@ -1241,10 +1241,7 @@ function check(input: string): Evidence {
 }
 
 function selfTest(): number {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), "knowledge-distiller-delivery-")
-  );
-  try {
+  return withTempDir("knowledge-distiller-delivery-", (root) => {
     const file = path.join(root, "report.json");
     const report: MutableDeliveryReport = {
       artifact_kind: "updated_note",
@@ -1554,9 +1551,7 @@ function selfTest(): number {
     }
     console.log("delivery-report checker self-test: PASS");
     return 0;
-  } finally {
-    fs.rmSync(root, { force: true, recursive: true });
-  }
+  });
 }
 
 function main(): number {

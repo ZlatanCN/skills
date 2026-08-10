@@ -3,7 +3,6 @@
 // It checks the editorial contract's shape, not whether the prose is wise.
 
 import * as fs from "node:fs";
-import * as os from "node:os";
 import path from "node:path";
 
 import {
@@ -14,6 +13,7 @@ import {
   nonEmptyString,
   readJsonInput,
   runMain,
+  withTempDir,
 } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
 import { parseMarkdown } from "./lib/markdown.ts";
@@ -511,10 +511,7 @@ function check(
 }
 
 function selfTest(): number {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), "knowledge-distiller-teaching-")
-  );
-  try {
+  return withTempDir("knowledge-distiller-teaching-", (root) => {
     const note = path.join(root, "Note.md");
     fs.writeFileSync(note, "# One\n## Two\n", "utf-8");
     const surface = parseMarkdown(note);
@@ -632,9 +629,7 @@ function selfTest(): number {
     }
     console.log("teaching-model checker self-test: PASS");
     return 0;
-  } finally {
-    fs.rmSync(root, { force: true, recursive: true });
-  }
+  });
 }
 
 type TeachingCliArgs = {

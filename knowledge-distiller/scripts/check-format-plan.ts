@@ -2,7 +2,6 @@
 // Validates the machine-readable part of the writing decision. It cannot judge whether a choice is pedagogically wise.
 
 import * as fs from "node:fs";
-import * as os from "node:os";
 import path from "node:path";
 
 import {
@@ -14,6 +13,7 @@ import {
   readJsonInput,
   runMain,
   stringValue,
+  withTempDir,
 } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
 import { parseMarkdown } from "./lib/markdown.ts";
@@ -534,10 +534,7 @@ function check(planInput: string, noteInput?: string): Evidence {
 }
 
 function selfTest(): number {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), "knowledge-distiller-format-plan-")
-  );
-  try {
+  return withTempDir("knowledge-distiller-format-plan-", (root) => {
     const note = path.join(root, "Note.md");
     fs.writeFileSync(
       note,
@@ -723,9 +720,7 @@ function selfTest(): number {
     }
     console.log("format-plan checker self-test: PASS");
     return 0;
-  } finally {
-    fs.rmSync(root, { force: true, recursive: true });
-  }
+  });
 }
 
 function main(): number {

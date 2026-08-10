@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
+import * as os from "node:os";
+import path from "node:path";
 
 export const EVIDENCE_SCHEMA_VERSION = "knowledge-distiller.evidence.v1";
 export const CHECKER_VERSION = "0.1.0";
@@ -95,6 +97,15 @@ export function runMain(main: () => number): void {
   } catch (error) {
     console.error(`ERROR: ${(error as Error).message}`);
     process.exitCode = 2;
+  }
+}
+
+export function withTempDir<T>(prefix: string, run: (root: string) => T): T {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  try {
+    return run(root);
+  } finally {
+    fs.rmSync(root, { force: true, recursive: true });
   }
 }
 

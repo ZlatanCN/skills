@@ -190,6 +190,6 @@ clarity reviewer 检查格式是否帮助读者恢复主线、找到重点和区
 
 ## 6. 权威性与冲突处理
 
-本文件是 `knowledge-distiller` 的格式语义来源。`SKILL.md` 只规定读取本文件和满足格式检查的硬门；`references/mechanical-gates.md` 负责脚本职责与机器证据契约；`references/final-checklist.md` 只保留可执行的最终检查项；`references/mermaid.md` 负责 Mermaid 的专门语法和渲染约束。
+本文件是 `knowledge-distiller` 的格式语义来源。`SKILL.md` 只规定读取本文件和满足格式检查的硬门；`references/mechanical-gates.md` 负责脚本职责与机器证据契约；`references/mermaid.md` 负责 Mermaid 的专门语法和渲染约束。
 
 如果格式规范与用户明确要求冲突，遵守用户要求；如果格式偏好与事实、范围、vault 完整性或可渲染性冲突，遵守后者，并在报告中说明未采用的格式方案。

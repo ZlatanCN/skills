@@ -3,7 +3,6 @@
 
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import path from "node:path";
 
 import {
@@ -13,6 +12,7 @@ import {
   finding,
   isRecord,
   runMain,
+  withTempDir,
 } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
 import { parseMarkdown } from "./lib/markdown.ts";
@@ -376,10 +376,7 @@ function check(
 }
 
 function selfTest(): number {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), "knowledge-distiller-note-gate-")
-  );
-  try {
+  return withTempDir("knowledge-distiller-note-gate-", (root) => {
     const vault = path.join(root, "vault");
     fs.mkdirSync(vault);
     const note = path.join(vault, "Note.md");
@@ -518,9 +515,7 @@ function selfTest(): number {
     }
     console.log("note gate self-test: PASS");
     return 0;
-  } finally {
-    fs.rmSync(root, { force: true, recursive: true });
-  }
+  });
 }
 
 type NoteCliArgs = {

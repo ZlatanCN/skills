@@ -2,10 +2,15 @@
 // Node 24+ runs this TypeScript directly with its built-in type stripping.
 
 import * as fs from "node:fs";
-import * as os from "node:os";
 import path from "node:path";
 
-import { evidence, exitForGate, finding, sha256 } from "./lib/evidence.ts";
+import {
+  evidence,
+  exitForGate,
+  finding,
+  sha256,
+  withTempDir,
+} from "./lib/evidence.ts";
 import type { Evidence } from "./lib/evidence.ts";
 import { key, maskInlineCode, parseMarkdown } from "./lib/markdown.ts";
 import type { BlockId, Heading } from "./lib/markdown.ts";
@@ -535,10 +540,7 @@ function runWikilinkCase(
 }
 
 function selfTest(): number {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), "knowledge-distiller-wikilink-")
-  );
-  try {
+  return withTempDir("knowledge-distiller-wikilink-", (root) => {
     fs.mkdirSync(path.join(root, "one"));
     fs.mkdirSync(path.join(root, "two"));
     fs.mkdirSync(path.join(root, "generated"));
@@ -719,9 +721,7 @@ function selfTest(): number {
     );
     console.log("wikilink checker self-test: PASS");
     return 0;
-  } finally {
-    fs.rmSync(root, { force: true, recursive: true });
-  }
+  });
 }
 
 function runCli(): number {

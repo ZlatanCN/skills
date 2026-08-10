@@ -2,7 +2,6 @@
 // Verifies byte identity and mechanical coverage of an update diff. It does not judge whether an operation is wise.
 
 import * as fs from "node:fs";
-import * as os from "node:os";
 import path from "node:path";
 
 import {
@@ -14,6 +13,7 @@ import {
   readJsonInput,
   runMain,
   nonEmptyString,
+  withTempDir,
 } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
 
@@ -454,10 +454,7 @@ function check(
 }
 
 function selfTest(): number {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), "knowledge-distiller-preservation-")
-  );
-  try {
+  return withTempDir("knowledge-distiller-preservation-", (root) => {
     const original = path.join(root, "original.md");
     const draft = path.join(root, "draft.md");
     fs.writeFileSync(original, "# Main\nold\nkeep\n", "utf-8");
@@ -522,9 +519,7 @@ function selfTest(): number {
     }
     console.log("preservation checker self-test: PASS");
     return 0;
-  } finally {
-    fs.rmSync(root, { force: true, recursive: true });
-  }
+  });
 }
 
 function main(): number {

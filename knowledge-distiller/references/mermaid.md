@@ -136,120 +136,17 @@ flowchart TB
 - [ ] 图足够小，读者不需要追踪过多交叉线或不相关分支。
 - [ ] parser 通过只代表语法可解析，不代表 Obsidian 兼容；未打开目标阅读视图时，按第 4 节把渲染风险写入 `format_plan.render_risks`。
 
-## 6. 最小可复用骨架
+## 6. 最小骨架
 
-### 6.1 关系/流程
+需要示例时，从选型矩阵确定类型，再按共同规则写最小图；默认骨架如下：
 
 ````markdown
 ```mermaid
-flowchart LR
+flowchart TB
     Input["输入"] --> Decision{"满足条件？"}
     Decision -->|是| Output["输出"]
     Decision -->|否| Retry["修正后重试"]
 ```
 ````
 
-### 6.2 交互/状态
-
-````markdown
-```mermaid
-sequenceDiagram
-    participant C as 客户端
-    participant S as 服务
-    C->>S: 请求
-    S-->>C: 响应
-```
-````
-
-````markdown
-```mermaid
-stateDiagram-v2
-    [*] --> Pending
-    Pending --> Active: 开始
-    Active --> Done: 完成
-    Done --> [*]
-```
-````
-
-### 6.3 模型/层级/时间
-
-````markdown
-```mermaid
-classDiagram
-    class Note
-    class Reference
-    Note --> Reference : cites
-```
-````
-
-````markdown
-```mermaid
-mindmap
-  root((知识主题))
-    概念
-    机制
-    边界
-```
-````
-
-````markdown
-```mermaid
-timeline
-    title API 演进
-    2024 : 发布 v1
-    2025 : 增加批量接口
-```
-````
-
-### 6.4 数据/比较
-
-````markdown
-```mermaid
-quadrantChart
-    title 方案比较
-    x-axis 成本低 --> 成本高
-    y-axis 收益低 --> 收益高
-    "方案 A": [0.25, 0.75]
-    "方案 B": [0.70, 0.60]
-```
-````
-
-````markdown
-```mermaid
-xychart-beta
-    title "请求量趋势"
-    x-axis [一月, 二月, 三月]
-    y-axis "请求数" 0 --> 100
-    line [20, 45, 70]
-```
-````
-
-### 6.5 边界/追踪
-
-````markdown
-```mermaid
-C4Context
-    Person(reader, "读者", "使用知识库")
-    System(vault, "知识库", "保存和连接笔记")
-    Rel(reader, vault, "阅读")
-```
-````
-
-````markdown
-```mermaid
-requirementDiagram
-    requirement readable {
-        id: R1
-        text: "笔记应可扫描"
-        risk: Low
-        verifymethod: Test
-    }
-    element checklist {
-        type: implementation
-        docref: "交付前检查清单"
-    }
-    readable - verifies -> checklist
-```
-````
-
-专用类型不需要全部背下来。先用本节矩阵确定问题，再查对应的 [Mermaid syntax reference](https://mermaid.js.org/intro/syntax-reference.html)；渲染状态和 fallback 按第 4 节执行。
+其他类型不在本文件重复大段语法样例。查对应的 [Mermaid syntax reference](https://mermaid.js.org/intro/syntax-reference.html)，并按第 4 节记录渲染状态与 fallback。

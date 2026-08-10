@@ -2,7 +2,6 @@
 // Validates the durable review event stream. It never infers provider health from a client timeout.
 
 import * as fs from "node:fs";
-import * as os from "node:os";
 import path from "node:path";
 
 import {
@@ -11,6 +10,7 @@ import {
   finding,
   isRecord,
   runMain,
+  withTempDir,
 } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
 
@@ -685,10 +685,7 @@ function check(fileInput: string, allowOpen = false): Evidence {
 }
 
 function selfTest(): number {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), "knowledge-distiller-review-journal-")
-  );
-  try {
+  return withTempDir("knowledge-distiller-review-journal-", (root) => {
     const file = path.join(root, "journal.jsonl");
     const base = {
       attempt_id: "attempt-1",
@@ -836,9 +833,7 @@ function selfTest(): number {
     }
     console.log("review-journal checker self-test: PASS");
     return 0;
-  } finally {
-    fs.rmSync(root, { force: true, recursive: true });
-  }
+  });
 }
 
 function main(): number {

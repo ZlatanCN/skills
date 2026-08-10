@@ -2,7 +2,6 @@
 // Mechanical Markdown/Obsidian surface gate. It does not judge truth or teaching quality.
 
 import * as fs from "node:fs";
-import * as os from "node:os";
 import path from "node:path";
 
 import {
@@ -11,61 +10,15 @@ import {
   finding,
   printEvidence,
   runMain,
+  withTempDir,
 } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
-import { canonicalCalloutType, parseMarkdown } from "./lib/markdown.ts";
-
-// Keep this allowlist aligned with §1 of references/mermaid.md.
-const SUPPORTED_MERMAID_TYPES = [
-  "flowchart",
-  "graph",
-  "swimlane-beta",
-  "sequenceDiagram",
-  "classDiagram",
-  "classDiagram-v2",
-  "stateDiagram",
-  "stateDiagram-v2",
-  "erDiagram",
-  "mindmap",
-  "timeline",
-  "gantt",
-  "journey",
-  "quadrantChart",
-  "pie",
-  "xychart",
-  "xychart-beta",
-  "sankey",
-  "sankey-beta",
-  "requirementDiagram",
-  "gitGraph",
-  "C4Context",
-  "C4Container",
-  "C4Component",
-  "C4Dynamic",
-  "C4Deployment",
-  "architecture-beta",
-  "block",
-  "block-beta",
-  "packet",
-  "packet-beta",
-  "kanban",
-  "radar-beta",
-  "treemap-beta",
-  "venn-beta",
-  "eventmodeling",
-  "ishikawa-beta",
-  "wardley-beta",
-  "cynefin-beta",
-  "treeView-beta",
-  "zenuml",
-  "railroad-diagram",
-  "railroad-ebnf",
-  "railroad-abnf",
-  "railroad-peg",
-  "flowchart-elk",
-  "info",
-] as const;
-const SUPPORTED_MERMAID_TYPE_SET = new Set<string>(SUPPORTED_MERMAID_TYPES);
+import {
+  canonicalCalloutType,
+  parseMarkdown,
+  SUPPORTED_MERMAID_TYPES,
+  SUPPORTED_MERMAID_TYPE_SET,
+} from "./lib/markdown.ts";
 
 type MermaidHeader = {
   after_frontmatter: string;
@@ -437,10 +390,7 @@ function assertSurfaceFailed(
 }
 
 function selfTest(): number {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), "knowledge-distiller-surface-")
-  );
-  try {
+  return withTempDir("knowledge-distiller-surface-", (root) => {
     const valid = path.join(root, "valid.md");
     fs.writeFileSync(
       valid,
@@ -616,9 +566,7 @@ function selfTest(): number {
     ]);
     console.log("note-surface checker self-test: PASS");
     return 0;
-  } finally {
-    fs.rmSync(root, { force: true, recursive: true });
-  }
+  });
 }
 
 function main(): number {

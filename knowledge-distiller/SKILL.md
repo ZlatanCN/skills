@@ -621,5 +621,5 @@ The following are prohibited because they violate the state contract:
 | Append a bare URL list and call it evidence | bind each link to a claim, support sentence and inline/footnote/callout placement |
 | Mutate the note after generating delivery evidence | invalidate all downstream artifacts and regenerate the final report last |
 
-Run the final checklist in `references/final-checklist.md` after the final read-back and after every content revision.
-The checklist supplements this workflow; it cannot override a failed or unknown state gate.
+After the final read-back and after every content revision, rerun the required mechanical gates and verify the Phase 8
+report fields above. These checks supplement this workflow; they cannot override a failed or unknown state gate.
