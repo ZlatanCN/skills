@@ -176,26 +176,26 @@ function check(input: string): Evidence {
   const resultNames = ["clarity", "accuracy"] as const;
   const results: Record<string, string> = {};
   for (const name of resultNames) {
-    const axis = isRecord(review?.[name]) ? review?.[name] as Record<string, unknown> : undefined;
-    const result = String(axis?.quality_result ?? "");
+    const axis = isRecord(review?.[name]) ? review?.[name] as Record<string, unknown> : {};
+    const result = String(axis.quality_result ?? "");
     if (!REVIEW_RESULTS.has(result)) findings.push(finding("delivery-review-result-invalid", "error", `review.${name}.quality_result is missing or unsupported`));
     else results[name] = result;
     if (result === "clean") {
       for (const field of ["cycle_id", "attempt_id", "observability", "source_coverage", "claims_checked", "after_state", "draft_hash"]) {
-        if (!nonEmptyString(axis?.[field]) && !(typeof axis?.[field] === "number" && Number(axis[field]) > 0)) findings.push(finding("delivery-clean-metadata-missing", "error", `review.${name}.${field} is required for quality_result=clean`));
+        if (!nonEmptyString(axis[field]) && !(typeof axis[field] === "number" && Number(axis[field]) > 0)) findings.push(finding("delivery-clean-metadata-missing", "error", `review.${name}.${field} is required for quality_result=clean`));
       }
-      if (!Number.isInteger(axis?.note_revision) || Number(axis.note_revision) < 0) findings.push(finding("delivery-clean-revision-invalid", "error", `review.${name}.note_revision must be a non-negative integer for quality_result=clean`));
-      if (written && axis?.draft_hash !== report.final_hash) findings.push(finding("delivery-clean-hash-artifact-mismatch", "error", `review.${name}.draft_hash must equal final_hash for a written clean artifact`));
-      if (axis?.source_coverage !== "complete") findings.push(finding("delivery-clean-coverage-invalid", "error", `review.${name}.source_coverage must be complete for quality_result=clean`));
-      if (typeof axis?.draft_hash !== "string" || !/^[a-f0-9]{64}$/i.test(axis.draft_hash)) findings.push(finding("delivery-clean-hash-invalid", "error", `review.${name}.draft_hash must be SHA-256 for quality_result=clean`));
+      if (!Number.isInteger(axis.note_revision) || Number(axis.note_revision) < 0) findings.push(finding("delivery-clean-revision-invalid", "error", `review.${name}.note_revision must be a non-negative integer for quality_result=clean`));
+      if (written && axis.draft_hash !== report.final_hash) findings.push(finding("delivery-clean-hash-artifact-mismatch", "error", `review.${name}.draft_hash must equal final_hash for a written clean artifact`));
+      if (axis.source_coverage !== "complete") findings.push(finding("delivery-clean-coverage-invalid", "error", `review.${name}.source_coverage must be complete for quality_result=clean`));
+      if (typeof axis.draft_hash !== "string" || !/^[a-f0-9]{64}$/i.test(axis.draft_hash)) findings.push(finding("delivery-clean-hash-invalid", "error", `review.${name}.draft_hash must be SHA-256 for quality_result=clean`));
       const labels = name === "clarity" ? ["C1", "C2", "C3", "C4", "C5", "teach_back"] : ["A1"];
-      for (const field of labels) if (!nonEmptyString(axis?.[field])) findings.push(finding("delivery-clean-review-contract-missing", "error", `review.${name}.${field} is required for quality_result=clean`));
+      for (const field of labels) if (!nonEmptyString(axis[field])) findings.push(finding("delivery-clean-review-contract-missing", "error", `review.${name}.${field} is required for quality_result=clean`));
     }
   }
   const manualFallback = review?.manual_fallback === true;
   for (const name of resultNames) {
-    const axis = isRecord(review?.[name]) ? review?.[name] as Record<string, unknown> : undefined;
-    if (axis?.fallback !== undefined && axis.fallback !== "manual_checked") findings.push(finding("delivery-fallback-invalid", "error", `review.${name}.fallback must be manual_checked when present`));
+    const axis = isRecord(review?.[name]) ? review?.[name] as Record<string, unknown> : {};
+    if (axis.fallback !== undefined && axis.fallback !== "manual_checked") findings.push(finding("delivery-fallback-invalid", "error", `review.${name}.fallback must be manual_checked when present`));
   }
   const journal = isRecord(review?.journal) ? review?.journal as Record<string, unknown> : undefined;
   if (!journal) findings.push(finding("delivery-journal-missing", "error", "review.journal must be an object"));
