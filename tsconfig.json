@@ -3,7 +3,9 @@
     "types": ["node"],
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "moduleDetection": "force"
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   },
   "include": ["knowledge-distiller/scripts/**/*.ts"]
 }
