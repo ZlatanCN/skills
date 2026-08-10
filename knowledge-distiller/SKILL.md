@@ -1,6 +1,6 @@
 ---
 name: knowledge-distiller
-version: "0.4.3"
+version: "0.4.4"
 description: >
   Distill a user's rough understanding, notes, or half-formed reasoning about a technical topic into a
   durable Chinese Obsidian note grounded in first-principles explanations and current evidence. Use this
@@ -43,7 +43,7 @@ route, write_policy
 reader_contract → reader, question, after, scope, spine, axes, dependencies
 setup           → state check, optional capabilities, fallback
 research        → status, sources, claim ledger, gaps
-teaching_model  → section tree, roles, relations, transitions, heading convention, format_policy
+teaching_model  → hash-bound section tree, roles, relations, transitions, heading convention, diagram_policy, format_policy
 vault_snapshot  → root/scan status, manifest, candidates, collision decision, link ledger
 target          → requested path, canonical path, scope, containment, symlink check
 draft           → path, note_revision, body map, format_plan, content hash, self-check state
@@ -64,9 +64,9 @@ Advance only when the phase contract is valid:
 | 0 route | reader contract + route + write policy | question, scope, after-state, or side-effect constraint is unresolved |
 | 1 setup | capability/fallback state | a draft-only run would write setup state |
 | 2 evidence | claim ledger + `research_status` | a material claim has no support, qualification, or exclusion |
-| 3 model | section tree and teaching spine | any section lacks question, role, dependency, boundary, or `why_next` |
+| 3 model | teaching-model blueprint, section tree and teaching spine | any section lacks question, role, dependency, boundary, or `why_next`; diagram policy is missing or contradicts an explicit Mermaid request |
 | 4 vault | root/scan state + target + collision + link ledger, or an explicit no-link draft disposition | for `allowed`, path/containment/anchor/scan/collision is unresolved; for `draft_only`, the no-link disposition is missing |
-| 5 draft | every body unit mapped to the model | prose, link, table, or diagram has no admitted role |
+| 5 draft | hash-bound `knowledge-distiller.teaching-model.v1`, format plan, and every body unit mapped to the model | prose, link, table, or diagram has no admitted role, or the model does not match the first draft bytes |
 | 6 write | transaction/read-back for `allowed`, or in-memory `not_written` disposition for `draft_only` | `blocked` reaches this phase, a draft-only run attempts persistence, write state is uncertain, or a hard gate fails |
 | 7 review | valid exact results or complete fallback | an opaque attempt has no journal evidence or fallback |
 | 8 delivery | truthful label and report | any blocker would be hidden by a success label |
@@ -195,6 +195,18 @@ The complete section blueprint must contain, for every node: question, answer, p
 role, relation, boundary, parent, children, `why_next`, heading level, and any required emphasis/callout/diagram
 candidate. The tree expresses the intended teaching model; a post-hoc summary of drafted prose is not a checkpoint.
 
+Before drafting, author the teaching-model blueprint in the execution record; do not derive it from finished prose.
+When the target and first draft bytes exist in Phase 5, materialize `knowledge-distiller.teaching-model.v1` with the
+exact target path and draft hash, then run its checker before the format plan or any polishing pass. Every visible
+heading must appear exactly once in `sections`; each section records its question, answer, dependency, boundary, role,
+relation, `why_next`, `next_heading`, and the next heading line; the terminal section explicitly uses `null` for both
+next fields. Add `diagram_policy` with the reader question, reason, decision and format. If the user explicitly
+requests Mermaid, set `user_requested_mermaid: true`, `decision: required`,
+`format: mermaid`, and reserve a real Mermaid block in the draft. A prose-only substitute fails this gate. Any later
+change to the draft invalidates the model and requires rebinding it to the new exact bytes. Record the request context
+as `MERMAID_REQUEST_FLAG=--mermaid-requested` or `MERMAID_REQUEST_FLAG=--mermaid-not-requested`; never infer it from
+the model JSON alone.
+
 🔴 CHECKPOINT · TEACHING MODEL GATE
 
 Stop before vault scanning or drafting if any section lacks a question, answer, dependency, boundary, or `why_next`,
@@ -299,7 +311,10 @@ For an existing note, classify every old format block—emphasis, callout, code,
 with the same operation and a reader-model reason. Deleting a format block only because its plain-text content remains is
 not sufficient; if its visual or navigational function is lost, preserve or redesign it.
 Create the machine-readable `knowledge-distiller.format-plan.v1` described in `references/mechanical-gates.md`; prose
-in the execution record is not a substitute for its hash and line coverage.
+in the execution record is not a substitute for its hash and line coverage. Every external link record must bind the
+URL to a `claim_id`, `support`, and `placement` (`inline|footnote|callout`); a standalone link list is not a valid
+format decision. Materialize and check the teaching model before this format plan, and keep both on the same exact
+draft hash.
 
 ### 6A. Language and terminology
 
@@ -378,7 +393,7 @@ against the exact temporary and final bytes.
 For an update, append `--original "<original-path>" --preservation "<preservation-json>"`; for a new note do not
 invent a preservation record.
 
-This aggregate owns the four new-note gates, or five gates for an update when preservation is supplied, and emits one
+This aggregate owns the five new-note gates, or six gates for an update when preservation is supplied, and emits one
 evidence envelope. `check-wikilinks.ts` remains available
 for focused diagnostics, but do not attribute the aggregate result to a checker that was not run. `passed` is a
 mechanical pass only; semantic link audit, claim evidence, preservation meaning and render success remain separate.
@@ -388,6 +403,15 @@ clean delivery.
 After final read-back, re-read every semantic link target and compare its recorded excerpt/content fingerprint and
 definition. If any target changed, invalidate the snapshot/link ledger and repeat Phase 4. A mechanically valid but
 semantically unknown link is not clean.
+
+🔴 CONTENT QA GATE · ANTI-BYPASS CHECK
+
+Assume the machine gates pass and attack the artifact: read it linearly without links, reconstruct the spine and every
+section transition, verify that the diagram decision matches the user's request, and inspect every external link for a
+nearby claim and natural inline/footnote/callout placement. A missing transition is a `reader_blocker`; an explicit
+Mermaid request without a Mermaid block is a `reader_blocker`; a detached or standalone external link is at least a
+`polish_item` and becomes an `accuracy_blocker` when it is presented as evidence. Do not use a success label until
+these checks and the exact-hash model/format evidence refer to the same final bytes.
 
 ## 8. Phase 7 — review as an evidence-bound event stream
 
@@ -431,6 +455,10 @@ Before presenting the report, materialize its machine-readable `knowledge-distil
 ```bash
 node scripts/check-delivery-report.ts --report "<delivery-json>" --json
 ```
+
+Generate this delivery record last and rerun it immediately against the final read-back. Any body, Mermaid, link,
+frontmatter, or metadata change after report generation invalidates `final_hash`, teaching-model evidence, format-plan
+evidence, review identity, and the delivery result; do not present the older report as if it described the new bytes.
 
 The checker is the final anti-overclaim gate. A prose label cannot override its failed or unavailable result.
 For `written`/`updated`, the record must identify `artifact_kind`, the absolute `note_path`, and the final read-back
@@ -490,6 +518,10 @@ The following are prohibited because they violate the state contract:
 | Retry an unknown or active attempt on the same revision | use fallback or a new revision/cycle only |
 | Accept a stale/late/mismatched reviewer result | journal it and exclude it from adjudication |
 | Call manual fallback or contradictory payload “clean” | record per-axis evidence and use the truthful label |
+| Write prose first and attach a post-hoc teaching model | create the hash-bound model before drafting and rerun it on final bytes |
+| Replace an explicit Mermaid request with prose | record `required/mermaid` and include a real Mermaid block |
+| Append a bare URL list and call it evidence | bind each link to a claim, support sentence and inline/footnote/callout placement |
+| Mutate the note after generating delivery evidence | invalidate all downstream artifacts and regenerate the final report last |
 
 Run the final checklist in `references/final-checklist.md` after the final read-back and after every content revision.
 The checklist supplements this workflow; it cannot override a failed or unknown state gate.

@@ -28,6 +28,7 @@ type PlanItem = Record<string, unknown> & {
 
 const PLAN_VERSION = "knowledge-distiller.format-plan.v1";
 const DECISIONS = new Set(["keep", "plain", "remove"]);
+const EXTERNAL_PLACEMENTS = new Set(["inline", "footnote", "callout"]);
 
 function items(value: unknown, name: string, findings: Finding[]): PlanItem[] {
   if (!Array.isArray(value)) {
@@ -98,7 +99,8 @@ function cover(
   entries: PlanItem[],
   kind: string,
   findings: Finding[],
-  requiredKind?: string
+  requiredKind?: string,
+  exactRaw = false
 ): void {
   const usable = entries.filter(
     (entry) => !requiredKind || entry.kind === requiredKind
@@ -107,7 +109,10 @@ function cover(
     const matches = usable.filter(
       (entry) =>
         entry.line === occurrence.line &&
-        (!occurrence.raw || !entry.raw || entry.raw === occurrence.raw)
+        (!occurrence.raw ||
+          (exactRaw
+            ? entry.raw === occurrence.raw
+            : !entry.raw || entry.raw === occurrence.raw))
     );
     if (matches.length === 0) {
       findings.push(
@@ -133,6 +138,76 @@ function cover(
               raw: occurrence.raw,
             },
             line: occurrence.line,
+          }
+        )
+      );
+    }
+  }
+}
+
+function validateExternalItems(entries: PlanItem[], findings: Finding[]): void {
+  for (const [index, entry] of entries.entries()) {
+    for (const field of ["raw", "claim_id", "support", "placement"]) {
+      if (!nonEmptyString(entry[field])) {
+        findings.push(
+          finding(
+            "external-link-field-missing",
+            "error",
+            `link_surface.external_links[${index}].${field} must be non-empty`
+          )
+        );
+      }
+    }
+    if (!EXTERNAL_PLACEMENTS.has(String(entry.placement))) {
+      findings.push(
+        finding(
+          "external-link-placement-invalid",
+          "error",
+          `link_surface.external_links[${index}].placement must be inline, footnote, or callout`
+        )
+      );
+    }
+  }
+}
+
+function isStandaloneExternalLine(line: string): boolean {
+  let text = line.trim();
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const stripped = text
+      .replace(/^>\s?/u, "")
+      .replace(/^[-*+]\s+/u, "")
+      .replace(/^\d+[.)]\s+/u, "");
+    if (stripped === text) {
+      break;
+    }
+    text = stripped;
+  }
+  text = text
+    .replaceAll(/\[[^\]\n]+\]\(https?:\/\/[^)\s]+(?:\s+"[^"]*")?\)/gu, "")
+    .replaceAll(/<https?:\/\/[^>]+>/gu, "")
+    .replaceAll(/https?:\/\/\S+/gu, "")
+    .replace(/^(?:参考资料|参考|来源|链接|官方文档)\s*[：:,]?\s*/u, "")
+    .replaceAll(/[\s`|]/gu, "");
+  return text.length === 0;
+}
+
+function validateExternalSurface(
+  surface: ReturnType<typeof parseMarkdown>,
+  entries: PlanItem[],
+  findings: Finding[]
+): void {
+  const byLine = new Map(entries.map((entry) => [entry.line, entry]));
+  for (const link of surface.external_links) {
+    const entry = byLine.get(link.line);
+    if (entry && isStandaloneExternalLine(surface.lines[link.line - 1] ?? "")) {
+      findings.push(
+        finding(
+          "external-link-standalone",
+          "error",
+          "external links must be attached to prose, a footnote, or a callout rather than placed as a standalone link line",
+          {
+            evidence: { placement: entry.placement, raw: link.raw },
+            line: link.line,
           }
         )
       );
@@ -220,6 +295,7 @@ function collectPlanItems(
     "link_surface.external_links",
     findings
   );
+  validateExternalItems(external, findings);
   const footnotes = items(links.footnotes, "link_surface.footnotes", findings);
   const renderStatus = stringValue(plan.render_status);
   if (
@@ -360,8 +436,11 @@ function coverSurface(
     surface.external_links,
     collections.external,
     "external link",
-    findings
+    findings,
+    undefined,
+    true
   );
+  validateExternalSurface(surface, collections.external, findings);
   cover(surface.footnotes, collections.footnotes, "footnote", findings);
   if (
     surface.mermaid_blocks.length > 0 &&
@@ -518,6 +597,74 @@ function selfTest(): number {
     fs.writeFileSync(planFile, JSON.stringify(plan), "utf-8");
     if (check(planFile, note).gate !== "passed") {
       throw new Error("valid format plan should pass");
+    }
+    const linkNote = path.join(root, "LinkNote.md");
+    fs.writeFileSync(
+      linkNote,
+      "# Main\n\n[Docs](https://example.com/docs)\n",
+      "utf-8"
+    );
+    const linkPlanFile = path.join(root, "link-plan.json");
+    fs.writeFileSync(
+      linkPlanFile,
+      JSON.stringify({
+        ...plan,
+        draft_hash: parseMarkdown(linkNote).content_hash,
+        link_surface: {
+          external_links: [
+            {
+              decision: "keep",
+              line: 3,
+              raw: "https://example.com/docs",
+              reader_function: "提供来源",
+            },
+          ],
+          footnotes: [],
+          wikilinks: [],
+        },
+        note_path: linkNote,
+      }),
+      "utf-8"
+    );
+    if (check(linkPlanFile, linkNote).gate !== "failed") {
+      throw new Error(
+        "standalone external links without claim binding should fail"
+      );
+    }
+    const listNote = path.join(root, "ListNote.md");
+    fs.writeFileSync(
+      listNote,
+      "# ListNote\n\n1. [Docs](https://example.com/docs)\n>> [Nested](https://example.com/nested)\n",
+      "utf-8"
+    );
+    const listPlanFile = path.join(root, "list-plan.json");
+    const listSurface = parseMarkdown(listNote);
+    fs.writeFileSync(
+      listPlanFile,
+      JSON.stringify({
+        ...plan,
+        draft_hash: listSurface.content_hash,
+        link_surface: {
+          external_links: listSurface.external_links.map((link, index) => ({
+            claim_id: `C-${index + 1}`,
+            decision: "keep",
+            line: link.line,
+            placement: "inline",
+            raw: link.raw,
+            reader_function: "提供来源",
+            support: "支持正文主张",
+          })),
+          footnotes: [],
+          wikilinks: [],
+        },
+        note_path: listNote,
+      }),
+      "utf-8"
+    );
+    if (check(listPlanFile, listNote).gate !== "failed") {
+      throw new Error(
+        "ordered and nested standalone external links should fail"
+      );
     }
     fs.writeFileSync(
       planFile,

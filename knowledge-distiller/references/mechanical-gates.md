@@ -33,15 +33,19 @@
 
 命令退出码统一为：`0 = passed`、`1 = failed`、`2 = unavailable/调用错误`。保留 JSON 原文、目标文件 SHA-256、命令、版本、退出码和时间戳。
 
-## 2. 内容门：一个入口，五个专责检查器
+## 2. 内容门：一个入口，六个专责检查器
 
 实际笔记写入前后运行：
+
+先根据原始用户请求设置 `MERMAID_REQUEST_FLAG=--mermaid-requested` 或 `MERMAID_REQUEST_FLAG=--mermaid-not-requested`，再运行：
 
 ```bash
 node scripts/check-note.ts \
   --file "$NOTE_PATH" \
   --vault-root "$VAULT_ROOT" \
   --format-plan "$FORMAT_PLAN_JSON" \
+  --teaching-model "$TEACHING_MODEL_JSON" \
+  "$MERMAID_REQUEST_FLAG" \
   --strict --portable --json
 ```
 
@@ -49,11 +53,13 @@ node scripts/check-note.ts \
 | --- | --- | --- |
 | `check-note-surface.ts` | frontmatter/code fence 是否闭合；代码语言标记；表格形状；callout 类型与前缀；危险 HTML/URL；Mermaid 支持的类型声明、禁止语法与 `flowchart` 保留字风险；强调分隔符 | 解释是否正确、callout 是否值得保留、图是否回答读者问题 |
 | `check-heading-tree.ts` | H1 根、层级跳跃、隐含文件名标题约定、重复标题提示 | 章节是否构成好的教学模型 |
+| `check-teaching-model.ts` | `knowledge-distiller.teaching-model.v1` 的精确 hash、每个可见标题的覆盖、逐节 `why_next`、图示决策与显式 Mermaid 请求 | 过渡是否真的帮助读者、答案是否正确、图是否值得存在 |
 | `check-wikilinks.ts` | canonical manifest、containment、排除目录、唯一文件、唯一 heading/block anchor、frontmatter/fence/code 排除 | 目标是否真的定义当前概念、链接是否改善主线 |
-| `check-format-plan.ts` | `format_plan` 的 hash、字段、决策枚举和逐行覆盖所有实际格式表面；Mermaid 渲染状态 | 选择的视觉形式是否最适合读者 |
+| `check-format-plan.ts` | `format_plan` 的 hash、字段、决策枚举和逐行覆盖所有实际格式表面；外链的 claim/support/placement；独立外链行；Mermaid 渲染状态 | 外链是否真的支持主张、选择的视觉形式是否最适合读者 |
 | `check-preservation.ts` | 原稿/草稿 SHA-256、实际变更 hunk、`changed_units` 覆盖和操作枚举 | 删除或重写是否符合教学模型、是否应该保留某段语义 |
 
-`check-note.ts` 只汇总这些 checker，不重新实现它们的规则。缺少 `vault-root` 或 `format-plan` 时，聚合门不通过；不要用“没有链接/没有格式”的默认值掩盖证据缺口。
+`check-note.ts` 只汇总这些 checker，不重新实现它们的规则。缺少 `vault-root`、`format-plan` 或 `teaching-model` 时，聚合门不通过；不要用“没有链接/没有格式”的默认值掩盖证据缺口。新笔记聚合门有五个硬检查器，更新已有笔记时再加 preservation，共六个。
+聚合器会在每个子 checker 前后及整轮结束比较目标文件 hash；发现笔记在检查期间被替换或修改时，结果为 `failed`，不得把不同版本的子证据拼成一次通过。
 更新已有笔记时在同一命令追加 `--original ORIGINAL.md --preservation RECORD.json`；新笔记不应伪造 preservation record。
 `draft_only` 不得创建计划文件时，可将同一 JSON 通过 stdin 传给 `--format-plan -`；这不会把临时产物写入磁盘。
 
@@ -70,13 +76,27 @@ node scripts/check-note.ts \
   "emphasis_targets": [{"line": 10, "raw": "**结论**", "decision": "keep", "reader_function": "扫描结论"}],
   "callout_candidates": [{"line": 14, "decision": "keep", "reader_function": "隔离版本边界"}],
   "code_table_diagram_map": [{"line": 20, "kind": "code | table | diagram", "decision": "keep", "reader_function": "展示可执行语法"}],
-  "link_surface": {"wikilinks": [], "external_links": [], "footnotes": []},
+  "link_surface": {"wikilinks": [], "external_links": [
+    {"line": 24, "raw": "https://example.com/spec", "claim_id": "C-07", "support": "规范定义该字段的边界", "placement": "inline", "decision": "keep", "reader_function": "核验边界"}
+  ], "footnotes": []},
   "render_status": "verified | unavailable | not_applicable",
   "render_risks": []
 }
 ```
 
 每个实际出现在 draft 中的格式表面必须有匹配的 `line` 记录，而且只能由 `decision: keep` 覆盖；若当前表面仍存在却标成 `plain/remove`，脚本会失败，避免把未执行的编辑伪装成已完成。尚未出现在 draft 中、但被考虑过的 plain/remove 候选可以保留在计划中，但必须写 `removal_test`。这能同时阻止漏记和“存在记录即完成”的假通过。
+
+`external_links` 还必须逐项提供实际 URL `raw`、对应的 `claim_id`、说明支持关系的 `support` 和 `placement`。`placement` 只能是 `inline`、`footnote` 或 `callout`；只贴 URL、只贴链接列表或使用 `standalone` 都会失败。这个门只验证链接被绑定到主张和正文位置，不验证来源本身是否足以证明主张。
+
+### 2.2 `teaching_model` 的机器部分
+
+写作者在动笔前建立 section blueprint；首稿字节出现后立即把它绑定为 `knowledge-distiller.teaching-model.v1`。至少包含 `central_question`、`spine`、`after_state`、`linear_teach_back`、逐个可见标题的 `sections`，以及必填的 `diagram_policy`。每个 section 记录 `question`、`answer`、`dependency`、`boundary`、`role`、`relation`、`why_next`、`next_heading` 和下一标题行；最后一节必须显式把 `next_heading` 与 `next_line` 设为 `null`。若用户明确要求 Mermaid，`diagram_policy` 必须是 `decision: required` 与 `format: mermaid`，且正文必须真的有 Mermaid 块。Mermaid 请求事实不能只由模型自报，调用方必须显式传入 `--mermaid-requested` 或 `--mermaid-not-requested`。运行：
+
+```bash
+node scripts/check-teaching-model.ts --model "$TEACHING_MODEL_JSON" --note "$NOTE_PATH" "$MERMAID_REQUEST_FLAG" --json
+```
+
+它防止“写完后补一个漂亮摘要”或“checker 通过但模型断裂”，但不替代线性 teach-back、事实审查和清晰度审查。
 
 ## 3. 审查门：事件流而不是字符串状态
 
@@ -97,7 +117,7 @@ node scripts/check-review-journal.ts --journal "$JOURNAL" --allow-open --json
 node scripts/check-delivery-report.ts --report "$DELIVERY_JSON" --json
 ```
 
-`knowledge-distiller.delivery.v1` 至少包含 `write_status`、`artifact_kind: new_note|updated_note`、写入产物的绝对 `note_path` 与 `final_hash`、完整的 `hard_gates`（`write_readback`、`preservation`、`heading`、`mechanical_link`、`semantic_link`、`evidence`、`render`；写入/更新必须 `write_readback: passed`，且只有 `new_note` 的 preservation 可为 `not_applicable`）、clarity/accuracy 的 `quality_result`、journal 状态、open blockers 和最终 `label`。新笔记还必须提供带 SHA-256 的 `creation_probe`，其证据文件要明确证明同一目标在写入前不存在；更新则不能用 `new_note` 规避 preservation。
+`knowledge-distiller.delivery.v1` 至少包含 `write_status`、`artifact_kind: new_note|updated_note`、写入产物的绝对 `note_path` 与 `final_hash`、完整的 `hard_gates`（`write_readback`、`preservation`、`heading`、`teaching_model`、`mechanical_link`、`semantic_link`、`evidence`、`render`；写入/更新必须 `write_readback: passed`，且只有 `new_note` 的 preservation 可为 `not_applicable`）、clarity/accuracy 的 `quality_result`、journal 状态、open blockers 和最终 `label`。新笔记还必须提供带 SHA-256 的 `creation_probe`，其证据文件要明确证明同一目标在写入前不存在；更新则不能用 `new_note` 规避 preservation。
 
 - `双轴审查通过` 必须同时拥有 confirmed write、所有 hard gates 通过、两个合法 clean 结果、已关闭 journal 且无 blocker；
 - hard gate 失败/不可用、审查不确定、写入可能部分完成或存在 reader/accuracy blocker 时，不得使用成功标签；
@@ -108,4 +128,4 @@ node scripts/check-delivery-report.ts --report "$DELIVERY_JSON" --json
 
 ## 5. 不要机械化的部分
 
-代码无法可靠决定：一个段落是否建立因果模型、一个 callout 是否有 removal-test 价值、外链是否真正支持主张、章节是否服务下一个章节、类比是否误导、事实是否在版本边界内成立、更新是否保留了用户要求保留的语义。上述内容必须保留给 claim ledger、teaching model、语义链接复核和 clarity/accuracy 双轴审查。
+代码无法可靠决定：一个段落是否真正建立因果模型、一个 `why_next` 是否对读者有说服力、一个 callout 是否有 removal-test 价值、外链来源是否足以支持主张、类比是否误导、事实是否在版本边界内成立、更新是否保留了用户要求保留的语义。上述内容必须保留给 claim ledger、teaching model、语义链接复核和 clarity/accuracy 双轴审查。

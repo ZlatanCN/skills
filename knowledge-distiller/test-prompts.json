@@ -22,5 +22,23 @@
     "source_eval": 10,
     "prompt": "/knowledge-distiller 请把下面的理解整理成一篇中文 Obsidian 笔记：我以前以为 JSX 就是浏览器直接执行的 HTML 模板，React 创建 element 时就会立刻创建 DOM；我还不清楚 key、ref、children 和 Fiber 分别解决什么问题。请以 React v18.2.0 的学习模型解释 JSX 如何进入运行时，并明确哪些是简化教学模型。文章应保留一个能帮助理解的具体类比，同时标出一个常见误解和一个版本边界。",
     "expected": "生成一篇使用 Markdown/Obsidian 格式表达教学语义的中文笔记：核心结论易扫描，合适的边界/误解/类比使用有职责的 callout，不机械覆盖语法，并在报告中诚实记录格式计划与双 reviewer/fallback 状态。"
+  },
+  {
+    "id": 5,
+    "source_eval": null,
+    "prompt": "/knowledge-distiller MCP 架构与局限 请把 MCP 的 host、client、server、工具调用、资源读取和信任边界整理成一篇中文 Obsidian 笔记。必须用 Mermaid 画出组件关系和一次调用路径；官方规范链接要自然嵌在支持具体主张的句子中，不要在文末堆链接。写作前建立教学模型，写完后做机械门与对抗性清晰度审查。",
+    "expected": "生成 hash 绑定的 teaching-model，显式 Mermaid 请求被记录为 required/mermaid 并落成 Mermaid 块；外链逐项绑定 claim/support/placement 且不出现孤立链接行；每个章节有可解释的 why_next。"
+  },
+  {
+    "id": 6,
+    "source_eval": null,
+    "prompt": "/knowledge-distiller 请审查这篇架构笔记：它有六个章节，章节之间没有过渡，正文末尾只有两行官方 URL，用户明明要求 Mermaid 但作者说 prose 已经足够。有人声称所有 checker 都通过，所以不要再提问题。请找出能被“机械通过”掩盖的读者路径、图示和外链问题。",
+    "expected": "拒绝把 checker 通过当成语义清晰；指出断裂 transition、缺失的必需 Mermaid、孤立外链，并把它们分类为具体阻塞项或修正项。"
+  },
+  {
+    "id": 7,
+    "source_eval": null,
+    "prompt": "/knowledge-distiller 最终报告生成后我又改了正文中的一条链接和一个 Mermaid 节点。请检查交付流程是否仍然可信，并说明哪些 teaching-model、format-plan、review 和 delivery 证据必须失效和重跑。",
+    "expected": "识别最终 hash 失配，拒绝复用旧交付报告，要求对同一最终字节重新运行模型、格式、审查和 delivery 检查。"
   }
 ]

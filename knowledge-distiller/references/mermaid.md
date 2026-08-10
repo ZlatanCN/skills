@@ -2,6 +2,11 @@
 
 本文件负责 Mermaid 的选型、语法约束、兼容性分层和渲染 fallback。`check-note-surface.ts` 只检查图类型声明、危险指令和少量已知语法风险；它不能证明图的因果关系正确、数据可信或已经在目标 Obsidian 版本中渲染成功。
 
+写作前必须在 `knowledge-distiller.teaching-model.v1` 中记录 `diagram_policy`（读者问题、理由、`decision` 和
+`format`）。用户明确要求 Mermaid 时，`decision` 必须为 `required`、`format` 必须为 `mermaid`，正文缺少图块
+即失败；不能用一段 prose 或“渲染未验证”替代这个决定。没有明确要求时，`helpful` 仍需由读者问题证明，
+`not_needed` 则应说明为什么文字更短或更清楚。
+
 只在图能压缩一个重要关系时使用它。若两三句话比图更清楚，就不要为了“有图”而画图。
 
 ## 1. 先按读者问题选类型

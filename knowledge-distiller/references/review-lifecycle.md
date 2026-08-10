@@ -177,7 +177,9 @@ result: clean | findings | protocol_invalid
 The clarity checklist is: undefined formula symbols; material terms used too early; sentences with three or more
 unexplained material terms; mechanisms stated without design rationale; and breaks in the end-to-end reader path
 (central question, section dependencies, scope, orphan material, incomparable alternatives, prerequisites, heading
-tree, or after-state). `teach_back` is a blind reconstruction of what the note enables, not praise or author intent.
+tree, or after-state). It also explicitly attacks two bypasses: a required architecture/process diagram silently
+replaced by prose, and an external link shown as a source list instead of being attached to a claim. `teach_back` is a
+blind reconstruction of what the note enables, not praise or author intent.
 
 ### Accuracy result
 
@@ -312,7 +314,8 @@ report only concrete findings and quote the exact passage for each:
 - C5: every end-to-end break: a missing central question or transition, a section that is not needed for the next
   section, an orphan fact or branch, a comparison of different axes as alternatives, a prerequisite introduced after
   its dependent idea, a heading tree whose levels contradict the teaching model (including unrelated major chapters
-  nested under one substantive first section), or an after-state the note does not actually enable. Quote the smallest
+  nested under one substantive first section), a required diagram replaced by prose, a standalone external link, or
+  an after-state the note does not actually enable. Quote the smallest
   passage or outline fragment that proves a local break; for a missing edge between sections, give `before_heading`,
   `after_heading`, and the missing relation.
 Return the `teach_back`, all five labels using “—” for an item with no finding, followed by `result: clean` or
@@ -340,6 +343,7 @@ examples. For A1, quote the exact claim for each problem, state the correction o
 can actually stand behind. Return `claims_checked: N` (or the checked claim IDs), `source_coverage: complete` only when
 the review covered every material claim and its needed source support, and list any `unverified` claims. If a claim
 cannot be verified with confidence, mark it “unverified” instead of guessing. Return `A1: —` and `result: clean` only
-when every claim is accurate, properly scoped, and covered; otherwise return each finding under A1, followed by
+when every claim is accurate, properly scoped, covered, and every external link is plausibly attached to the claim it
+purports to support; otherwise return each finding under A1, followed by
 `result: findings` or `result: unverified`. Preserve the metadata above exactly.
 ```
