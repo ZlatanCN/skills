@@ -22,6 +22,12 @@ review score, or a complete-looking file never overrides them. Research returns,
 are raw inputs: they enter the note only through an adjudicated claim ledger and teaching model. Never put the user's
 mistakes, conversation framing, review status, or generation process into the note body.
 
+The raw claim and its correction are audit state, not body prose. Keep them separate from the reader-facing `body_claim`:
+the raw claim may appear only in the claim ledger and Phase 8 correction record; it never enters the note body. Do not
+quote, negate, or contrast with an unseen original claim (for example, `“X”并不准确`, `把 X 说成 Y 过于绝对`, or
+`不是 X 而是 Y`). An in-scope evolution, controversy, counterexample, or source-attributed viewpoint must introduce
+its own evidence-bound `body_claim`; it never licenses copying the raw claim into the body.
+
 An explicit request for language, title, path, metadata, structure, or output format overrides these style defaults, but
 never overrides factual integrity, preservation of unrelated vault content, security, containment, or safe-write gates.
 
@@ -159,6 +165,13 @@ support      → what that range establishes
 limits       → what it does not establish
 decision     → include | qualify | correct | defer | drop
 body_role    → premise | mechanism | example | boundary | decision
+audit_claim  → the raw wording, audit-only; never paste it into the body, including an admitted contrast
+body_claim   → the self-contained reader-facing wording that earns a place in the model
+contrast     → none, or {antecedent_claim_ids, introduced_at, purpose, disposition} when an in-scope viewpoint is shown
+              (`retain_as_history | retain_as_controversy | retain_as_counterexample | source_attributed`)
+body_map     → the only provenance bridge: {surface_id, claim_id, body_claim, operation}; every reader-visible surface
+              must point to a body claim, never directly to `audit_claim`, reviewer prose, or a Phase 8 report. Bind
+              the map to the same final draft hash as the teaching model and format plan.
 ```
 
 Maintain `research_status → complete | partial | unavailable` independently of claim status. Record source
@@ -184,6 +197,19 @@ adjudicated teaching model and format policy before composing:
 原始主张 → 证据判定 → 修正后主张 → 正文处置
 读者作用 → 依赖 → 来源/原因 → 边界 → 下一问
 ```
+
+Treat `原始主张`/`audit_claim` as audit-only input and write a separate `body_claim` for every surviving item. `correct`
+means rewrite the domain claim, not narrate the correction. If a contrast is retained, `contrast` must identify the
+earlier viewpoint(s), where the note introduces them, and why the reader needs them. Use `contrast: none` when no
+correction-shaped comparison survives. A claim ledger alone does not introduce an antecedent for the reader. If the
+original wording is not part of the reader's question, the body claim must not preserve
+its wording, quotation, or an implicit “earlier claim” that the note never establishes.
+
+The `body_map` is normative, not a post-hoc explanation: compose every visible surface from its mapped `body_claim` and
+its evidence-bound `claim_id`. A corrected or dropped `audit_claim` may not re-enter as a positive statement, paraphrase,
+or implied premise merely because it appears in a model, format plan, review comment, or delivery report. A supported
+rewrite is allowed only as its own `body_claim` with its own evidence and reader role. Any content change prompted by a
+reviewer, format plan, or report must re-enter at Phase 2 and rebuild the teaching model and body map before drafting.
 
 Restate the central question and one-sentence spine. For every surviving claim, choose `include`, `qualify`,
 `correct`, `defer`, or `drop`; assign one primary role and dependency. Each section must answer a necessary question,
@@ -302,8 +328,11 @@ bytes or meaning change after the scan, invalidate the link ledger and rescan.
 ## 6. Phase 5 — compose from the model
 
 Read `references/reader-model.md`, `references/obsidian-writing-style.md`, and `references/mechanical-gates.md` again. Write from the adjudicated section tree, never in source-return order or as a
-technology list. Map every top-level section, every material paragraph, and every retained format block to a claim,
-role, dependency, transition, boundary, and format decision. Use `keep`, `rewrite`, `move`, `merge`, `split`, `delete`,
+technology list. Map every top-level section, every material paragraph, and every retained format block to a unique
+`surface_id`, a `claim_id` and its `body_claim`, role, dependency, transition, boundary, and format decision. Include
+all reader-visible frontmatter fields (including summary/description, aliases, and custom metadata) when they carry a
+claim, plus any claim-bearing tag, title, filename, embed, or alt text. Use `keep`, `rewrite`, `move`, `merge`,
+`split`, `delete`,
 `defer`, or `add`; technically correct prose
 without a current job in the spine is classified as `defer` by default, and is removed only through the explicit
 `delete` rule and preservation diff below.
@@ -324,6 +353,44 @@ product names, standards, URLs, citations, and conventional English technical te
 Use the vault's established term when one exists; do not invent translations for conventional terms such as `token`,
 `softmax`, or `LLM`. Define every non-obvious formula symbol nearby. Do not write conversation framing such as `你说的`,
 `你的理解`, or `这里要纠正`.
+
+🔴 CHECKPOINT · HIDDEN-ANTECEDENT GATE
+
+Before retaining every reader-visible output surface—not only paragraphs, but also all claim-bearing frontmatter fields,
+tags, title/filename, headings, list items, table cells, callout titles/body, footnotes, embeds/alt text, and
+claim-bearing Mermaid labels—read it as a standalone passage by a reader who has not seen the user's input. If it
+contains a correction or contrast pattern—such as `X 不准确`, `把 X 说成 Y`, `并非 X`,
+`不是 X 而是 Y`, `看似 X 实际 Y`, `所谓 X 其实 Y`, `不能简单理解为 X`, `不能把 X 等同于 Y`,
+`不是因为 X 而是因为 Y`, `这一说法只适用于 Y`, `与其 X 不如 Y`, `关键不在 X 而在 Y`,
+`不意味着`, `未必`, `无法推出`, `不足以`, `只是`, `看起来像`, `后来不再`, `因此结论不成立`,
+`这一/该/上述/前述/所称/原有/仍然/相反/然而/却`, `不表示`, `不代表`, `不说明`, `并未表明`, `失效`,
+or a quoted claim followed by a rebuttal—check that X is introduced in the note before use and has an in-scope purpose.
+The ledger does not count as reader-visible introduction. Also compare the surface semantically against every corrected
+or dropped `audit_claim`: a positive restatement, near-paraphrase, or implied premise is a `reader_blocker` when it has
+no independent `body_claim`, evidence, and reader role. This is provenance checking, not string matching; a supported
+rewrite may overlap in meaning with its raw claim. If the antecedent or provenance is not established, rewrite it as a
+direct domain claim, qualification, mechanism, or boundary. This gate applies even when the correction is factually
+right and the prose has a valid teaching-model role.
+
+Legitimate contrast is explicit rather than implicit: introduce the period/source/viewpoint first, in the same or a
+preceding reader-visible surface, then compare it (for
+example, “早期方案采用 A；后续版本改用 B”); or state the competing explanations/limiting counterexample before
+adjudicating them. Record that purpose and the actual introducing `surface_id` in `contrast`. Source attribution alone
+does not license an unsupported consequence; the consequence needs its own evidence-bound `body_claim`. A direct
+capability boundary such as “系统不提供 cron 调度”
+is allowed when it states the mechanism's limit rather than rebutting an unseen claim.
+
+The same surface may introduce its own comparison: a question heading may name both sides, a version boundary may state
+“从 v2.0 起不再支持 Python 2”, and a self-contained counterexample may state the case and its consequence together.
+Do not treat code syntax, code identifiers, wikilink aliases, node IDs, protocol/status labels, or bare state/operation
+labels as claim-bearing prose by default. Inspect comments, captions, explanatory inline code, and Mermaid node/edge labels
+when they make a domain assertion; a correction-shaped label needs an antecedent in the same diagram or an earlier mapped
+surface, while a transition such as `Ready --> Retry: timeout` does not.
+
+Do not block every negative or contrastive sentence: `一致性不能等同于可用性`, `故障不是单因而是反馈放大`,
+`非幂等操作`, and `A[未命中] --> B[回源]`
+are valid when they introduce their own concepts and explain a mechanism or boundary. Block only when the rhetoric
+depends on an absent earlier claim or source conversation; a short status/operation label is not itself an antecedent.
 
 ### 6B. Frontmatter and body
 
@@ -411,7 +478,14 @@ section transition, verify that the diagram decision matches the user's request,
 nearby claim and natural inline/footnote/callout placement. A missing transition is a `reader_blocker`; an explicit
 Mermaid request without a Mermaid block is a `reader_blocker`; a detached or standalone external link is at least a
 `polish_item` and becomes an `accuracy_blocker` when it is presented as evidence. Do not use a success label until
-these checks and the exact-hash model/format evidence refer to the same final bytes.
+these checks and the exact-hash model/format/body-map evidence refer to the same final bytes. Also apply the
+hidden-antecedent and provenance gates across every mapped reader-visible surface; record the `surface_id`, `claim_id`,
+and disposition in the clarity evidence. A surface that only makes sense as a reply to unseen source material, or that
+restates an audit-only claim without an independent evidence-bound body claim, is a `reader_blocker` until rewritten.
+The existing mechanical checkers do not prove body-map coverage or semantic provenance; absent or unverified body-map
+evidence is not clean. The clarity evidence must carry the body-map/final-draft hash and a disposition for every mapped
+surface; an empty marker such as `C5: —`, an unbound free-text assertion, or a checker pass without this evidence cannot
+be normalized to clean. This is a semantic human gate, not evidence that a mechanical checker passed.
 
 ## 8. Phase 7 — review as an evidence-bound event stream
 
@@ -421,13 +495,27 @@ Review improves confidence but does not authorize an unsafe write. Read `referen
 After the final read-back and hard gates, **must** spawn exactly two independent read-only subagents in parallel when
 the environment provides subagents:
 
-- `clarity`: reader model, spine, section roles, transitions, terminology, and format roles;
+- `clarity`: reader model, spine, section roles, transitions, terminology, and format roles; extend C5 with the
+  hidden-antecedent check across all reader-visible prose surfaces, and classify an unseen-source reply as a
+  `reader_blocker` even when its facts are correct;
 - `accuracy`: material claims, source coverage, boundaries, examples, tables, diagrams, and links.
 
 Pass each reviewer the resolved absolute path and exact draft identity required by the reference. Wait for both results
 before adjudication. Do not call the reviewer unavailable merely because the tool has not yet been searched; only a
 real capability or dispatch failure permits fallback. If the write status is not `written`/`updated`, use the exact
 draft fallback required by the reference.
+
+When using the exact clarity prompt from `references/review-lifecycle.md` §8, append this C5 check: “For every
+reader-visible correction or contrast, verify that its antecedent is introduced in the note and has an in-scope purpose;
+inspect all claim-bearing frontmatter fields, tags, title/filename, headings, lists, tables, callouts, footnotes,
+embeds/alt text, explanatory code, and claim-bearing Mermaid labels; include implicit references such as `该说法` or
+`前述假设`; compare each mapped surface against corrected/dropped audit claims for positive restatement or
+near-paraphrase; record surface_id/claim_id/disposition; classify an unseen-source or unproven-provenance reply as
+`reader_blocker`. Exclude code syntax, IDs, and bare status/operation labels unless they assert a domain claim. Do not
+flag a self-contained mechanism/boundary contrast merely because it contains `不是` or `不能`.” Apply the same check
+in manual fallback; if provenance cannot be established, use a non-clean result. If the canonical journal schema cannot
+carry the body-map hash and per-surface dispositions, attach them as the clarity evidence file required by that schema;
+never treat the schema's empty C5 placeholder as a substitute.
 
 Follow the reference's journal validation and closure protocol exactly. The checker is a mechanical aid; it does not
 replace reviewer adjudication.
@@ -436,7 +524,13 @@ The reference owns the canonical state dimensions, identity binding, journal sch
 cutoff, and result normalization. Follow those rules without restating or inventing a second local state machine.
 
 Use the reference's bounded convergence rules. After any content revision, rerun the required gates and invalidate
-results for the previous draft.
+results for the previous draft. A revision that changes claim meaning, scope, antecedent, provenance, reader path,
+surface inventory, source binding, or format-block role must restart at Phase 2 and rebuild the model, body map, format
+plan, review, and delivery evidence. Only a pure punctuation/whitespace/style change that preserves every claim-bearing
+surface's text, surface_id, claim_id, body_claim, scope, source, reader role, and format responsibility may follow the
+reference's local revision path; it still requires new final-byte hashes and body-map evidence. Any change that cannot
+prove all of those invariants must restart at Phase 2. Never integrate a reviewer quote, format-plan `raw` text, or
+Phase 8 correction record directly into the body.
 
 ### 8A. Fallback, adjudication, and convergence
 
@@ -480,7 +574,9 @@ blocked use `未写入（阻塞）`; for possibly_partial say the file state is 
   attempt/revision/hash identity, fallback, and any stale/late_ignored events; never infer provider failure from a cutoff.
 **收敛判断** — finite budget, reviewer attempts, fallback passes, actual body revisions, and stopping reason.
 **标签说明** — the factual reason for the delivery label.
-**修正记录** — 原始主张 / 修正为 / 来源 / 为什么.
+**修正记录** — audit-only；hidden-antecedent/provenance gate 不适用于这段审计报告。按 `claim_id` 记录
+`audit_claim` / `body_claim` / 来源 / 为什么，以及必要的 `contrast` 目的、前件和 introducing `surface_id`；
+这些记录不得回流到正文措辞。若后续要据此修改内容，必须回到 Phase 2，不得把报告当作正文来源。
 **额外补充** — verified additions from research.
 **未核实** — claims excluded or qualified because evidence was partial/unavailable.
 **库内修改** — each existing-note mutation, added block ID, or corrected stale content.
@@ -512,6 +608,8 @@ The following are prohibited because they violate the state contract:
 | Treat `state.json` existence as extension availability | verify the capability separately |
 | Call an unavailable/partial scan “no related note” | report scan state and unresolved connection |
 | Treat mechanical link success as semantic correctness | audit target definition and fingerprint independently |
+| Write `X 不准确`, `看似 X 实际 Y`, or `把 X 说成 Y` when X exists only in the user's input | rewrite the surviving claim directly; keep the correction pair in the ledger/report only |
+| Let `audit_claim`, reviewer prose, format-plan `raw`, or Phase 8 correction records generate a visible surface | map the surface to an evidence-bound `body_claim`; if content changes, restart at Phase 2 |
 | Write when policy/target/collision is unresolved | fail closed, clarify, or return in-memory draft |
 | Continue after uncertain replacement/read-back | `possibly_partial`, stop writes, disclose recovery state |
 | Call parent cutoff a provider failure or cancellation | separate provider, parent, and cancel states |
