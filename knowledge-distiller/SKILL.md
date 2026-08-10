@@ -289,8 +289,9 @@ bytes or meaning change after the scan, invalidate the link ledger and rescan.
 ## 6. Phase 5 — compose from the model
 
 Read `references/reader-model.md` and `references/obsidian-writing-style.md` again. Write from the adjudicated section tree, never in source-return order or as a
-technology list. Map every top-level section and every material paragraph to a claim, role, dependency, transition,
-and boundary. Use `keep`, `rewrite`, `move`, `merge`, `split`, `delete`, `defer`, or `add`; technically correct prose
+technology list. Map every top-level section, every material paragraph, and every retained format block to a claim,
+role, dependency, transition, boundary, and format decision. Use `keep`, `rewrite`, `move`, `merge`, `split`, `delete`,
+`defer`, or `add`; technically correct prose
 without a current job in the spine is classified as `defer` by default, and is removed only through the explicit
 `delete` rule and preservation diff below.
 

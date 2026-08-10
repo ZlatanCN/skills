@@ -87,8 +87,8 @@ Check every diagram:
 - [ ] Shape semantics are consistent and edge labels are short.
 - [ ] Important terms are defined or linked in nearby prose, not hidden in the diagram.
 - [ ] It is small enough to scan; split it if the reader must trace too many crossings or unrelated branches.
-- [ ] A Mermaid parser or Obsidian reading view was used when available. If no renderer is available, mark the
-  diagram `render-unverified` in the Phase 8 report and keep a one-sentence textual explanation in the note.
+- [ ] A Mermaid parser or Obsidian reading view was used when available. If no renderer is available, report
+  `Mermaid 渲染未验证` in Phase 8 and keep a one-sentence textual explanation in the note.
 
 Obsidian bundles its own Mermaid version. Prefer the basic syntax in this reference rather than assuming that the
 latest Mermaid documentation and the installed Obsidian renderer support the same features. If a feature-specific

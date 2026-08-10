@@ -325,7 +325,8 @@ attempt_id: <attempt-id>
 note_revision: <note-revision>
 note_path: <vault-path>/<area>/<filename>.md
 
-Read `references/obsidian-writing-style.md` before reviewing the note. Treat every callout, emphasized phrase,
+Read `references/obsidian-writing-style.md` before reviewing the note. If the note contains a Mermaid diagram, also
+read `references/mermaid.md`. Treat every callout, emphasized phrase,
 code block, table, diagram, link, footnote, embed, and example as part of the factual artifact. Check that each format
 feature uses valid portable syntax for the declared vault/runtime; mark custom CSS/plugin-dependent syntax as
 unverified unless the capability is evidenced. Do not require a feature merely for variety, but do check that a
