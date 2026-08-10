@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.3] - 2026-08-10
+
+### 重构
+- refactor(scripts): 统一引入 runMain 并优化退出处理
+
+### 其他
+- chore knowledge-distiller: record full test score
+- chore knowledge-distiller: record absolute score
+- chore knowledge-distiller: record final Mermaid check
+- fix knowledge-distiller: ignore quoted Mermaid syntax
+- chore knowledge-distiller: record Mermaid validation
+- fix knowledge-distiller: ignore quoted Mermaid labels
+- fix knowledge-distiller: tighten Mermaid safety checks
+- refactor knowledge-distiller: expand Mermaid support
+- chore: record Mermaid Darwin validation
+- harden Mermaid compatibility checks
+- fix Mermaid type declarations and surface checks
+- refactor knowledge-distiller: broaden Mermaid guidance
+
+
 ## [0.4.2] - 2026-08-10
 
 ### 其他
