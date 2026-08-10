@@ -1,5 +1,5 @@
-import * as fs from "node:fs";
 import { createHash } from "node:crypto";
+import * as fs from "node:fs";
 
 export const EVIDENCE_SCHEMA_VERSION = "knowledge-distiller.evidence.v1";
 export const CHECKER_VERSION = "0.1.0";
@@ -41,9 +41,9 @@ export function finding(
   code: string,
   severity: Severity,
   message: string,
-  details: Partial<Omit<Finding, "code" | "severity" | "message">> = {},
+  details: Partial<Omit<Finding, "code" | "severity" | "message">> = {}
 ): Finding {
-  return { code, severity, message, ...details };
+  return { code, message, severity, ...details };
 }
 
 export function evidence(
@@ -52,32 +52,49 @@ export function evidence(
   input: Record<string, unknown>,
   metrics: Record<string, unknown>,
   findings: Finding[] = [],
-  checks?: Record<string, Evidence | Record<string, unknown>>,
+  checks?: Record<string, Evidence | Record<string, unknown>>
 ): Evidence {
   return {
-    schema_version: EVIDENCE_SCHEMA_VERSION,
     checker,
     checker_version: CHECKER_VERSION,
-    generated_at: new Date().toISOString(),
+    findings,
     gate,
+    generated_at: new Date().toISOString(),
     input,
     metrics,
-    findings,
+    schema_version: EVIDENCE_SCHEMA_VERSION,
     ...(checks ? { checks } : {}),
   };
 }
 
-export function printEvidence(result: Evidence, json: boolean, human: string): void {
-  if (json) console.log(JSON.stringify(result, null, 2));
-  else console.log(human);
+export function printEvidence(
+  result: Evidence,
+  json: boolean,
+  human: string
+): void {
+  if (json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    console.log(human);
+  }
 }
 
 export function exitForGate(gate: Gate): number {
-  return gate === "passed" ? 0 : gate === "failed" ? 1 : 2;
+  if (gate === "passed") {
+    return 0;
+  }
+  if (gate === "failed") {
+    return 1;
+  }
+  return 2;
 }
 
 export function readJsonInput(input: string): unknown {
-  return JSON.parse(input === "-" ? fs.readFileSync(0, "utf8") : fs.readFileSync(input, "utf8"));
+  return JSON.parse(
+    input === "-"
+      ? fs.readFileSync(0, "utf-8")
+      : fs.readFileSync(input, "utf-8")
+  );
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -91,4 +108,3 @@ export function stringValue(value: unknown): string | undefined {
 export function nonEmptyString(value: unknown): boolean {
   return typeof value === "string" && value.trim().length > 0;
 }
-

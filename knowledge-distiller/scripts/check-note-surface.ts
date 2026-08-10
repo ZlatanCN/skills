@@ -2,200 +2,396 @@
 // Mechanical Markdown/Obsidian surface gate. It does not judge truth or teaching quality.
 
 import * as fs from "node:fs";
-import * as path from "node:path";
 import * as os from "node:os";
-import { canonicalCalloutType, parseMarkdown } from "./lib/markdown.ts";
-import { evidence, exitForGate, finding, printEvidence, type Evidence, type Finding } from "./lib/evidence.ts";
+import path from "node:path";
 
-function check(fileInput: string, portable: boolean, strict: boolean): Evidence {
+import {
+  evidence,
+  exitForGate,
+  finding,
+  printEvidence,
+} from "./lib/evidence.ts";
+import type { Evidence, Finding } from "./lib/evidence.ts";
+import { canonicalCalloutType, parseMarkdown } from "./lib/markdown.ts";
+
+function collectFenceFindings(
+  file: string,
+  strict: boolean,
+  fences: ReturnType<typeof parseMarkdown>["fences"],
+  findings: Finding[]
+): void {
+  for (const fence of fences) {
+    if (!fence.language) {
+      findings.push(
+        finding(
+          "code-language-missing",
+          strict ? "error" : "warning",
+          "fenced code block has no language tag",
+          { line: fence.line, path: file }
+        )
+      );
+    }
+  }
+}
+
+function collectCalloutFindings(
+  file: string,
+  portable: boolean,
+  callouts: ReturnType<typeof parseMarkdown>["callouts"],
+  findings: Finding[]
+): void {
+  for (const callout of callouts) {
+    if (!canonicalCalloutType(callout.type)) {
+      findings.push(
+        finding(
+          "callout-custom-type",
+          portable ? "error" : "warning",
+          `callout type ${callout.type} is not portable without vault-specific CSS/plugin support`,
+          {
+            evidence: { depth: callout.depth, type: callout.type },
+            line: callout.line,
+            path: file,
+          }
+        )
+      );
+    }
+  }
+}
+
+function collectBodyFindings(
+  file: string,
+  strict: boolean,
+  surface: ReturnType<typeof parseMarkdown>,
+  findings: Finding[]
+): void {
+  const bodyLineMap = new Map(surface.body_lines);
+  for (const [lineNumber, line] of surface.body_lines) {
+    if (/^\s*(?:>\s*)+\[![A-Za-z0-9_-]+\][+-]?/u.test(line)) {
+      const next = bodyLineMap.get(lineNumber + 1) ?? "";
+      if (next.trim() && !/^\s*>/u.test(next)) {
+        findings.push(
+          finding(
+            "callout-prefix-missing",
+            strict ? "error" : "warning",
+            "content immediately after a callout opener is missing the required > prefix",
+            { line: lineNumber + 1, path: file }
+          )
+        );
+      }
+    }
+    if (
+      /\]\(\s*javascript:/iu.test(line) ||
+      /<\s*(?:script|iframe)\b/iu.test(line)
+    ) {
+      findings.push(
+        finding(
+          "unsafe-markup-surface",
+          "error",
+          "note contains a script-like or javascript URL surface",
+          { line: lineNumber, path: file }
+        )
+      );
+    }
+  }
+}
+
+function collectMermaidFindings(
+  file: string,
+  strict: boolean,
+  blocks: ReturnType<typeof parseMarkdown>["mermaid_blocks"],
+  findings: Finding[]
+): void {
+  for (const block of blocks) {
+    const { body } = block;
+    const first =
+      body
+        .split(/\r?\n/u)
+        .find((line) => line.trim())
+        ?.trim()
+        .toLowerCase() ?? "";
+    if (
+      !/^(?:flowchart|graph|sequencediagram|statediagram-v2)\b/u.test(first)
+    ) {
+      findings.push(
+        finding(
+          "mermaid-type-unsupported",
+          "error",
+          "Mermaid block does not start with a supported diagram type",
+          {
+            evidence: {
+              first_line: first,
+              supported: ["flowchart", "sequenceDiagram", "stateDiagram-v2"],
+            },
+            line: block.line,
+            path: file,
+          }
+        )
+      );
+    }
+    const forbidden: [RegExp, string][] = [
+      [/\bclick\b/iu, "click interactions"],
+      [/\bcallback\b/iu, "callbacks"],
+      [/javascript\s*:/iu, "javascript URL"],
+      [/^\s*%%\s*\{init\}/imu, "init directive"],
+      [/^\s*config\b/imu, "config directive"],
+      [/<\s*script\b/iu, "embedded script"],
+    ];
+    for (const [pattern, label] of forbidden) {
+      if (pattern.test(body)) {
+        findings.push(
+          finding(
+            "mermaid-unsafe-syntax",
+            "error",
+            `Mermaid contains forbidden ${label}`,
+            { line: block.line, path: file }
+          )
+        );
+      }
+    }
+    if (
+      /^(?:flowchart|graph)\b/iu.test(first) &&
+      /(?:\[|\(|\{|\|)\s*end\s*(?:\]|\)|\})/iu.test(body)
+    ) {
+      findings.push(
+        finding(
+          "mermaid-unquoted-end",
+          strict ? "error" : "warning",
+          "flowchart uses end as an unquoted label or node value",
+          { line: block.line, path: file }
+        )
+      );
+    }
+  }
+}
+
+function collectEmphasisFindings(
+  file: string,
+  strict: boolean,
+  bodyLines: ReturnType<typeof parseMarkdown>["body_lines"],
+  findings: Finding[]
+): void {
+  for (const [line, text] of bodyLines) {
+    const masked = text.replaceAll(/`[^`]*`/gu, "");
+    for (const [token, syntax] of [
+      ["**", "bold"],
+      ["~~", "strike"],
+      ["==", "highlight"],
+    ] as const) {
+      const count = masked.split(token).length - 1;
+      if (count % 2 !== 0) {
+        findings.push(
+          finding(
+            "emphasis-unbalanced",
+            strict ? "error" : "warning",
+            `${syntax} delimiter appears unbalanced`,
+            { line, path: file }
+          )
+        );
+      }
+    }
+  }
+}
+
+function check(
+  fileInput: string,
+  portable: boolean,
+  strict: boolean
+): Evidence {
   const file = path.resolve(fileInput);
   const findings: Finding[] = [];
   if (!fs.existsSync(file)) {
-    findings.push(finding("file-missing", "error", "note file does not exist", { path: file }));
-    return evidence("check-note-surface", "failed", { path: file }, {}, findings);
+    findings.push(
+      finding("file-missing", "error", "note file does not exist", {
+        path: file,
+      })
+    );
+    return evidence(
+      "check-note-surface",
+      "failed",
+      { path: file },
+      {},
+      findings
+    );
   }
   if (!fs.statSync(file).isFile()) {
-    findings.push(finding("file-not-regular", "error", "note path is not a regular file", { path: file }));
-    return evidence("check-note-surface", "failed", { path: file }, {}, findings);
+    findings.push(
+      finding("file-not-regular", "error", "note path is not a regular file", {
+        path: file,
+      })
+    );
+    return evidence(
+      "check-note-surface",
+      "failed",
+      { path: file },
+      {},
+      findings
+    );
   }
   const surface = parseMarkdown(file);
-  for (const item of surface.parse_errors) findings.push(finding(item.code, "error", item.message, { path: file, line: item.line }));
-
-  for (const fence of surface.fences) {
-    if (!fence.language) {
-      findings.push(finding("code-language-missing", strict ? "error" : "warning", "fenced code block has no language tag", {
-        path: file,
-        line: fence.line,
-      }));
-    }
+  for (const item of surface.parse_errors) {
+    findings.push(
+      finding(item.code, "error", item.message, { line: item.line, path: file })
+    );
   }
 
-  for (const callout of surface.callouts) {
-    if (!canonicalCalloutType(callout.type)) {
-      findings.push(finding("callout-custom-type", portable ? "error" : "warning", `callout type ${callout.type} is not portable without vault-specific CSS/plugin support`, {
-        path: file,
-        line: callout.line,
-        evidence: { type: callout.type, depth: callout.depth },
-      }));
-    }
-  }
-
-  const bodyLineMap = new Map(surface.body_lines);
-  for (const [lineNumber, line] of surface.body_lines) {
-    if (/^\s*(?:>\s*)+\[![A-Za-z0-9_-]+\][+-]?/.test(line)) {
-      const next = bodyLineMap.get(lineNumber + 1) ?? "";
-      if (next.trim() && !/^\s*>/.test(next)) {
-        findings.push(finding("callout-prefix-missing", strict ? "error" : "warning", "content immediately after a callout opener is missing the required > prefix", {
-          path: file,
-          line: lineNumber + 1,
-        }));
-      }
-    }
-    if (/\]\(\s*javascript:/i.test(line) || /<\s*(?:script|iframe)\b/i.test(line)) {
-      findings.push(finding("unsafe-markup-surface", "error", "note contains a script-like or javascript URL surface", { path: file, line: lineNumber }));
-    }
-  }
-
-  for (const block of surface.mermaid_blocks) {
-    const body = block.body;
-    const first = body.split(/\r?\n/).find((line) => line.trim())?.trim().toLowerCase() ?? "";
-    if (!/^(flowchart|graph|sequencediagram|statediagram-v2)\b/.test(first)) {
-      findings.push(finding("mermaid-type-unsupported", "error", "Mermaid block does not start with a supported diagram type", {
-        path: file,
-        line: block.line,
-        evidence: { first_line: first, supported: ["flowchart", "sequenceDiagram", "stateDiagram-v2"] },
-      }));
-    }
-    const forbidden: Array<[RegExp, string]> = [
-      [/\bclick\b/i, "click interactions"],
-      [/\bcallback\b/i, "callbacks"],
-      [/javascript\s*:/i, "javascript URL"],
-      [/^\s*%%\s*\{init\}/im, "init directive"],
-      [/^\s*config\b/im, "config directive"],
-      [/<\s*script\b/i, "embedded script"],
-    ];
-    for (const [pattern, label] of forbidden) {
-      if (pattern.test(body)) findings.push(finding("mermaid-unsafe-syntax", "error", `Mermaid contains forbidden ${label}`, { path: file, line: block.line }));
-    }
-    if (/^(?:flowchart|graph)\b/i.test(first) && /(?:\[|\(|\{|\|)\s*end\s*(?:\]|\)|\})/i.test(body)) {
-      findings.push(finding("mermaid-unquoted-end", strict ? "error" : "warning", "flowchart uses end as an unquoted label or node value", { path: file, line: block.line }));
-    }
-  }
-
-  for (const [line, text] of surface.body_lines) {
-    const masked = text.replace(/`[^`]*`/g, "");
-    for (const [token, syntax] of [["**", "bold"], ["~~", "strike"], ["==", "highlight"]] as const) {
-      const count = masked.split(token).length - 1;
-      if (count % 2 !== 0) {
-        findings.push(finding("emphasis-unbalanced", strict ? "error" : "warning", `${syntax} delimiter appears unbalanced`, { path: file, line }));
-      }
-    }
-  }
+  collectFenceFindings(file, strict, surface.fences, findings);
+  collectCalloutFindings(file, portable, surface.callouts, findings);
+  collectBodyFindings(file, strict, surface, findings);
+  collectMermaidFindings(file, strict, surface.mermaid_blocks, findings);
+  collectEmphasisFindings(file, strict, surface.body_lines, findings);
 
   const errors = findings.filter((item) => item.severity === "error");
-  return evidence("check-note-surface", errors.length === 0 ? "passed" : "failed", {
-    path: file,
-    sha256: surface.content_hash,
-    portable,
-    strict,
-  }, {
-    bytes: surface.bytes,
-    lines: surface.lines.length,
-    headings: surface.headings.length,
-    fences: surface.fences.length,
-    callouts: surface.callouts.length,
-    tables: surface.tables.length,
-    wikilinks: surface.wikilinks.length,
-    external_links: surface.external_links.length,
-    footnotes: surface.footnotes.length,
-    emphasis: surface.emphasis.length,
-    mermaid_blocks: surface.mermaid_blocks.length,
-  }, findings);
+  return evidence(
+    "check-note-surface",
+    errors.length === 0 ? "passed" : "failed",
+    {
+      path: file,
+      portable,
+      sha256: surface.content_hash,
+      strict,
+    },
+    {
+      bytes: surface.bytes,
+      callouts: surface.callouts.length,
+      emphasis: surface.emphasis.length,
+      external_links: surface.external_links.length,
+      fences: surface.fences.length,
+      footnotes: surface.footnotes.length,
+      headings: surface.headings.length,
+      lines: surface.lines.length,
+      mermaid_blocks: surface.mermaid_blocks.length,
+      tables: surface.tables.length,
+      wikilinks: surface.wikilinks.length,
+    },
+    findings
+  );
 }
 
 function selfTest(): number {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "knowledge-distiller-surface-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "knowledge-distiller-surface-")
+  );
   try {
     const valid = path.join(root, "valid.md");
-    fs.writeFileSync(valid, [
-      "# Main",
-      "**结论** 与 `Fiber`。",
-      "> [!warning]- 常见误解",
-      "> 这是一条边界。",
-      "> [!question] 嵌套问题",
-      "> > [!info] 嵌套边界",
-      "> > 只覆盖 renderer。",
-      "",
-      "| A | B |",
-      "|---|---|",
-      "| 1 | 2 |",
-      "",
-      "```ts",
-      "const x = 1;",
-      "```",
-      "",
-      "```html",
-      "<script>const example = true;</script>",
-      "```",
-      "",
-      "```mermaid",
-      "flowchart TB",
-      "  A[\"开始\"] --> B[\"结束\"]",
-      "```",
-      "",
-    ].join("\n"), "utf8");
+    fs.writeFileSync(
+      valid,
+      [
+        "# Main",
+        "**结论** 与 `Fiber`。",
+        "> [!warning]- 常见误解",
+        "> 这是一条边界。",
+        "> [!question] 嵌套问题",
+        "> > [!info] 嵌套边界",
+        "> > 只覆盖 renderer。",
+        "",
+        "| A | B |",
+        "|---|---|",
+        "| 1 | 2 |",
+        "",
+        "```ts",
+        "const x = 1;",
+        "```",
+        "",
+        "```html",
+        "<script>const example = true;</script>",
+        "```",
+        "",
+        "```mermaid",
+        "flowchart TB",
+        '  A["开始"] --> B["结束"]',
+        "```",
+        "",
+      ].join("\n"),
+      "utf-8"
+    );
     const validResult = check(valid, true, true);
-    if (validResult.gate !== "passed" || validResult.metrics.callouts !== 3) throw new Error("valid surface should pass, including nested callouts");
+    if (validResult.gate !== "passed" || validResult.metrics.callouts !== 3) {
+      throw new Error("valid surface should pass, including nested callouts");
+    }
 
     const invalid = path.join(root, "invalid.md");
-    fs.writeFileSync(invalid, [
-      "# Main",
-      "> [!custom] bad",
-      "```mermaid",
-      "flowchart TB",
-      "A[\"x\"] --> B[\"end\"]",
-      "click A callback()",
-      "```",
-    ].join("\n"), "utf8");
-    if (check(invalid, true, true).gate !== "failed") throw new Error("invalid surface should fail");
+    fs.writeFileSync(
+      invalid,
+      [
+        "# Main",
+        "> [!custom] bad",
+        "```mermaid",
+        "flowchart TB",
+        'A["x"] --> B["end"]',
+        "click A callback()",
+        "```",
+      ].join("\n"),
+      "utf-8"
+    );
+    if (check(invalid, true, true).gate !== "failed") {
+      throw new Error("invalid surface should fail");
+    }
     console.log("note-surface checker self-test: PASS");
     return 0;
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(root, { force: true, recursive: true });
   }
 }
 
 function main(): number {
   const args = process.argv.slice(2);
-  if (args.includes("--self-test")) return selfTest();
+  if (args.includes("--self-test")) {
+    return selfTest();
+  }
   const json = args.includes("--json");
   const portable = args.includes("--portable");
   const strict = args.includes("--strict");
   const files: string[] = [];
   for (let i = 0; i < args.length; i += 1) {
-    if (args[i] === "--file") files.push(path.resolve(args[++i] ?? ""));
-    else if (!["--json", "--portable", "--strict", "--help", "-h"].includes(args[i])) throw new Error(`unknown argument: ${args[i]}`);
+    if (args[i] === "--file") {
+      i += 1;
+      files.push(path.resolve(args[i] ?? ""));
+    } else if (
+      !["--json", "--portable", "--strict", "--help", "-h"].includes(args[i])
+    ) {
+      throw new Error(`unknown argument: ${args[i]}`);
+    }
   }
   if (args.includes("--help") || args.includes("-h")) {
-    console.log("usage: node scripts/check-note-surface.ts --file NOTE [--portable] [--strict] [--json]");
+    console.log(
+      "usage: node scripts/check-note-surface.ts --file NOTE [--portable] [--strict] [--json]"
+    );
     console.log("       node scripts/check-note-surface.ts --self-test");
     return 0;
   }
-  if (files.length === 0) throw new Error("usage: node scripts/check-note-surface.ts --file NOTE");
+  if (files.length === 0) {
+    throw new Error("usage: node scripts/check-note-surface.ts --file NOTE");
+  }
   const results = files.map((file) => check(file, portable, strict));
   const merged: Evidence = evidence(
     "check-note-surface",
     results.every((result) => result.gate === "passed") ? "passed" : "failed",
     { paths: files, portable, strict },
-    { files: files.length, passed: results.filter((result) => result.gate === "passed").length },
+    {
+      files: files.length,
+      passed: results.filter((result) => result.gate === "passed").length,
+    },
     results.flatMap((result) => result.findings),
-    Object.fromEntries(results.map((result) => [String(result.input.path), result])),
+    Object.fromEntries(
+      results.map((result) => [String(result.input.path), result])
+    )
   );
-  if (!json) {
+  if (json) {
+    printEvidence(merged, true, "");
+  } else {
     const errors = merged.findings.filter((item) => item.severity === "error");
-    if (errors.length > 0) errors.forEach((item) => console.error(`ERROR ${item.path ?? ""}:${item.line ?? 0}: ${item.message}`));
-    else console.log(`OK: checked ${files.length} note(s); Markdown/Obsidian surface is valid`);
-  } else printEvidence(merged, true, "");
+    if (errors.length > 0) {
+      for (const item of errors) {
+        console.error(
+          `ERROR ${item.path ?? ""}:${item.line ?? 0}: ${item.message}`
+        );
+      }
+    } else {
+      console.log(
+        `OK: checked ${files.length} note(s); Markdown/Obsidian surface is valid`
+      );
+    }
+  }
   return exitForGate(merged.gate);
 }
 
