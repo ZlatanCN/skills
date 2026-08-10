@@ -19,18 +19,19 @@ import {
 import type { Evidence, Finding } from "./lib/evidence.ts";
 
 const WRITE_STATES = new Set([
-  "written",
-  "updated",
-  "unchanged",
-  "not_written",
-  "possibly_partial",
+  "not_applicable",
+  "idle",
+  "staging",
+  "committed",
+  "uncertain",
 ]);
+const WRITE_OUTCOMES = new Set(["created", "updated", "unchanged"]);
 const GATES = new Set(["passed", "failed", "unavailable", "not_applicable"]);
-const REVIEW_RESULTS = new Set([
-  "clean",
-  "findings",
-  "unverified",
-  "protocol_invalid",
+const REVIEW_OUTCOMES = new Set([
+  "provider_clean",
+  "provider_findings",
+  "provider_unverified",
+  "manual_checked",
   "unavailable",
 ]);
 const REQUIRED_HARD_GATES = [
@@ -67,7 +68,8 @@ const SCRIPT_DIR = path.dirname(new URL(import.meta.url).pathname);
 type MutableDeliveryReport = {
   schema_version: string;
   label: string;
-  write_status: string;
+  write_state: string;
+  write_outcome?: string;
   note_path: string;
   hard_gates: Record<string, string>;
   review: {
@@ -204,7 +206,7 @@ function validateJournalSummary(
   if (
     checked?.metrics?.closed !== true ||
     checked.metrics.events !== journal.events ||
-    checked.metrics.cutoff_order !== journal.cutoff_order
+    checked.metrics.close_order !== journal.close_order
   ) {
     findings.push(
       finding(
@@ -215,8 +217,8 @@ function validateJournalSummary(
           evidence: {
             checked: checked?.metrics,
             declared: {
+              close_order: journal.close_order,
               closed: journal.closed,
-              cutoff_order: journal.cutoff_order,
               events: journal.events,
             },
           },
@@ -238,7 +240,7 @@ function validateCleanAxisBinding(
   const matching = events.find(
     (event) =>
       event.axis === axis &&
-      event.quality_result === "clean" &&
+      event.result === "clean" &&
       event.cycle_id === axisData.cycle_id &&
       event.attempt_id === axisData.attempt_id &&
       event.note_revision === axisData.note_revision &&
@@ -250,7 +252,7 @@ function validateCleanAxisBinding(
       finding(
         "delivery-clean-review-unbound",
         "error",
-        `review.${axis} clean result is not bound to a matching clean event in the checked journal`,
+        `review.${axis} provider_clean outcome is not bound to a matching clean event in the checked journal`,
         {
           evidence: {
             attempt_id: axisData.attempt_id,
@@ -323,7 +325,7 @@ function bindCleanReviews(
     ? path.resolve(String(report.note_path))
     : "";
   for (const axis of ["clarity", "accuracy"] as const) {
-    if (results[axis] !== "clean") {
+    if (results[axis] !== "provider_clean") {
       continue;
     }
     const review = report.review as Record<string, unknown>;
@@ -345,7 +347,7 @@ function bindCreationProbe(
   report: Record<string, unknown>,
   findings: Finding[]
 ): void {
-  if (report.write_status !== "written" && report.write_status !== "updated") {
+  if (report.write_state !== "committed") {
     return;
   }
   if (report.artifact_kind !== "new_note") {
@@ -543,12 +545,12 @@ function validateArtifact(
   report: Record<string, unknown>,
   findings: Finding[]
 ): boolean {
-  if (report.schema_version !== "knowledge-distiller.delivery.v1") {
+  if (report.schema_version !== "knowledge-distiller.delivery.v2") {
     findings.push(
       finding(
         "delivery-version-invalid",
         "error",
-        "schema_version must be knowledge-distiller.delivery.v1"
+        "schema_version must be knowledge-distiller.delivery.v2"
       )
     );
   }
@@ -565,18 +567,18 @@ function validateArtifact(
       )
     );
   }
-  if (!WRITE_STATES.has(String(report.write_status))) {
+  if (!WRITE_STATES.has(String(report.write_state))) {
     findings.push(
       finding(
         "delivery-write-state-invalid",
         "error",
-        "write_status is not a canonical delivery state"
+        "write_state is not a canonical delivery state"
       )
     );
   }
   if (
     !nonEmptyString(report.note_path) &&
-    report.write_status !== "not_written"
+    !["not_applicable", "idle"].includes(String(report.write_state))
   ) {
     findings.push(
       finding(
@@ -586,9 +588,27 @@ function validateArtifact(
       )
     );
   }
+  const committed = report.write_state === "committed";
   const written =
-    report.write_status === "written" || report.write_status === "updated";
-  if (written) {
+    committed && ["created", "updated"].includes(String(report.write_outcome));
+  if (committed && !WRITE_OUTCOMES.has(String(report.write_outcome))) {
+    findings.push(
+      finding(
+        "delivery-write-outcome-invalid",
+        "error",
+        "committed write_state requires write_outcome created, updated, or unchanged"
+      )
+    );
+  } else if (!committed && report.write_outcome !== undefined) {
+    findings.push(
+      finding(
+        "delivery-write-outcome-illegal",
+        "error",
+        "write_outcome is only valid when write_state=committed"
+      )
+    );
+  }
+  if (committed) {
     validateWrittenArtifact(report, findings);
   }
   if (
@@ -687,7 +707,7 @@ function validateCleanReviewAxis(
         finding(
           "delivery-clean-metadata-missing",
           "error",
-          `review.${name}.${field} is required for quality_result=clean`
+          `review.${name}.${field} is required for outcome=provider_clean`
         )
       );
     }
@@ -697,7 +717,7 @@ function validateCleanReviewAxis(
       finding(
         "delivery-clean-revision-invalid",
         "error",
-        `review.${name}.note_revision must be a non-negative integer for quality_result=clean`
+        `review.${name}.note_revision must be a non-negative integer for outcome=provider_clean`
       )
     );
   }
@@ -715,7 +735,7 @@ function validateCleanReviewAxis(
       finding(
         "delivery-clean-coverage-invalid",
         "error",
-        `review.${name}.source_coverage must be complete for quality_result=clean`
+        `review.${name}.source_coverage must be complete for outcome=provider_clean`
       )
     );
   }
@@ -727,7 +747,7 @@ function validateCleanReviewAxis(
       finding(
         "delivery-clean-hash-invalid",
         "error",
-        `review.${name}.draft_hash must be SHA-256 for quality_result=clean`
+        `review.${name}.draft_hash must be SHA-256 for outcome=provider_clean`
       )
     );
   }
@@ -739,7 +759,7 @@ function validateCleanReviewAxis(
         finding(
           "delivery-clean-review-contract-missing",
           "error",
-          `review.${name}.${field} is required for quality_result=clean`
+          `review.${name}.${field} is required for outcome=provider_clean`
         )
       );
     }
@@ -764,41 +784,23 @@ function validateReviewResults(
   const results: Record<string, string> = {};
   for (const name of ["clarity", "accuracy"] as const) {
     const axis = getReviewAxis(review, name);
-    const result = String(axis.quality_result ?? "");
-    if (REVIEW_RESULTS.has(result)) {
-      results[name] = result;
+    const outcome = String(axis.outcome ?? "");
+    if (REVIEW_OUTCOMES.has(outcome)) {
+      results[name] = outcome;
     } else {
       findings.push(
         finding(
           "delivery-review-result-invalid",
           "error",
-          `review.${name}.quality_result is missing or unsupported`
+          `review.${name}.outcome is missing or unsupported`
         )
       );
     }
-    if (result === "clean") {
+    if (outcome === "provider_clean") {
       validateCleanReviewAxis(name, axis, written, report.final_hash, findings);
     }
   }
   return results;
-}
-
-function validateReviewFallbacks(
-  review: Record<string, unknown> | undefined,
-  findings: Finding[]
-): void {
-  for (const name of ["clarity", "accuracy"] as const) {
-    const { fallback } = getReviewAxis(review, name);
-    if (fallback !== undefined && fallback !== "manual_checked") {
-      findings.push(
-        finding(
-          "delivery-fallback-invalid",
-          "error",
-          `review.${name}.fallback must be manual_checked when present`
-        )
-      );
-    }
-  }
 }
 
 function validateReviewJournal(
@@ -839,13 +841,13 @@ function validateReviewJournal(
   if (
     journal.gate === "passed" &&
     (!(typeof journal.events === "number" && journal.events > 0) ||
-      !(typeof journal.cutoff_order === "number" && journal.cutoff_order > 0))
+      !(typeof journal.close_order === "number" && journal.close_order > 0))
   ) {
     findings.push(
       finding(
         "delivery-journal-evidence-missing",
         "error",
-        "a passed review journal must include positive events and cutoff_order"
+        "a passed review journal must include positive events and close_order"
       )
     );
   }
@@ -892,13 +894,14 @@ function validateReview(
     );
   }
   const results = validateReviewResults(review, report, written, findings);
-  validateReviewFallbacks(review, findings);
   const journal = validateReviewJournal(review, findings);
   const { blockers, openItems } = validateReviewOpenItems(report, findings);
   return {
     blockers,
     journal,
-    manualFallback: review?.manual_fallback === true,
+    manualFallback:
+      results.clarity === "manual_checked" &&
+      results.accuracy === "manual_checked",
     openItems,
     results,
     review,
@@ -933,7 +936,10 @@ function validateDeliveryRestrictions(
       )
     );
   }
-  if (written && gateObject?.write_readback !== "passed") {
+  if (
+    report.write_state === "committed" &&
+    gateObject?.write_readback !== "passed"
+  ) {
     findings.push(
       finding(
         "delivery-write-readback-required",
@@ -1006,7 +1012,7 @@ function validateSuccessLabelClaims(
       finding(
         "delivery-write-overclaim",
         "error",
-        "a success delivery label requires write_status written or updated"
+        "a success delivery label requires write_state=committed with write_outcome=created or updated"
       )
     );
   }
@@ -1045,20 +1051,14 @@ function validateManualFallbackClaim(
   hasBlocker: boolean,
   findings: Finding[]
 ): void {
-  const { journal, manualFallback, results, review } = reviewContext;
-  const clarityManualFallback =
-    isRecord(review?.clarity) && review.clarity.fallback === "manual_checked";
-  const accuracyManualFallback =
-    isRecord(review?.accuracy) && review.accuracy.fallback === "manual_checked";
+  const { journal, manualFallback, results } = reviewContext;
   if (
     label === "已交付；部分审查由人工复核" &&
     !(
       manualFallback &&
       journal?.gate === "unavailable" &&
-      results.clarity === "unavailable" &&
-      results.accuracy === "unavailable" &&
-      clarityManualFallback &&
-      accuracyManualFallback &&
+      results.clarity === "manual_checked" &&
+      results.accuracy === "manual_checked" &&
       !hasBlocker
     )
   ) {
@@ -1066,7 +1066,7 @@ function validateManualFallbackClaim(
       finding(
         "delivery-manual-fallback-overclaim",
         "error",
-        "partial manual-review delivery requires explicit manual_checked fallback for both unavailable axes"
+        "partial manual-review delivery requires manual_checked outcome for both axes and an unavailable journal"
       )
     );
   }
@@ -1102,21 +1102,24 @@ function validateWriteStateLabelClaims(
   label: string,
   findings: Finding[]
 ): void {
-  if (report.write_status === "possibly_partial" && !label.includes("不确定")) {
+  if (report.write_state === "uncertain" && !label.includes("不确定")) {
     findings.push(
       finding(
         "delivery-partial-overclaim",
         "error",
-        "possibly_partial writes must be reported as uncertain"
+        "uncertain writes must be reported as uncertain"
       )
     );
   }
-  if (report.write_status === "not_written" && SUCCESS_LABELS.has(label)) {
+  if (
+    !["committed"].includes(String(report.write_state)) &&
+    SUCCESS_LABELS.has(label)
+  ) {
     findings.push(
       finding(
         "delivery-not-written-overclaim",
         "error",
-        "not_written cannot use a success delivery label"
+        "a non-committed write cannot use a success delivery label"
       )
     );
   }
@@ -1142,7 +1145,9 @@ function validateDeliveryLabelClaims(
     gateValues.every(
       (value) => value === "passed" || value === "not_applicable"
     );
-  const bothClean = results.clarity === "clean" && results.accuracy === "clean";
+  const bothClean =
+    results.clarity === "provider_clean" &&
+    results.accuracy === "provider_clean";
   const journalClosed = journal?.gate === "passed" && journal.closed === true;
   const hasBlocker = hasDeliveryBlocker(blockers, openItems);
   const reviewUncertain =
@@ -1234,7 +1239,8 @@ function check(input: string): Evidence {
       journal_closed: deliveryState.journalClosed,
       label: deliveryState.label,
       open_item_count: reviewContext.openItems.length,
-      write_status: report.write_status,
+      write_outcome: report.write_outcome,
+      write_state: report.write_state,
     },
     findings
   );
@@ -1269,8 +1275,8 @@ function selfTest(): number {
           cycle_id: "cycle-1",
           draft_hash: "a".repeat(64),
           note_revision: 1,
-          observability: "provider",
-          quality_result: "clean",
+          observability: "observed",
+          outcome: "provider_clean",
           source_coverage: "complete",
         },
         clarity: {
@@ -1285,15 +1291,16 @@ function selfTest(): number {
           cycle_id: "cycle-1",
           draft_hash: "a".repeat(64),
           note_revision: 1,
-          observability: "provider",
-          quality_result: "clean",
+          observability: "observed",
+          outcome: "provider_clean",
           source_coverage: "complete",
           teach_back: "reader can explain",
         },
-        journal: { closed: true, cutoff_order: 2, events: 3, gate: "passed" },
+        journal: { close_order: 7, closed: true, events: 7, gate: "passed" },
       },
-      schema_version: "knowledge-distiller.delivery.v1",
-      write_status: "updated",
+      schema_version: "knowledge-distiller.delivery.v2",
+      write_outcome: "updated",
+      write_state: "committed",
     };
     const note = path.join(root, "Note.md");
     fs.writeFileSync(note, "# Note\n", "utf-8");
@@ -1307,31 +1314,34 @@ function selfTest(): number {
     }
     const journalPath = path.join(root, "journal.jsonl");
     const journalBase = {
-      cancel_state: "not_requested",
       client_dispatch_id: "dispatch",
       cycle_id: "cycle-1",
       draft_hash: report.final_hash,
       evidence: { source: "self-test" },
       note_path: note,
       note_revision: 1,
-      observability: "self-test",
+      observability: "observed",
       observed_at: "2026-08-10T00:00:00Z",
-      parent_wait_state: "waiting",
-      provider_execution_state: "pending",
-      provider_liveness: "unobserved",
       provider_operation_id: "provider",
     };
     const journalEvents = [
       {
         ...journalBase,
         attempt_id: "clarity-1",
+        attempt_state: "pending",
         axis: "clarity",
         event_id: "j1",
         event_type: "dispatch",
         order: 1,
-        quality_result: "unavailable",
-        state_after: "active",
-        state_before: "pending",
+      },
+      {
+        ...journalBase,
+        attempt_id: "clarity-1",
+        attempt_state: "running",
+        axis: "clarity",
+        event_id: "j2",
+        event_type: "progress",
+        order: 2,
       },
       {
         ...journalBase,
@@ -1342,63 +1352,60 @@ function selfTest(): number {
         C5: "—",
         after_state: "explain",
         attempt_id: "clarity-1",
+        attempt_state: "completed",
         axis: "clarity",
         claims_checked: 3,
-        event_id: "j2",
+        event_id: "j3",
         event_type: "result",
         findings: [],
-        order: 2,
-        provider_execution_state: "completed",
-        provider_liveness: "terminal",
-        quality_result: "clean",
+        order: 3,
+        result: "clean",
         source_coverage: "complete",
-        state_after: "completed",
-        state_before: "active",
         teach_back: "reader can explain",
         unverified: "—",
       },
       {
         ...journalBase,
         attempt_id: "accuracy-1",
+        attempt_state: "pending",
         axis: "accuracy",
-        event_id: "j3",
+        event_id: "j4",
         event_type: "dispatch",
-        order: 3,
-        quality_result: "unavailable",
-        state_after: "active",
-        state_before: "pending",
+        order: 4,
+      },
+      {
+        ...journalBase,
+        attempt_id: "accuracy-1",
+        attempt_state: "running",
+        axis: "accuracy",
+        event_id: "j5",
+        event_type: "progress",
+        order: 5,
       },
       {
         ...journalBase,
         A1: "—",
         after_state: "explain",
         attempt_id: "accuracy-1",
+        attempt_state: "completed",
         axis: "accuracy",
         claims_checked: 3,
-        event_id: "j4",
+        event_id: "j6",
         event_type: "result",
         findings: [],
-        order: 4,
-        provider_execution_state: "completed",
-        provider_liveness: "terminal",
-        quality_result: "clean",
+        order: 6,
+        result: "clean",
         source_coverage: "complete",
-        state_after: "completed",
-        state_before: "active",
         unverified: "—",
       },
       {
         ...journalBase,
-        attempt_id: "close-1",
+        attempt_id: "run",
         axis: "system",
-        cutoff_order: 4,
-        event_id: "j5",
+        close_order: 7,
+        event_id: "j7",
         event_type: "report_closed",
-        order: 5,
-        parent_wait_state: "closed",
-        quality_result: "unavailable",
-        state_after: "closed",
-        state_before: "completed",
+        order: 7,
       },
     ];
     fs.writeFileSync(
@@ -1407,9 +1414,9 @@ function selfTest(): number {
       "utf-8"
     );
     report.review.journal = {
+      close_order: 7,
       closed: true,
-      cutoff_order: 4,
-      events: 5,
+      events: 7,
       gate: "passed",
       path: journalPath,
       sha256: fileHash(journalPath),
@@ -1475,9 +1482,9 @@ function selfTest(): number {
       JSON.stringify({
         ...report,
         review: {
-          accuracy: { quality_result: "clean" },
-          clarity: { quality_result: "clean" },
-          journal: { closed: true, cutoff_order: 2, events: 3, gate: "passed" },
+          accuracy: { outcome: "provider_clean" },
+          clarity: { outcome: "provider_clean" },
+          journal: { close_order: 2, closed: true, events: 3, gate: "passed" },
         },
       }),
       "utf-8"
@@ -1508,21 +1515,39 @@ function selfTest(): number {
         label: "已交付；部分审查由人工复核",
         review: {
           accuracy: {
-            fallback: "manual_checked",
-            quality_result: "unavailable",
+            outcome: "manual_checked",
           },
           clarity: {
-            fallback: "manual_checked",
-            quality_result: "unavailable",
+            outcome: "manual_checked",
           },
           journal: { closed: false, gate: "unavailable" },
-          manual_fallback: true,
         },
       }),
       "utf-8"
     );
     if (check(file).gate !== "passed") {
       throw new Error("explicit two-axis manual fallback should pass");
+    }
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        ...report,
+        label: "未写入（仅草稿）",
+        write_outcome: "updated",
+        write_state: "idle",
+      }),
+      "utf-8"
+    );
+    if (check(file).gate !== "failed") {
+      throw new Error("write_outcome must not escape committed write_state");
+    }
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ ...report, write_outcome: undefined }),
+      "utf-8"
+    );
+    if (check(file).gate !== "failed") {
+      throw new Error("committed write_state requires write_outcome");
     }
     fs.writeFileSync(
       file,

@@ -111,20 +111,20 @@
     },
     {
       "id": 6,
-      "prompt": "请把下面这段关于分布式系统故障排查的理解整理成一篇中文 Obsidian 笔记，并做一次深度准确性审查：我认为线上故障通常不是单个服务坏了，而是超时、重试和队列积压互相放大，最后形成级联故障。审查可能需要很久；只有确认 provider 确实卡住或无响应才取消 reviewer。客户端只是暂时等不到状态时，不要把它称为 provider 失败或已取消；如果父任务停止等待，请区分 deferred、unknown 和 canceled-confirmed，并在必要时做人工 fallback。不要把审查时间长本身当成卡住。",
-      "expected_output": "A Chinese Obsidian note explaining cascading failures and a truthful Phase 8 report that preserves the distinction between parent waiting, provider liveness, cancellation confirmation, and manual fallback",
+      "prompt": "请把下面这段关于分布式系统故障排查的理解整理成一篇中文 Obsidian 笔记，并做一次深度准确性审查：我认为线上故障通常不是单个服务坏了，而是超时、重试和队列积压互相放大，最后形成级联故障。审查可能需要很久；客户端只是暂时等不到状态时，不要把它称为 reviewer 失败或取消。只有收到明确的 provider 失败/停滞信号，或确认停止，才结束该 reviewer attempt；不要把审查时间长本身当成卡住。",
+      "expected_output": "A Chinese Obsidian note explaining cascading failures and a truthful delivery report that preserves the distinction between Run state, ReviewAttempt lifecycle, observation evidence, confirmed stop, and manual fallback",
       "files": [],
       "expectations": [
         "Note stays focused on cascading failure mechanisms, timeout/retry amplification, and queue buildup",
         "The report does not infer provider failure or cancellation from wall-clock duration alone",
-        "Opaque or late reviewer state is distinguished from confirmed cancellation, and incomplete review is not reported as clean",
+        "Opaque or late reviewer evidence is distinguished from a confirmed stop, and incomplete review is not reported as clean",
         "If a reviewer result is unavailable, the report uses the documented manual fallback or an honest unresolved state",
         "Expository prose is in Chinese; code, protocol names, URLs, citations, and conventional English technical terms remain in their proper form",
         "Frontmatter and anchored wikilinks follow the current skill rules when a note is written",
         "The execution log persists cycle and attempt identity together with note revision and note path before reviewer waiting",
-        "Each missing reviewer axis records parent cutoff, provider operation identity or opacity, observability, and transition evidence",
-        "An opaque client-only observation becomes unknown/deferred without cancellation unless provider-side stall evidence exists",
-        "Late results remain attached to their original attempt and revision, and the review loop has a finite boundary"
+        "Each reviewer axis records its discriminated attempt state, provider identity when available, observability, and transition evidence",
+        "An empty poll or slow provider leaves a pending/running attempt open; only explicit provider failure or confirmed stop changes lifecycle",
+        "Late results remain attached to their original attempt and revision, and only the revision budget—not wait time—bounds convergence"
       ]
     },
     {

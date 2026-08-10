@@ -1,6 +1,6 @@
 ---
 name: knowledge-distiller
-version: "0.4.4"
+version: "0.5.0"
 description: >
   Distill a user's rough understanding, notes, or half-formed reasoning about a technical topic into a
   durable Chinese Obsidian note grounded in first-principles explanations and current evidence. Use this
@@ -31,21 +31,28 @@ its own evidence-bound `body_claim`; it never licenses copying the raw claim int
 An explicit request for language, title, path, metadata, structure, or output format overrides these style defaults, but
 never overrides factual integrity, preservation of unrelated vault content, security, containment, or safe-write gates.
 
-An invocation has exactly one `route` and one `write_policy`:
+An invocation has exactly one route and one write mode:
 
 ```text
-route        → answer_only | clarify | distill_note
-write_policy → draft_only | allowed | blocked
+route      → answer_only | clarify | distill_note
+write_mode → none | draft | persist
 ```
 
-`answer_only` and `clarify` terminate before any setup or vault side effect. `draft_only` permits reasoning and an
-in-memory draft but no persistent mutation of any kind. `allowed` still requires every later safety gate. `blocked`
-means the cycle cannot safely proceed; do not silently downgrade it to a draft merely to produce output.
+`answer_only` and `clarify` use `none` and terminate before setup or vault side effects. `draft` permits reasoning and an
+in-memory draft but no persistent mutation. `persist` still requires every later safety gate. `blocked` is a Run state,
+not a write mode; never silently turn it into a draft.
 
-The workflow is a state machine, not a prose checklist. Maintain one execution record for the current invocation:
+The workflow is a state machine, not a prose checklist. The Run has one main state:
 
 ```text
-route, write_policy
+intake | compose | persist | review | report | done
+blocked(reason) | failed(reason) | stopped(reason)
+```
+
+Maintain one execution record for the current invocation:
+
+```text
+route, write_mode, run_state
 reader_contract → reader, question, after, scope, spine, axes, dependencies
 setup           → state check, optional capabilities, fallback
 research        → status, sources, claim ledger, gaps
@@ -53,28 +60,28 @@ teaching_model  → hash-bound section tree, roles, relations, transitions, head
 vault_snapshot  → root/scan status, manifest, candidates, collision decision, link ledger
 target          → requested path, canonical path, scope, containment, symlink check
 draft           → path, note_revision, body map, format_plan, content hash, self-check state
-write_tx        → original/final hash, temp state, atomicity, read-back, write_status
-review_journal  → cycle/attempt IDs, provider/parent/cancel states, events, findings, fallback
+write_tx        → not_applicable | idle | staging | committed(outcome) | uncertain
+review_cycle    → cycle/revision/hash, two ReviewAttempts, fallback, events
 delivery        → label, blockers, corrections, mutations, open items
 mechanical_evidence → checker JSON, exact input hashes, gate states, commands, versions, exit codes
 ```
 
-Use these status words literally. `complete`, `partial`, and `unavailable` describe evidence availability; `passed`,
-`failed`, and `unknown` describe a gate or observation. `deferred` is only the parent's wait boundary. It is never a
-provider failure, cancellation, or clean result.
+`ReviewAttempt` is one of `pending`, `running`, `completed(result)`, `failed(reason)`, or `stopped(reason)`.
+`observability` (`observed|silent|lost`) is evidence metadata, not lifecycle. `GateResult` is one of
+`passed|failed|unavailable|not_applicable`. Delivery labels are derived from these records.
 
 Advance only when the phase contract is valid:
 
 | Phase | Must produce | Must stop or return when |
 | --- | --- | --- |
 | 0 route | reader contract + route + write policy | question, scope, after-state, or side-effect constraint is unresolved |
-| 1 setup | capability/fallback state | a draft-only run would write setup state |
+| 1 setup | capability/fallback state | a `write_mode: draft` run would write setup state |
 | 2 evidence | claim ledger + `research_status` | a material claim has no support, qualification, or exclusion |
 | 3 model | teaching-model blueprint, section tree and teaching spine | any section lacks question, role, dependency, boundary, or `why_next`; diagram policy is missing or contradicts an explicit Mermaid request |
-| 4 vault | root/scan state + target + collision + link ledger, or an explicit no-link draft disposition | for `allowed`, path/containment/anchor/scan/collision is unresolved; for `draft_only`, the no-link disposition is missing |
+| 4 vault | root/scan state + target + collision + link ledger, or an explicit no-link draft disposition | for `persist`, path/containment/anchor/scan/collision is unresolved; for `draft`, the no-link disposition is missing |
 | 5 draft | hash-bound `knowledge-distiller.teaching-model.v1`, format plan, and every body unit mapped to the model | prose, link, table, or diagram has no admitted role, or the model does not match the first draft bytes |
-| 6 write | transaction/read-back for `allowed`, or in-memory `not_written` disposition for `draft_only` | `blocked` reaches this phase, a draft-only run attempts persistence, write state is uncertain, or a hard gate fails |
-| 7 review | valid exact results or complete fallback | an opaque attempt has no journal evidence or fallback |
+| 6 write | transaction/read-back for `persist`, or in-memory `not_applicable`/`idle` disposition for `draft` | `blocked` reaches this phase, a draft run attempts persistence, write state is uncertain, or a hard gate fails |
+| 7 review | valid exact results or complete fallback | an attempt has no journal evidence or fallback |
 | 8 delivery | truthful label and report | any blocker would be hidden by a success label |
 
 If a later phase changes the reader, scope, axes, section relations, target, claim support, or note bytes, invalidate
@@ -94,30 +101,29 @@ Choose exactly one route before mandatory research:
 - `distill_note`: raw understanding exists and should become a durable note; continue through Phases 1–8.
 - `clarify`: unrelated topics or an output choice that cannot be inferred safely. Ask one concise question and stop.
 
-Derive `write_policy` before any tool that can change state:
+Derive `write_mode` before any tool that can change state:
 
-- `draft_only`: an explicit request not to create, update, persist, save, or write files. No `state.json`, review
+- `draft`: an explicit request not to create, update, persist, save, or write files. No `state.json`, review
   journal, temporary file, backup, generated block ID, directory, or note may be written. Keep the draft and audit in
-  memory and report `not_written`.
-- `allowed`: only for `distill_note` without an explicit no-write constraint. It authorizes the final note transaction,
+  memory and report `write_state: idle` or `not_applicable`.
+- `persist`: only for `distill_note` without an explicit no-write constraint. It authorizes the final note transaction,
   not unsafe paths, duplicates, guessed links, or unverified replacement.
-- `blocked`: always for `answer_only`/`clarify`, and whenever a root, target, collision, containment, or hard safety
-  gate is unresolved or failed.
+- `none`: for `answer_only`/`clarify`, and for any run blocked by an unresolved or failed safety gate.
 
 Interpret “只回答/不用整理成笔记” as `answer_only`; interpret “整理成草稿但不要落盘” as
-`distill_note + draft_only`. Preserve the skill's implicit note behavior when raw understanding is supplied without a
+`distill_note + draft`. Preserve the skill's implicit note behavior when raw understanding is supplied without a
 conflicting constraint. If the user explicitly requests multiple independent notes, create a separate full cycle and
 execution record for each topic; do not share a target, collision decision, claim ledger, or reviewer attempt across
 cycles.
 
 🔴 CHECKPOINT · ROUTE / SIDE-EFFECT GATE
 
-Record `route`, `write_policy`, reader, question, after-state, scope, spine, axes, and dependencies. Then:
+Record `route`, `write_mode`, reader, question, after-state, scope, spine, axes, and dependencies. Then:
 
 - `answer_only` → stop; do not run setup, research, vault scanning, writing, or review.
 - `clarify` → ask the one question and stop; do not create a partial note or persistent clarification artifact.
-- `draft_only` → continue only with read/reason operations; every persistent mutation remains forbidden.
-- `allowed` → continue to Phase 1; later gates may change the policy to `blocked`.
+- `draft` → continue only with read/reason operations; every persistent mutation remains forbidden.
+- `persist` → continue to Phase 1; later gates may move the Run to `blocked`.
 
 ## 2. Phase 1 — optional capabilities without hidden setup writes
 
@@ -140,7 +146,7 @@ Interpret the result as follows:
   `setup_write: pending`; perform the `write` form only after Phase 4's target/collision gate and Phase 6's successful
   final read-back, or after the user explicitly chooses “记住我的选择” in Phase 8. A failed state write is
   `state_write_failed`; it never blocks note quality by itself, but it must not be reported as persisted.
-- with `draft_only`, never run the `write` form. No optional-skill preference is persisted during this invocation.
+- with `write_mode: draft`, never run the `write` form. No optional-skill preference is persisted during this invocation.
 
 An optional skill is an aid, not evidence. Its absence does not justify weaker factual, structural, link, or write
 gates. A durable asynchronous review journal is a different requirement and is handled in Phase 7.
@@ -251,7 +257,7 @@ Read relevant MOCs and enough of related notes to identify actual definitions. D
 same-topic note or create a genuinely distinct angle. By default:
 
 - one same-topic candidate without an explicit path → update it in place;
-- several candidates without an explicit choice → `route: clarify`, `write_policy: blocked`, ask one question, stop;
+- several candidates without an explicit choice → `route: clarify`, `write_mode: none`, ask one question, stop;
 - an explicit existing same-topic path → update that path;
 - an explicit new path with a same-topic candidate → create only when the user explicitly requests a new standalone
   note/distinct angle; otherwise clarify.
@@ -259,7 +265,7 @@ same-topic note or create a genuinely distinct angle. By default:
 Canonicalize `target`: resolve the requested path against the root, reject `..` traversal, and check every component
 for symlink escape. Default `target_scope` is `inside_vault`. An absolute path outside the root is permitted only when
 the user explicitly supplied it; mark `explicit_out_of_vault`, use no vault-derived links, and mark the vault-link gate
-unavailable. Otherwise set `write_policy: blocked`.
+unavailable. Otherwise move the Run to `blocked` and set `write_mode: none`.
 
 🔴 CHECKPOINT · VAULT / COLLISION GATE
 
@@ -267,19 +273,19 @@ Do not compose or write while target containment, symlink check, or same-topic c
 do not write setup state, a draft file, review journal, block ID, or note; ask the missing choice and stop. For root/scan
 availability, use this deterministic branch:
 
-| Root/scan state | `allowed` | `draft_only` |
+| Root/scan state | `persist` | `draft` |
 | --- | --- | --- |
 | resolved + complete | continue with target and link gates | compose in memory; links still need the same gates |
-| resolved + partial | set `blocked`; do not compose or write | compose in memory with all vault-derived links omitted; report `partial` |
-| unavailable | set `blocked`; request a valid root; do not compose or write | compose in memory with no vault-derived links or target claim; report `not_written` |
+| resolved + partial | move Run to `blocked`; do not compose or write | compose in memory with all vault-derived links omitted; report `partial` |
+| unavailable | move Run to `blocked`; request a valid root; do not compose or write | compose in memory with no vault-derived links or target claim; report `write_state: idle` |
 | explicit, safe `target_scope: explicit_out_of_vault` supplied by the user | write only that target; no vault links; `actual_vault_check: unavailable` and never clean | compose in memory; no vault links |
 
-Apply this precedence before using the table: (1) route/write policy is fixed by Phase 0; (2) collision,
+Apply this precedence before using the table: (1) route/write mode is fixed by Phase 0; (2) collision,
 containment, and symlink failures always block—even for a draft; (3) an explicitly supplied, safe
 `explicit_out_of_vault` target uses its dedicated row regardless of vault scan status; (4) all other requests use the
-root/scan rows. The `draft_only` column and the explicit out-of-vault row are the only ways an unresolved root/scan can
+root/scan rows. The `draft` column and the explicit out-of-vault row are the only ways an unresolved root/scan can
 reach Phase 5. An explicit path does not make vault-derived links available. A blocked run does not claim vault
-integration, does not emit cross-note links, and never changes `write_policy` into a successful draft implicitly.
+integration, does not emit cross-note links, and never changes its Run state into a successful draft implicitly.
 
 ### 5A. Link ledger: mechanical and semantic identity
 
@@ -310,7 +316,7 @@ resolved skill-implementation directory. Sort normalized relative POSIX paths an
 `{relative_path, realpath, basename, content_hash, headings, block_ids}`. Use SHA-256 over file bytes for
 `content_hash`, Unicode NFKC + surrounding-whitespace trim + locale-independent case-fold for duplicate filename keys,
 and SHA-256 over UTF-8 canonical sorted JSON (no insignificant whitespace) for `manifest_hash`. Persisting this
-manifest is not required for a draft-only run; its in-memory object and hash are still required for its link decision.
+manifest is not required for a `write_mode: draft` run; its in-memory object and hash are still required for its link decision.
 
 Within each target note, strip frontmatter and fenced code; count normalized heading occurrences and accept a block ID
 only when `^id` is the final non-whitespace token of a non-fenced paragraph matching `[A-Za-z0-9_-]+`. A partial or
@@ -430,26 +436,26 @@ report its required `Mermaid 渲染未验证` status when rendering is unavailab
 
 ## 7. Phase 6 — fail-closed write transaction and verification
 
-Branch on `write_policy` before any write-capable tool:
+Branch on `write_mode` before any write-capable tool:
 
-- `draft_only` → compose only in memory, `write_status: not_written`; do not create a directory, temp file, backup,
+- `draft` → compose only in memory, `write_state: idle` or `not_applicable`; do not create a directory, temp file, backup,
   `state.json`, journal, block ID, or target; skip path-based review.
-- `blocked` → do not compose or write; return the exact clarification/safety blocker.
-- `allowed` → continue only after the Phase 4 target and collision gates pass.
+- Run `blocked` → do not compose or write; return the exact clarification/safety blocker.
+- `persist` → continue only after the Phase 4 target and collision gates pass.
 
 🔴 STOP · WRITE GATE
 
-Before an allowed create/update, record the exact canonical path, target scope, collision decision, preservation scope,
+Before a `persist` create/update, record the exact canonical path, target scope, collision decision, preservation scope,
 and intended write state. For an update, read original bytes and record `original_hash` plus a recovery handle. The
 preservation scope includes unrelated body paragraphs, frontmatter properties, and vault-local links. Write
 the draft to a same-directory temporary file without replacing the target. Read the temp file back, verify the
 frontmatter/body boundary, run the heading and wikilink gates against that exact temp, then atomically replace when
 possible. If atomic replacement is unavailable, record that fact and use the safest recoverable replacement.
 
-Read the final target back, record `final_hash`, rerun all required gates, and set `write_status` to `written` or
-`updated` only after confirmed read-back. If validation fails before replacement, discard the temp. If replacement may
-have occurred but recovery/read-back is uncertain, set `possibly_partial`, stop all further writes, and never claim
-success.
+Read the final target back, record `final_hash`, rerun all required gates, and set `write_state: committed` with
+`write_outcome: created|updated|unchanged` only after confirmed read-back. If validation fails before replacement,
+discard the temp. If replacement may have occurred but recovery/read-back is uncertain, set `write_state: uncertain`,
+stop all further writes, and never claim success.
 
 ### 7A. Gate evidence
 
@@ -490,7 +496,7 @@ be normalized to clean. This is a semantic human gate, not evidence that a mecha
 ## 8. Phase 7 — review as an evidence-bound event stream
 
 Review improves confidence but does not authorize an unsafe write. Read `references/obsidian-writing-style.md` §5–6 and
-`references/review-lifecycle.md`; the reference is the authoritative review protocol and §8 contains the exact prompts.
+`references/review-lifecycle.md`; the reference is the authoritative review protocol and §7 contains the exact prompts.
 
 After the final read-back and hard gates, **must** spawn exactly two independent read-only subagents in parallel when
 the environment provides subagents:
@@ -501,11 +507,12 @@ the environment provides subagents:
 - `accuracy`: material claims, source coverage, boundaries, examples, tables, diagrams, and links.
 
 Pass each reviewer the resolved absolute path and exact draft identity required by the reference. Wait for both results
-before adjudication. Do not call the reviewer unavailable merely because the tool has not yet been searched; only a
-real capability or dispatch failure permits fallback. If the write status is not `written`/`updated`, use the exact
-draft fallback required by the reference.
+before adjudication. There is no wall-clock deadline: keep `ReviewAttempt`s open until a terminal result, explicit
+provider failure/stall, confirmed stop, or dispatch/journal failure. Do not call a reviewer unavailable merely because a
+poll is empty, a client wait expires, or the provider is slow. If `write_state` is not `committed`, use the exact-draft
+fallback required by the reference.
 
-When using the exact clarity prompt from `references/review-lifecycle.md` §8, append this C5 check: “For every
+When using the exact clarity prompt from `references/review-lifecycle.md` §7, append this C5 check: “For every
 reader-visible correction or contrast, verify that its antecedent is introduced in the note and has an in-scope purpose;
 inspect all claim-bearing frontmatter fields, tags, title/filename, headings, lists, tables, callouts, footnotes,
 embeds/alt text, explanatory code, and claim-bearing Mermaid labels; include implicit references such as `该说法` or
@@ -520,8 +527,8 @@ never treat the schema's empty C5 placeholder as a substitute.
 Follow the reference's journal validation and closure protocol exactly. The checker is a mechanical aid; it does not
 replace reviewer adjudication.
 
-The reference owns the canonical state dimensions, identity binding, journal schema, cancellation precedence, closure
-cutoff, and result normalization. Follow those rules without restating or inventing a second local state machine.
+The reference owns the canonical Run, ReviewAttempt, WriteTransaction, GateResult, identity binding, journal schema,
+event-order closure, and result normalization. Follow those rules without inventing a second local state machine.
 
 Use the reference's bounded convergence rules. After any content revision, rerun the required gates and invalidate
 results for the previous draft. A revision that changes claim meaning, scope, antecedent, provenance, reader path,
@@ -537,14 +544,14 @@ Phase 8 correction record directly into the body.
 If either axis is unavailable or invalid, run the reference's exact-draft manual fallback and report
 `manual_checked`; manual fallback is never reviewer `clean`. Adjudicate valid findings together, make one integrated
 edit pass, then rerun the required gates and both reviewers for the new draft. Stop at the reference's clean convergence,
-fallback, open blocker, or finite budget boundary.
+fallback, open blocker, explicit stop, or finite revision-budget boundary.
 
 ## 9. Phase 8 — truthful delivery report
 
-Read `references/review-lifecycle.md` §7 for its write-state vocabulary, using the stricter state contract above when
+Read `references/review-lifecycle.md` §6 for its write-state vocabulary, using the stricter state contract above when
 an example is ambiguous. Report in Chinese and include only sections with content:
 
-Before presenting the report, materialize its machine-readable `knowledge-distiller.delivery.v1` record and run:
+Before presenting the report, materialize its machine-readable `knowledge-distiller.delivery.v2` record and run:
 
 ```bash
 node scripts/check-delivery-report.ts --report "<delivery-json>" --json
@@ -555,24 +562,25 @@ frontmatter, or metadata change after report generation invalidates `final_hash`
 evidence, review identity, and the delivery result; do not present the older report as if it described the new bytes.
 
 The checker is the final anti-overclaim gate. A prose label cannot override its failed or unavailable result.
-For `written`/`updated`, the record must identify `artifact_kind`, the absolute `note_path`, and the final read-back
-`final_hash`. A passed journal must additionally carry its evidence-file path and SHA-256; the checker re-runs the
-journal checker and binds each clean axis to a matching event, attempt, note path, and draft hash. `preservation:
-not_applicable` is legal only for `artifact_kind: new_note`, which must also carry a hash-bound creation probe proving
-the exact target was absent before the write; an update must use the preservation checker and every written artifact
-must report `write_readback: passed`.
+For `write_state: committed`, the record must identify `artifact_kind`, the absolute `note_path`, `write_outcome`, and
+the final read-back `final_hash`. A passed journal must additionally carry its evidence-file path and SHA-256; the
+checker re-runs the journal checker and binds each clean axis to a matching event, attempt, note path, and draft hash.
+`preservation: not_applicable` is legal only for `artifact_kind: new_note`, which must also carry a hash-bound creation
+probe proving the exact target was absent before the write; an update must use the preservation checker and every
+committed artifact must report `write_readback: passed`.
 
 ```text
 ✅ 笔记已创建/更新: <absolute-or-vault-relative-path>（N 轮修订）
 
-Use that success line only when write_status is written/updated, final read-back and all required hard gates pass,
-and no reader_blocker or accuracy_blocker remains. For draft_only use `未写入（仅草稿）` and include the draft; for
-blocked use `未写入（阻塞）`; for possibly_partial say the file state is uncertain and do not claim delivery.
+Use that success line only when `write_state: committed` with `write_outcome: created|updated`, final read-back and all
+required hard gates pass, and no reader_blocker or accuracy_blocker remains. For `write_mode: draft` use
+`未写入（仅草稿）` and include the draft; for a blocked Run use `未写入（阻塞）`; for `write_state: uncertain` say the
+file state is uncertain and do not claim delivery.
 
 **回答** — only when the user asked an explicit question; give the direct verdict in 1–3 sentences.
-**审查状态** — report provider_execution_state, parent_wait_state, cancel_state, quality_result, observability,
-  attempt/revision/hash identity, fallback, and any stale/late_ignored events; never infer provider failure from a cutoff.
-**收敛判断** — finite budget, reviewer attempts, fallback passes, actual body revisions, and stopping reason.
+**审查状态** — report each axis' `ReviewAttempt` branch/result, observability, attempt/revision/hash identity, fallback,
+  and any `late_ignored` events; never infer provider failure from a client wait or empty poll.
+**收敛判断** — revision budget, reviewer attempts, fallback passes, actual body revisions, and stopping reason.
 **标签说明** — the factual reason for the delivery label.
 **修正记录** — audit-only；hidden-antecedent/provenance gate 不适用于这段审计报告。按 `claim_id` 记录
 `audit_claim` / `body_claim` / 来源 / 为什么，以及必要的 `contrast` 目的、前件和 introducing `surface_id`；
@@ -592,8 +600,8 @@ state was not written, ask exactly once:
 > 检测到 [missing skills] 未安装。选择：**帮我安装**、**不用，记住我的选择**、**下次再说**。
 
 `帮我安装` uses the environment's skill installer and does not alter the note; `不用，记住我的选择` may run the
-setup-state write only when the invocation was `allowed` and the note's final read-back already passed; `下次再说`
-leaves state untouched. Never persist a choice during `draft_only`, `answer_only`, `clarify`, or a blocked/partial
+setup-state write only when the invocation was `persist` and the note's final read-back already passed; `下次再说`
+leaves state untouched. Never persist a choice during `draft`, `answer_only`, `clarify`, or a blocked/partial
 write.
 
 ## 10. Permanent anti-patterns
@@ -611,9 +619,9 @@ The following are prohibited because they violate the state contract:
 | Write `X 不准确`, `看似 X 实际 Y`, or `把 X 说成 Y` when X exists only in the user's input | rewrite the surviving claim directly; keep the correction pair in the ledger/report only |
 | Let `audit_claim`, reviewer prose, format-plan `raw`, or Phase 8 correction records generate a visible surface | map the surface to an evidence-bound `body_claim`; if content changes, restart at Phase 2 |
 | Write when policy/target/collision is unresolved | fail closed, clarify, or return in-memory draft |
-| Continue after uncertain replacement/read-back | `possibly_partial`, stop writes, disclose recovery state |
-| Call parent cutoff a provider failure or cancellation | separate provider, parent, and cancel states |
-| Retry an unknown or active attempt on the same revision | use fallback or a new revision/cycle only |
+| Continue after uncertain replacement/read-back | `write_state: uncertain`, stop writes, disclose recovery state |
+| Treat a client timeout or empty poll as reviewer failure/cancellation | keep the attempt open; only an explicit provider/user event changes state |
+| Retry a pending/running attempt on the same revision | use fallback or a new attempt after explicit failure only |
 | Accept a stale/late/mismatched reviewer result | journal it and exclude it from adjudication |
 | Call manual fallback or contradictory payload “clean” | record per-axis evidence and use the truthful label |
 | Write prose first and attach a post-hoc teaching model | create the hash-bound model before drafting and rerun it on final bytes |

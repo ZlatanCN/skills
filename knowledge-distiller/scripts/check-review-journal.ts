@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Validates the durable review event stream. It never infers provider health from a client timeout.
+// Validates the review event stream without treating observation as lifecycle state.
 
 import * as fs from "node:fs";
 import path from "node:path";
@@ -14,61 +14,34 @@ import {
 } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
 
-const EXECUTION_STATES = new Set([
+const ATTEMPT_STATES = new Set([
   "pending",
-  "active",
+  "running",
   "completed",
   "failed",
-  "unknown",
+  "stopped",
 ]);
-const LIVENESS_STATES = new Set([
-  "unobserved",
-  "healthy",
-  "suspected_stall",
-  "terminal",
-]);
-const PARENT_STATES = new Set(["waiting", "deferred", "closed"]);
-const CANCEL_STATES = new Set([
-  "not_requested",
-  "cancel_requested",
-  "canceled_confirmed",
-  "unknown",
-  "superseded",
-]);
-const QUALITY_RESULTS = new Set([
-  "clean",
-  "findings",
-  "unverified",
-  "protocol_invalid",
-  "unavailable",
-]);
-const QUALITY_EVENT_TYPES = new Set([
+const RESULTS = new Set(["clean", "findings", "unverified"]);
+const OBSERVABILITY = new Set(["observed", "silent", "lost"]);
+const AXES = new Set(["clarity", "accuracy"]);
+const EVENT_TYPES = new Set([
+  "dispatch",
+  "progress",
+  "poll",
   "result",
-  "review_result",
-  "manual_fallback_completed",
+  "failure",
+  "stop_requested",
+  "stop_confirmed",
   "manual_fallback",
-  "review_completed",
+  "late_ignored",
+  "report_closed",
 ]);
-const ALLOWED_TRANSITIONS: Record<string, Set<string>> = {
-  active: new Set(["active", "completed", "failed", "unknown", "deferred"]),
-  cancel_requested: new Set([
-    "cancel_requested",
-    "canceled_confirmed",
-    "unknown",
-  ]),
-  completed: new Set(["completed", "closed"]),
-  failed: new Set(["failed", "closed"]),
-  pending: new Set(["pending", "active", "failed", "unknown"]),
-  suspected_stall: new Set(["suspected_stall", "cancel_requested", "deferred"]),
-  unknown: new Set([
-    "unknown",
-    "completed",
-    "failed",
-    "suspected_stall",
-    "deferred",
-    "cancel_requested",
-    "closed",
-  ]),
+const TRANSITIONS: Record<string, Set<string>> = {
+  completed: new Set(["completed"]),
+  failed: new Set(["failed"]),
+  pending: new Set(["pending", "running", "failed", "stopped"]),
+  running: new Set(["running", "completed", "failed", "stopped"]),
+  stopped: new Set(["stopped"]),
 };
 
 function nonBlank(value: unknown): boolean {
@@ -144,7 +117,10 @@ function readEvents(
           "journal-json-invalid",
           "error",
           `line is not a JSON object: ${(error as Error).message}`,
-          { line: index + 1, path: file }
+          {
+            line: index + 1,
+            path: file,
+          }
         )
       );
     }
@@ -152,7 +128,7 @@ function readEvents(
   return events;
 }
 
-type JournalIdentity = {
+type Identity = {
   axis: string;
   cycle_id: string;
   draft_hash: string;
@@ -162,25 +138,15 @@ type JournalIdentity = {
 
 type JournalState = {
   closeIndex: number;
-  cutoffOrder: number;
+  closeOrder: number;
   eventIds: Set<string>;
-  identities: Map<string, JournalIdentity>;
+  identities: Map<string, Identity>;
   previousOrder: number;
+  attemptStates: Map<string, string>;
 };
 
-type EventFields = {
-  attemptId: string;
-  axis: string;
-  cycleId: string;
-  draftHash: string;
-  eventType: string;
-  notePath: string;
-};
-
-function validateEventAttributes(
+function validateCommon(
   event: Record<string, unknown>,
-  axis: string,
-  draftHash: string,
   line: number,
   findings: Finding[]
 ): void {
@@ -197,7 +163,10 @@ function validateEventAttributes(
       )
     );
   }
-  if (draftHash && !/^[a-f0-9]{64}$/iu.test(draftHash)) {
+  if (
+    typeof event.draft_hash !== "string" ||
+    !/^[a-f0-9]{64}$/iu.test(event.draft_hash)
+  ) {
     findings.push(
       finding(
         "journal-hash-invalid",
@@ -205,13 +174,6 @@ function validateEventAttributes(
         "draft_hash must be a SHA-256 hex digest",
         { line }
       )
-    );
-  }
-  if (axis && !new Set(["clarity", "accuracy", "both", "system"]).has(axis)) {
-    findings.push(
-      finding("journal-axis-invalid", "error", `unsupported axis ${axis}`, {
-        line,
-      })
     );
   }
   if (!requiredString(event, "observed_at", line, findings)) {
@@ -224,12 +186,12 @@ function validateEventAttributes(
       )
     );
   }
-  if (!requiredString(event, "observability", line, findings)) {
+  if (!OBSERVABILITY.has(String(event.observability))) {
     findings.push(
       finding(
-        "journal-observability-missing",
+        "journal-observability-invalid",
         "error",
-        "observability is required for every event",
+        "observability must be observed, silent, or lost",
         { line }
       )
     );
@@ -244,27 +206,14 @@ function validateEventAttributes(
       )
     );
   }
-  if (
-    !nonBlank(event.client_dispatch_id) &&
-    !nonBlank(event.provider_operation_id)
-  ) {
-    findings.push(
-      finding(
-        "journal-dispatch-identity-missing",
-        "error",
-        "each event needs a client_dispatch_id or provider_operation_id",
-        { line }
-      )
-    );
-  }
 }
 
-function validateEventIdentity(
+function validateEventOrder(
   event: Record<string, unknown>,
   index: number,
   state: JournalState,
   findings: Finding[]
-): EventFields {
+): string {
   const line = index + 1;
   const eventId = requiredString(event, "event_id", line, findings);
   if (eventId && state.eventIds.has(eventId)) {
@@ -289,15 +238,126 @@ function validateEventIdentity(
         "journal-order-invalid",
         "error",
         "order must be a strictly increasing integer",
-        {
-          evidence: { order: event.order, previous_order: state.previousOrder },
-          line,
-        }
+        { line }
       )
     );
   } else {
     state.previousOrder = Number(event.order);
   }
+  return eventId;
+}
+
+function validateEventShape(
+  event: Record<string, unknown>,
+  eventType: string,
+  attemptId: string,
+  axis: string,
+  line: number,
+  findings: Finding[]
+): void {
+  if (!EVENT_TYPES.has(eventType)) {
+    findings.push(
+      finding(
+        "journal-event-type-invalid",
+        "error",
+        `unsupported event_type ${eventType}`,
+        { line }
+      )
+    );
+  }
+  if (
+    eventType === "report_closed" &&
+    (axis !== "system" || attemptId !== "run")
+  ) {
+    findings.push(
+      finding(
+        "journal-close-identity-invalid",
+        "error",
+        "report_closed must use axis=system and attempt_id=run",
+        { line }
+      )
+    );
+  }
+  if (eventType !== "report_closed" && !AXES.has(axis)) {
+    findings.push(
+      finding("journal-axis-invalid", "error", `unsupported axis ${axis}`, {
+        line,
+      })
+    );
+  }
+  if (
+    !["report_closed", "manual_fallback"].includes(eventType) &&
+    !nonBlank(event.client_dispatch_id) &&
+    !nonBlank(event.provider_operation_id)
+  ) {
+    findings.push(
+      finding(
+        "journal-dispatch-identity-missing",
+        "error",
+        "attempt events need a client_dispatch_id or provider_operation_id",
+        { line }
+      )
+    );
+  }
+  if (eventType === "manual_fallback" && !nonBlank(event.fallback_id)) {
+    findings.push(
+      finding(
+        "journal-fallback-identity-missing",
+        "error",
+        "manual_fallback requires fallback_id",
+        { line }
+      )
+    );
+  }
+}
+
+function recordAttemptIdentity(
+  event: Record<string, unknown>,
+  eventType: string,
+  cycleId: string,
+  attemptId: string,
+  axis: string,
+  notePath: string,
+  draftHash: string,
+  state: JournalState,
+  line: number,
+  findings: Finding[]
+): string {
+  const key = `${cycleId}\u0000${attemptId}`;
+  if (eventType === "report_closed") {
+    return key;
+  }
+  const identity: Identity = {
+    axis,
+    cycle_id: cycleId,
+    draft_hash: draftHash,
+    note_path: notePath,
+    note_revision: Number(event.note_revision),
+  };
+  const prior = state.identities.get(key);
+  if (prior && JSON.stringify(prior) !== JSON.stringify(identity)) {
+    findings.push(
+      finding(
+        "journal-identity-drift",
+        "error",
+        "cycle/attempt identity changed within one attempt",
+        { line }
+      )
+    );
+  } else if (cycleId && attemptId) {
+    state.identities.set(key, identity);
+  }
+  return key;
+}
+
+function validateIdentity(
+  event: Record<string, unknown>,
+  index: number,
+  state: JournalState,
+  findings: Finding[]
+): { key: string; eventType: string; axis: string } {
+  const line = index + 1;
+  validateEventOrder(event, index, state, findings);
 
   const eventType = requiredString(event, "event_type", line, findings);
   const cycleId = requiredString(event, "cycle_id", line, findings);
@@ -305,80 +365,22 @@ function validateEventIdentity(
   const axis = requiredString(event, "axis", line, findings);
   const notePath = requiredString(event, "note_path", line, findings);
   const draftHash = requiredString(event, "draft_hash", line, findings);
-  validateEventAttributes(event, axis, draftHash, line, findings);
-  const identityKey = `${cycleId}\u0000${attemptId}`;
-  const identity: JournalIdentity = {
-    axis,
-    cycle_id: cycleId,
-    draft_hash: draftHash,
-    note_path: notePath,
-    note_revision: Number(event.note_revision),
-  };
-  const prior = state.identities.get(identityKey);
-  if (prior && JSON.stringify(prior) !== JSON.stringify(identity)) {
-    findings.push(
-      finding(
-        "journal-identity-drift",
-        "error",
-        "cycle/attempt identity changed within one attempt",
-        { evidence: { current: identity, previous: prior }, line }
-      )
-    );
-  } else if (cycleId && attemptId) {
-    state.identities.set(identityKey, identity);
-  }
-  return { attemptId, axis, cycleId, draftHash, eventType, notePath };
-}
+  validateCommon(event, line, findings);
 
-function validateEventState(
-  event: Record<string, unknown>,
-  line: number,
-  findings: Finding[]
-): void {
-  const before = String(event.state_before ?? "");
-  const after = String(event.state_after ?? "");
-  if (!before || !after) {
-    findings.push(
-      finding(
-        "journal-state-missing",
-        "error",
-        "state_before and state_after are required",
-        { line }
-      )
-    );
-  }
-  if (
-    before &&
-    after &&
-    (!ALLOWED_TRANSITIONS[before] || !ALLOWED_TRANSITIONS[before].has(after))
-  ) {
-    findings.push(
-      finding(
-        "journal-transition-invalid",
-        "error",
-        `${before} → ${after} is not an allowed review transition`,
-        { line }
-      )
-    );
-  }
-  for (const [field, allowed] of [
-    ["provider_execution_state", EXECUTION_STATES],
-    ["provider_liveness", LIVENESS_STATES],
-    ["parent_wait_state", PARENT_STATES],
-    ["cancel_state", CANCEL_STATES],
-    ["quality_result", QUALITY_RESULTS],
-  ] as const) {
-    if (event[field] !== undefined && !allowed.has(String(event[field]))) {
-      findings.push(
-        finding(
-          "journal-enum-invalid",
-          "error",
-          `${field} has an unsupported value`,
-          { evidence: { value: event[field] }, line }
-        )
-      );
-    }
-  }
+  validateEventShape(event, eventType, attemptId, axis, line, findings);
+  const key = recordAttemptIdentity(
+    event,
+    eventType,
+    cycleId,
+    attemptId,
+    axis,
+    notePath,
+    draftHash,
+    state,
+    line,
+    findings
+  );
+  return { axis, eventType, key };
 }
 
 function requireCleanContract(
@@ -389,39 +391,43 @@ function requireCleanContract(
 ): void {
   const labels =
     axis === "clarity" ? ["C1", "C2", "C3", "C4", "C5", "teach_back"] : ["A1"];
-  const code =
-    axis === "clarity"
-      ? "journal-clarity-contract-missing"
-      : "journal-accuracy-contract-missing";
   for (const label of labels) {
     if (!present(event[label])) {
       findings.push(
-        finding(code, "error", `quality_result=clean requires ${label}`, {
-          line,
-        })
+        finding(
+          "journal-clean-contract-missing",
+          "error",
+          `result=clean requires ${label}`,
+          { line }
+        )
       );
     }
   }
 }
 
-function validateCleanEvidence(
+function validateCleanResult(
   event: Record<string, unknown>,
+  axis: string,
   line: number,
   findings: Finding[]
 ): void {
+  if (event.result !== "clean") {
+    return;
+  }
   const hasFindings = Array.isArray(event.findings)
     ? event.findings.length > 0
     : nonBlank(event.findings);
   const partial =
     event.source_coverage === "partial" ||
-    (Array.isArray(event.unverified) && event.unverified.length > 0) ||
-    nonBlank(event.unverified);
+    (Array.isArray(event.unverified)
+      ? event.unverified.length > 0
+      : nonBlank(event.unverified));
   if (hasFindings || partial) {
     findings.push(
       finding(
         "journal-clean-contradiction",
         "error",
-        "quality_result=clean contradicts findings, partial coverage, or unverified claims",
+        "result=clean contradicts findings, partial coverage, or unverified claims",
         { line }
       )
     );
@@ -431,7 +437,7 @@ function validateCleanEvidence(
       finding(
         "journal-clean-coverage-missing",
         "error",
-        "quality_result=clean requires source_coverage=complete",
+        "result=clean requires source_coverage=complete",
         { line }
       )
     );
@@ -444,7 +450,7 @@ function validateCleanEvidence(
       finding(
         "journal-clean-claims-missing",
         "error",
-        "quality_result=clean requires claims_checked",
+        "result=clean requires claims_checked",
         { line }
       )
     );
@@ -458,7 +464,7 @@ function validateCleanEvidence(
       finding(
         "journal-clean-after-state-missing",
         "error",
-        "quality_result=clean requires reader after-state evidence",
+        "result=clean requires reader after-state evidence",
         { line }
       )
     );
@@ -471,53 +477,275 @@ function validateCleanEvidence(
       finding(
         "journal-clean-identity-missing",
         "error",
-        "quality_result=clean requires reviewer identity evidence",
+        "result=clean requires reviewer identity evidence",
         { line }
       )
     );
   }
-}
-
-function validateCleanResult(
-  event: Record<string, unknown>,
-  eventType: string,
-  axis: string,
-  line: number,
-  findings: Finding[]
-): void {
-  if (event.quality_result !== "clean") {
-    return;
-  }
-  if (!QUALITY_EVENT_TYPES.has(eventType)) {
-    findings.push(
-      finding(
-        "journal-clean-event-type-invalid",
-        "error",
-        "quality_result=clean must come from a result or completed fallback event",
-        { line }
-      )
-    );
-  }
-  if (
-    event.provider_execution_state !== "completed" ||
-    event.state_after !== "completed"
-  ) {
-    findings.push(
-      finding(
-        "journal-clean-nonterminal",
-        "error",
-        "quality_result=clean requires provider_execution_state=completed and state_after=completed",
-        { line }
-      )
-    );
-  }
-  validateCleanEvidence(event, line, findings);
   if (axis === "clarity" || axis === "accuracy") {
     requireCleanContract(event, axis, line, findings);
   }
 }
 
-function validateCloseEvent(
+function validateAttemptTransition(
+  eventType: string,
+  attemptState: string,
+  prior: string | undefined,
+  line: number,
+  findings: Finding[]
+): void {
+  if (!prior && !["dispatch", "manual_fallback"].includes(eventType)) {
+    findings.push(
+      finding(
+        "journal-attempt-start-invalid",
+        "error",
+        "an attempt must start with dispatch or manual_fallback",
+        { line }
+      )
+    );
+  }
+  if (
+    prior &&
+    eventType !== "late_ignored" &&
+    !TRANSITIONS[prior]?.has(attemptState)
+  ) {
+    findings.push(
+      finding(
+        "journal-transition-invalid",
+        "error",
+        `${prior} → ${attemptState} is not an allowed attempt transition`,
+        { line }
+      )
+    );
+  }
+}
+
+function validateDispatchState(
+  eventType: string,
+  attemptState: string,
+  line: number,
+  findings: Finding[]
+): void {
+  if (
+    eventType === "dispatch" &&
+    !["pending", "running"].includes(attemptState)
+  ) {
+    findings.push(
+      finding(
+        "journal-dispatch-state-invalid",
+        "error",
+        "dispatch must leave an attempt pending or running",
+        { line }
+      )
+    );
+  }
+}
+
+function validateObservationState(
+  eventType: string,
+  attemptState: string,
+  line: number,
+  findings: Finding[]
+): void {
+  if (
+    ["progress", "poll"].includes(eventType) &&
+    !["pending", "running"].includes(attemptState)
+  ) {
+    findings.push(
+      finding(
+        "journal-observation-state-invalid",
+        "error",
+        "progress and poll events require pending or running",
+        { line }
+      )
+    );
+  }
+}
+
+function validateResultState(
+  event: Record<string, unknown>,
+  eventType: string,
+  attemptState: string,
+  axis: string,
+  line: number,
+  findings: Finding[]
+): void {
+  if (eventType !== "result") {
+    return;
+  }
+  if (attemptState !== "completed" || !RESULTS.has(String(event.result))) {
+    findings.push(
+      finding(
+        "journal-result-state-invalid",
+        "error",
+        "result requires attempt_state=completed and result=clean/findings/unverified",
+        { line }
+      )
+    );
+  }
+  validateCleanResult(event, axis, line, findings);
+}
+
+function validateFailureState(
+  event: Record<string, unknown>,
+  eventType: string,
+  attemptState: string,
+  line: number,
+  findings: Finding[]
+): void {
+  if (eventType !== "failure") {
+    return;
+  }
+  if (
+    attemptState !== "failed" ||
+    !nonBlank(event.failure_reason) ||
+    present(event.result)
+  ) {
+    findings.push(
+      finding(
+        "journal-failure-state-invalid",
+        "error",
+        "failure requires attempt_state=failed and failure_reason, without result",
+        { line }
+      )
+    );
+  }
+}
+
+function validateStopState(
+  eventType: string,
+  attemptState: string,
+  prior: string | undefined,
+  line: number,
+  findings: Finding[]
+): void {
+  if (
+    eventType === "stop_requested" &&
+    (!prior ||
+      !["pending", "running"].includes(prior) ||
+      attemptState !== prior)
+  ) {
+    findings.push(
+      finding(
+        "journal-stop-request-invalid",
+        "error",
+        "stop_requested must leave a pending or running attempt unchanged",
+        { line }
+      )
+    );
+  }
+  if (
+    eventType === "stop_confirmed" &&
+    (attemptState !== "stopped" ||
+      !prior ||
+      !["pending", "running"].includes(prior))
+  ) {
+    findings.push(
+      finding(
+        "journal-stop-confirmation-invalid",
+        "error",
+        "stop_confirmed must transition pending/running to stopped",
+        { line }
+      )
+    );
+  }
+}
+
+function validateFallbackState(
+  event: Record<string, unknown>,
+  eventType: string,
+  attemptState: string,
+  line: number,
+  findings: Finding[]
+): void {
+  if (
+    eventType === "manual_fallback" &&
+    (attemptState !== "completed" ||
+      event.fallback !== "manual_checked" ||
+      present(event.result))
+  ) {
+    findings.push(
+      finding(
+        "journal-fallback-state-invalid",
+        "error",
+        "manual_fallback requires completed, fallback=manual_checked, and no provider result",
+        { line }
+      )
+    );
+  }
+}
+
+function validateLateState(
+  event: Record<string, unknown>,
+  eventType: string,
+  attemptState: string,
+  prior: string | undefined,
+  line: number,
+  findings: Finding[]
+): void {
+  if (
+    eventType === "late_ignored" &&
+    (!prior || attemptState !== prior || present(event.result))
+  ) {
+    findings.push(
+      finding(
+        "journal-late-event-invalid",
+        "error",
+        "late_ignored must preserve the current attempt state and carry no result",
+        { line }
+      )
+    );
+  }
+  if (
+    prior &&
+    ["completed", "failed", "stopped"].includes(prior) &&
+    eventType !== "late_ignored"
+  ) {
+    findings.push(
+      finding(
+        "journal-terminal-reentry",
+        "error",
+        "a terminal attempt cannot receive another lifecycle event",
+        { line }
+      )
+    );
+  }
+}
+
+function validateAttemptEvent(
+  event: Record<string, unknown>,
+  key: string,
+  eventType: string,
+  axis: string,
+  state: JournalState,
+  line: number,
+  findings: Finding[]
+): void {
+  const attemptState = String(event.attempt_state ?? "");
+  if (!ATTEMPT_STATES.has(attemptState)) {
+    findings.push(
+      finding(
+        "journal-attempt-state-invalid",
+        "error",
+        "attempt_state is not canonical",
+        { line }
+      )
+    );
+    return;
+  }
+  const prior = state.attemptStates.get(key);
+  validateAttemptTransition(eventType, attemptState, prior, line, findings);
+  validateDispatchState(eventType, attemptState, line, findings);
+  validateObservationState(eventType, attemptState, line, findings);
+  validateResultState(event, eventType, attemptState, axis, line, findings);
+  validateFailureState(event, eventType, attemptState, line, findings);
+  validateStopState(eventType, attemptState, prior, line, findings);
+  validateFallbackState(event, eventType, attemptState, line, findings);
+  validateLateState(event, eventType, attemptState, prior, line, findings);
+  state.attemptStates.set(key, attemptState);
+}
+
+function validateClose(
   event: Record<string, unknown>,
   index: number,
   state: JournalState,
@@ -532,30 +760,33 @@ function validateCloseEvent(
       finding(
         "journal-close-duplicate",
         "error",
-        "review report may have only one report_closed event",
+        "review journal may have only one report_closed event",
         { line }
       )
     );
   }
   state.closeIndex = index;
-  if (Number.isInteger(event.cutoff_order)) {
-    state.cutoffOrder = Number(event.cutoff_order);
-  } else {
+  if (
+    !Number.isInteger(event.close_order) ||
+    Number(event.close_order) !== Number(event.order)
+  ) {
     findings.push(
       finding(
-        "journal-cutoff-missing",
+        "journal-close-order-invalid",
         "error",
-        "report_closed requires an integer cutoff_order",
+        "report_closed requires close_order equal to its event order",
         { line }
       )
     );
+  } else {
+    state.closeOrder = Number(event.close_order);
   }
-  if (event.state_after !== "closed" || event.parent_wait_state !== "closed") {
+  if (event.attempt_state !== undefined) {
     findings.push(
       finding(
-        "journal-close-state-invalid",
+        "journal-close-state-present",
         "error",
-        "report_closed must end in state_after=closed and parent_wait_state=closed",
+        "report_closed must not carry an attempt_state",
         { line }
       )
     );
@@ -576,23 +807,44 @@ function check(fileInput: string, allowOpen = false): Evidence {
     );
   }
   const state: JournalState = {
+    attemptStates: new Map<string, string>(),
     closeIndex: -1,
-    cutoffOrder: Number.POSITIVE_INFINITY,
+    closeOrder: Number.POSITIVE_INFINITY,
     eventIds: new Set<string>(),
-    identities: new Map<string, JournalIdentity>(),
+    identities: new Map<string, Identity>(),
     previousOrder: 0,
   };
 
   for (const [index, event] of events.entries()) {
-    const { axis, eventType } = validateEventIdentity(
+    if (state.closeIndex >= 0 && event.event_type !== "late_ignored") {
+      findings.push(
+        finding(
+          "journal-event-after-close",
+          "error",
+          "only late_ignored events may follow report_closed",
+          { line: index + 1 }
+        )
+      );
+    }
+    const { key, eventType, axis } = validateIdentity(
       event,
       index,
       state,
       findings
     );
-    validateEventState(event, index + 1, findings);
-    validateCleanResult(event, eventType, axis, index + 1, findings);
-    validateCloseEvent(event, index, state, findings);
+    if (eventType === "report_closed") {
+      validateClose(event, index, state, findings);
+    } else {
+      validateAttemptEvent(
+        event,
+        key,
+        eventType,
+        axis,
+        state,
+        index + 1,
+        findings
+      );
+    }
   }
 
   if (state.closeIndex >= 0) {
@@ -607,57 +859,11 @@ function check(fileInput: string, allowOpen = false): Evidence {
         finding(
           "journal-close-without-lifecycle",
           "error",
-          "report_closed must follow at least one real lifecycle event"
+          "report_closed must follow at least one attempt event"
         )
       );
     }
-    const closeOrder = Number(events[state.closeIndex].order);
-    if (state.cutoffOrder > closeOrder) {
-      findings.push(
-        finding(
-          "journal-cutoff-invalid",
-          "error",
-          "cutoff_order cannot be after report_closed",
-          { line: state.closeIndex + 1 }
-        )
-      );
-    }
-    for (const [index, event] of events.entries()) {
-      if (
-        event.quality_result === "clean" &&
-        Number(event.order) > state.cutoffOrder
-      ) {
-        findings.push(
-          finding(
-            "journal-clean-after-cutoff",
-            "error",
-            "a clean result must be at or before report_closed.cutoff_order",
-            {
-              evidence: { cutoff_order: state.cutoffOrder, order: event.order },
-              line: index + 1,
-            }
-          )
-        );
-      }
-    }
-    for (const [index, event] of events.entries()) {
-      if (
-        index > state.closeIndex &&
-        event.event_type !== "late_ignored" &&
-        event.state_after !== "late_ignored"
-      ) {
-        findings.push(
-          finding(
-            "journal-event-after-close",
-            "error",
-            "only late_ignored events may follow report_closed",
-            { line: index + 1 }
-          )
-        );
-      }
-    }
-  }
-  if (events.length > 0 && state.closeIndex < 0) {
+  } else if (events.length > 0) {
     findings.push(
       finding(
         "journal-not-closed",
@@ -674,10 +880,10 @@ function check(fileInput: string, allowOpen = false): Evidence {
     { path: file },
     {
       attempts: state.identities.size,
-      closed: state.closeIndex >= 0,
-      cutoff_order: Number.isFinite(state.cutoffOrder)
-        ? state.cutoffOrder
+      close_order: Number.isFinite(state.closeOrder)
+        ? state.closeOrder
         : undefined,
+      closed: state.closeIndex >= 0,
       events: events.length,
     },
     findings
@@ -690,29 +896,30 @@ function selfTest(): number {
     const base = {
       attempt_id: "attempt-1",
       axis: "clarity",
-      cancel_state: "not_requested",
       client_dispatch_id: "dispatch-1",
       cycle_id: "cycle-1",
       draft_hash: "a".repeat(64),
       evidence: { source: "self-test" },
       note_path: "/tmp/Note.md",
       note_revision: 1,
-      observability: "provider-status",
+      observability: "observed",
       observed_at: "2026-08-10T00:00:00Z",
-      parent_wait_state: "waiting",
-      provider_execution_state: "pending",
-      provider_liveness: "unobserved",
       provider_operation_id: "provider-1",
-      quality_result: "unavailable",
     };
     const events = [
       {
         ...base,
+        attempt_state: "pending",
         event_id: "e1",
         event_type: "dispatch",
         order: 1,
-        state_after: "active",
-        state_before: "pending",
+      },
+      {
+        ...base,
+        attempt_state: "running",
+        event_id: "e2",
+        event_type: "progress",
+        order: 2,
       },
       {
         ...base,
@@ -722,29 +929,26 @@ function selfTest(): number {
         C4: "—",
         C5: "—",
         after_state: "explain",
+        attempt_state: "completed",
         claims_checked: 3,
-        event_id: "e2",
+        event_id: "e3",
         event_type: "result",
         findings: [],
-        order: 2,
-        provider_execution_state: "completed",
-        provider_liveness: "terminal",
-        quality_result: "clean",
+        order: 3,
+        result: "clean",
         source_coverage: "complete",
-        state_after: "completed",
-        state_before: "active",
         teach_back: "reader can explain the model",
         unverified: "—",
       },
       {
         ...base,
-        cutoff_order: 2,
-        event_id: "e3",
+        attempt_id: "run",
+        attempt_state: undefined,
+        axis: "system",
+        close_order: 4,
+        event_id: "e4",
         event_type: "report_closed",
-        order: 3,
-        parent_wait_state: "closed",
-        state_after: "closed",
-        state_before: "completed",
+        order: 4,
       },
     ];
     fs.writeFileSync(
@@ -755,82 +959,87 @@ function selfTest(): number {
     if (check(file).gate !== "passed") {
       throw new Error("valid journal should pass");
     }
+
     fs.writeFileSync(
       file,
-      `${events
-        .map((event, index) =>
-          JSON.stringify(
-            index === 1
-              ? {
-                  ...event,
-                  findings: ["contradiction"],
-                  quality_result: "clean",
-                }
-              : event
-          )
-        )
-        .join("\n")}\n`,
+      `${events.map((event, index) => JSON.stringify(index === 2 ? { ...event, findings: ["contradiction"] } : event)).join("\n")}\n`,
       "utf-8"
     );
     if (check(file).gate !== "failed") {
       throw new Error("contradictory clean result should fail");
     }
-    fs.writeFileSync(file, "", "utf-8");
+
+    fs.writeFileSync(
+      file,
+      `${events.map((event, index) => JSON.stringify(index === 0 ? { ...event, attempt_state: "completed", result: "clean" } : event)).join("\n")}\n`,
+      "utf-8"
+    );
     if (check(file).gate !== "failed") {
-      throw new Error("empty journal should fail closed");
+      throw new Error("dispatch cannot masquerade as a completed result");
     }
-    fs.writeFileSync(file, `${JSON.stringify({ ...events[2] })}\n`, "utf-8");
+
+    fs.writeFileSync(file, `${JSON.stringify(events[3])}\n`, "utf-8");
     if (check(file).gate !== "failed") {
       throw new Error("close-only journal should fail");
     }
+
+    const stopped = [
+      {
+        ...base,
+        attempt_state: "pending",
+        event_id: "s1",
+        event_type: "dispatch",
+        order: 1,
+      },
+      {
+        ...base,
+        attempt_state: "running",
+        event_id: "s2",
+        event_type: "progress",
+        order: 2,
+      },
+      {
+        ...base,
+        attempt_state: "running",
+        event_id: "s3",
+        event_type: "stop_requested",
+        order: 3,
+      },
+      {
+        ...base,
+        attempt_state: "stopped",
+        event_id: "s4",
+        event_type: "stop_confirmed",
+        order: 4,
+      },
+      {
+        ...base,
+        attempt_id: "run",
+        axis: "system",
+        close_order: 5,
+        event_id: "s5",
+        event_type: "report_closed",
+        order: 5,
+      },
+    ];
     fs.writeFileSync(
       file,
-      `${events
-        .map((event, index) =>
-          JSON.stringify(
-            index === 0
-              ? {
-                  ...event,
-                  C1: "—",
-                  C2: "—",
-                  C3: "—",
-                  C4: "—",
-                  C5: "—",
-                  after_state: "explain",
-                  claims_checked: 3,
-                  event_type: "dispatch",
-                  quality_result: "clean",
-                  source_coverage: "complete",
-                  teach_back: "reader can explain",
-                }
-              : event
-          )
-        )
-        .join("\n")}\n`,
+      `${stopped.map((event) => JSON.stringify(event)).join("\n")}\n`,
+      "utf-8"
+    );
+    if (check(file).gate !== "passed") {
+      throw new Error("explicit stop sequence should pass");
+    }
+
+    fs.writeFileSync(
+      file,
+      `${[...stopped, { ...stopped[2], attempt_state: "completed", event_id: "s6", event_type: "result", order: 6, result: "clean" }].map((event) => JSON.stringify(event)).join("\n")}\n`,
       "utf-8"
     );
     if (check(file).gate !== "failed") {
-      throw new Error("dispatch event cannot masquerade as a clean result");
+      throw new Error("non-late event after closure should fail");
     }
-    fs.writeFileSync(
-      file,
-      `${events
-        .map((event, index) => {
-          if (index === 1) {
-            return { ...event, order: 4 };
-          }
-          if (index === 2) {
-            return { ...event, cutoff_order: 2, order: 5 };
-          }
-          return event;
-        })
-        .map((event) => JSON.stringify(event))
-        .join("\n")}\n`,
-      "utf-8"
-    );
-    if (check(file).gate !== "failed") {
-      throw new Error("a clean result after cutoff must fail");
-    }
+
     console.log("review-journal checker self-test: PASS");
     return 0;
   });
@@ -840,6 +1049,9 @@ function main(): number {
   const args = process.argv.slice(2);
   const json = args.includes("--json");
   const allowOpen = args.includes("--allow-open");
+  if (args.includes("--self-test")) {
+    return selfTest();
+  }
   let journal = "";
   for (let i = 0; i < args.length; i += 1) {
     if (args[i] === "--journal") {
@@ -865,10 +1077,10 @@ function main(): number {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
   } else if (result.gate === "passed") {
-    console.log("OK: review journal is identity-safe and transition-valid");
+    console.log("OK: review journal is identity-safe and attempt-state-valid");
   } else {
     for (const item of result.findings.filter(
-      (findingItem) => findingItem.severity === "error"
+      (entry) => entry.severity === "error"
     )) {
       console.error(
         `ERROR ${item.path ?? ""}:${item.line ?? 0}: ${item.message}`
@@ -878,11 +1090,4 @@ function main(): number {
   return exitForGate(result.gate);
 }
 
-function runCli(): number {
-  if (process.argv.includes("--self-test")) {
-    return selfTest();
-  }
-  return main();
-}
-
-runMain(runCli);
+runMain(main);
