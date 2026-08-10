@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.4] - 2026-08-10
+
+### 修复
+- fix: bind teaching model and editorial gates
+
+### 其他
+- merge: knowledge-distiller editorial gates
+
+
 ## [0.4.3] - 2026-08-10
 
 ### 重构
