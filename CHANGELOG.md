@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.1] - 2026-08-10
+
+### 修复
+- fix(lint): 调整 lint-staged 配置文件的文件匹配规则
+
+### 重构
+- refactor(format-plan): 重构格式检查计划模块及Markdown解析模块
+
+
 ## [0.4.0] - 2026-08-10
 
 ### 其他
