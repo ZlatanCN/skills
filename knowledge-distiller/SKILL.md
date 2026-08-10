@@ -294,6 +294,9 @@ role, dependency, transition, boundary, and format decision. Use `keep`, `rewrit
 `defer`, or `add`; technically correct prose
 without a current job in the spine is classified as `defer` by default, and is removed only through the explicit
 `delete` rule and preservation diff below.
+For an existing note, classify every old format block—emphasis, callout, code, table, diagram, link, embed, or footnote—
+with the same operation and a reader-model reason. Deleting a format block only because its plain-text content remains is
+not sufficient; if its visual or navigational function is lost, preserve or redesign it.
 
 ### 6A. Language and terminology
 
