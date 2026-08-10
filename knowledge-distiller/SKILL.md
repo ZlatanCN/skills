@@ -399,124 +399,35 @@ semantically unknown link is not clean.
 
 ## 8. Phase 7 — review as an evidence-bound event stream
 
-Review improves confidence but does not authorize an unsafe write. Read `references/obsidian-writing-style.md` §5–6,
-then spawn the two read-only reviewers in parallel when the environment supports it, using the exact prompts in
-`references/review-lifecycle.md` §8. Substitute the resolved
-absolute path and metadata; never pass an unresolved placeholder. If the write status is not `written`/`updated`, use
-only the draft fallback and no path-based reviewer.
+Review improves confidence but does not authorize an unsafe write. Read `references/obsidian-writing-style.md` §5–6 and
+`references/review-lifecycle.md`; the reference is the authoritative review protocol and §8 contains the exact prompts.
 
-An asynchronous reviewer requires a durable append-only journal. Before dispatch, persist a lifecycle checkpoint with
-`cycle_id`, `attempt_id`, axis, path, `note_revision`, immutable `draft_hash`, parent cutoff, a provider operation ID
-when one exists, otherwise a client dispatch ID, and observability mode. The pre-dispatch record may therefore have
-`provider_operation_id: pending`; fill it only from provider evidence after submission. The client dispatch ID is the
-stable local identity before provider acknowledgement; once an operation ID exists, store both and never use the
-operation ID as a replacement for `attempt_id`. If the journal is unavailable, do not dispatch; run the complete
-manual fallback and report `journal_unavailable`. A client submission proves neither provider acceptance nor
-completion.
+After the final read-back and hard gates, **must** spawn exactly two independent read-only subagents in parallel when
+the environment provides subagents:
 
-Validate the open JSONL before dispatch and after every append with `--allow-open`; run the same command without that
-flag before closure:
+- `clarity`: reader model, spine, section roles, transitions, terminology, and format roles;
+- `accuracy`: material claims, source coverage, boundaries, examples, tables, diagrams, and links.
 
-```bash
-node scripts/check-review-journal.ts --journal "<review-journal.jsonl>" --allow-open --json
-# before report_closed: omit --allow-open
-```
+Pass each reviewer the resolved absolute path and exact draft identity required by the reference. Wait for both results
+before adjudication. Do not call the reviewer unavailable merely because the tool has not yet been searched; only a
+real capability or dispatch failure permits fallback. If the write status is not `written`/`updated`, use the exact
+draft fallback required by the reference.
 
-The checker verifies event identity, monotonic order, legal transitions, contradictory clean results and the close/
-late-result boundary. It does not decide whether a reviewer finding is factually correct.
+Follow the reference's journal validation and closure protocol exactly. The checker is a mechanical aid; it does not
+replace reviewer adjudication.
 
-Keep these dimensions independent:
+The reference owns the canonical state dimensions, identity binding, journal schema, cancellation precedence, closure
+cutoff, and result normalization. Follow those rules without restating or inventing a second local state machine.
 
-```text
-provider_execution_state → pending | active | completed | failed | unknown
-provider_liveness       → unobserved | healthy | suspected_stall | terminal
-parent_wait_state        → waiting | deferred | closed
-cancel_state             → not_requested | cancel_requested | canceled_confirmed | unknown
-quality_result           → clean | findings | unverified | protocol_invalid | unavailable
-```
-
-`deferred` records only that the parent stopped waiting. Opaque or empty observations remain `unknown`. A provider's
-terminal `failed` goes directly to fallback and sets `provider_liveness: terminal`; it is never a cancellation case.
-Only provider-observed, nonterminal stall evidence may set `provider_liveness: suspected_stall` and enter
-`cancel_requested`; only a matching provider acknowledgement yields `canceled_confirmed`. If an exact completed result
-event precedes the cancellation acknowledgement in journal `order`, accept the completed result, mark the cancellation
-acknowledgement `superseded`, and never set `canceled_confirmed`. If cancellation is confirmed first, a later completed
-payload for that attempt is a contradictory provider event (`protocol_invalid`), not a clean result. A cancel request
-cannot erase a completed result that was evidenced first.
-
-The reviewer reference's legacy single-state terms map mechanically to this record: `pending|queued →
-provider_execution_state: pending`; `running|active → active`; `completed → completed`; `failed → failed`;
-`deferred → parent_wait_state: deferred` while provider execution remains active or unknown; `cancel-requested →
-cancel_state: cancel_requested`; `canceled-confirmed → canceled_confirmed`; `suspected-stall →
-provider_liveness: suspected_stall`; a nonterminal `stalled` observation follows the same mapping, while a terminal
-`failed` observation maps to `provider_execution_state: failed` and never to cancellation. `unknown → unknown`. These
-are not alternative states. Store the five canonical dimensions plus the legacy event name when the reference
-requires it.
-
-Use this minimal append-only journal schema for every dispatch, observation, fallback, revision, cancellation, and close:
-
-```text
-{event_id, order, event_type, cycle_id, attempt_id, axis, note_path, note_revision, draft_hash,
- client_dispatch_id, provider_operation_id, provider_execution_state, provider_liveness, parent_wait_state,
- cancel_state, state_before, state_after, observability, evidence, observed_at}
-```
-
-Append one complete record per event in monotonic `order`; do not overwrite an earlier state. Use a single-writer lock
-(`flock` or the environment's equivalent) around read-order-increment-append-flush; if no lock and durable flush are
-available, the journal is unavailable and async dispatch is forbidden. The pre-dispatch event is written before the
-provider call. If a post-dispatch append fails, do not relabel the provider as failed/canceled: set
-`provider_execution_state: unknown`, `quality_result: unavailable`, `delivery: review-uncertain`, stop new dispatches,
-run fallback, and report the unjournaled operation. To close, acquire the same lock, process all
-matching results observed before closure, append a `report_closed` event containing the final `cutoff_order`, flush it,
-and release the lock. A result observed after that order is `late_ignored`; if the close append/flush is uncertain, set
-`report_close_uncertain` and do not claim a clean lifecycle.
-
-Accept a result only when `cycle_id`, `attempt_id`, axis, path, `note_revision`, and `draft_hash` all match. A mismatch,
-older revision, or result after the atomic `report_closed` event is journaled as `stale`/`late_ignored`; it cannot
-change findings, revisions, convergence, or delivery. An exact terminal result arriving before report closure must be
-validated and adjudicated even if the parent had stopped waiting.
-
-The verbatim reference prompt requires `attempt_id`, `note_revision`, and `note_path`; do not invent extra provider
-fields. Wrap that prompt and its result in the local dispatch envelope carrying `cycle_id` and `draft_hash`. Validate
-the three required returned fields against the envelope, then verify the immutable draft hash locally. If the provider
-also returns cycle/hash fields, they must match; if a required returned field is absent or the local artifact hash has
-changed, record `protocol_invalid` and use fallback. This closes identity fencing without changing the reference
-prompt contract.
-
-Normalize payloads before using them. `clean` requires no C1–C5/A1 findings, no unverified claims, complete accuracy
-source coverage, and evidence of the reader after-state. Contradictory fields—such as `clean` with findings or partial
-coverage—are `protocol_invalid`, never clean.
-
-Read `references/review-lifecycle.md` §4A before dispatch. Use its prompts and budget, but map its generic lifecycle
-terms into the canonical provider/parent/cancel fields above; this section's separated-state and identity rules are
-authoritative when the reference uses a single `reviewer_state` or ambiguous transition. The default finite budget is
-the initial review plus at most
-two integrated revision rounds; only an explicit user request may enlarge it. Track reviewer attempts, fallback
-passes, and body revision rounds separately. Never retry the same revision while its attempt is `unknown`, `active`, or
-`cancel_requested`; a new body revision is a new cycle, attempt, and hash.
-
-Run `references/final-checklist.md` once before the first dispatch and again after every content revision. A checklist
-pass cannot override an unavailable or failed state gate, and a checklist run without the exact draft identity is not a
-review of that artifact.
+Use the reference's bounded convergence rules. After any content revision, rerun the required gates and invalidate
+results for the previous draft.
 
 ### 8A. Fallback, adjudication, and convergence
 
-Fallback inspects the exact draft hash/revision, not a generic topic. It must record per-axis `passed|failed|unavailable`
-for the reader contract and linear spine, evidence/limits of every material claim, every link's mechanical and
-semantic target, heading/render gates, and the complete clarity/accuracy C1–C5/A1 checklist. `manual_checked` alone
-never means clean. Record each event with an event ID, monotonic order, state before/after, evidence, and operation.
-
-Use findings only after identity and protocol validation. Normalize both axes, remove preferences, duplicates, and
-out-of-scope items, then make one integrated edit pass. Restate the reader contract and choose the structural operation
-that restores the path: keep, rewrite, move, merge, split, delete, defer, or add. Accuracy repairs need source-backed
-wording; clarity repairs need structural reasoning. After every content revision, read the whole note linearly, state
-the spine and each top-level section's role, rerun required gates, increment the revision/hash, and invalidate old
-review results.
-
-Before closing the report, process all exact results received before `report_closed`. Results after it remain
-`late_ignored` and are disclosed. A `reader_blocker` or `accuracy_blocker` means unfinished even if written; only a
-`polish_item` may remain under an open-item label. Stop at clean convergence, no actionable repair, budget exhaustion,
-or a documented fallback/open item—never chase preferences or invent edge-case work.
+If either axis is unavailable or invalid, run the reference's exact-draft manual fallback and report
+`manual_checked`; manual fallback is never reviewer `clean`. Adjudicate valid findings together, make one integrated
+edit pass, then rerun the required gates and both reviewers for the new draft. Stop at the reference's clean convergence,
+fallback, open blocker, or finite budget boundary.
 
 ## 9. Phase 8 — truthful delivery report
 
