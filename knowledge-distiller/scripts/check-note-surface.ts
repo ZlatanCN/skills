@@ -143,12 +143,11 @@ function selfTest(): number {
     fs.writeFileSync(invalid, [
       "# Main",
       "> [!custom] bad",
-      "```",
-      "unclosed",
       "```mermaid",
       "flowchart TB",
       "A[\"x\"] --> B[\"end\"]",
       "click A callback()",
+      "```",
     ].join("\n"), "utf8");
     if (check(invalid, true, true).gate !== "failed") throw new Error("invalid surface should fail");
     console.log("note-surface checker self-test: PASS");
@@ -198,4 +197,3 @@ try {
   console.error(`ERROR: ${(error as Error).message}`);
   process.exitCode = 2;
 }
-
