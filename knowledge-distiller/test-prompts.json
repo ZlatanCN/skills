@@ -16,5 +16,11 @@
     "source_eval": 5,
     "prompt": "什么是幂等性？请用两三句话直接解释一下，不需要创建笔记。",
     "expected": "直接用中文回答幂等性的事实问题，不创建笔记，不执行研究、vault 扫描或 reviewer 流程。"
+  },
+  {
+    "id": 4,
+    "source_eval": 10,
+    "prompt": "/knowledge-distiller 请把下面的理解整理成一篇中文 Obsidian 笔记：我以前以为 JSX 就是浏览器直接执行的 HTML 模板，React 创建 element 时就会立刻创建 DOM；我还不清楚 key、ref、children 和 Fiber 分别解决什么问题。请以 React v18.2.0 的学习模型解释 JSX 如何进入运行时，并明确哪些是简化教学模型。文章应保留一个能帮助理解的具体类比，同时标出一个常见误解和一个版本边界。",
+    "expected": "生成一篇使用 Markdown/Obsidian 格式表达教学语义的中文笔记：核心结论易扫描，合适的边界/误解/类比使用有职责的 callout，不机械覆盖语法，并在报告中诚实记录格式计划与双 reviewer/fallback 状态。"
   }
 ]

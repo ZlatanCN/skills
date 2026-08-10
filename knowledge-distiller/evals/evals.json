@@ -176,6 +176,21 @@
         "The note has a recoverable teach-back: one spine, the question answered by each major section, and what the reader can explain, predict, or choose afterward",
         "The note passes the existing Chinese prose, frontmatter, evidence, anchored-link, and review lifecycle requirements"
       ]
+    },
+    {
+      "id": 10,
+      "prompt": "/knowledge-distiller 请把下面的理解整理成一篇中文 Obsidian 笔记：我以前以为 JSX 就是浏览器直接执行的 HTML 模板，React 创建 element 时就会立刻创建 DOM；我还不清楚 key、ref、children 和 Fiber 分别解决什么问题。请以 React v18.2.0 的学习模型解释 JSX 如何进入运行时，并明确哪些是简化教学模型。文章应保留一个能帮助理解的具体类比，同时标出一个常见误解和一个版本边界。",
+      "expected_output": "A Chinese Obsidian note that uses Markdown and Obsidian formatting as semantic teaching tools, with an honest format audit and review/fallback report",
+      "files": [],
+      "expectations": [
+        "The note keeps one causal spine from JSX syntax through React element and Fiber to DOM, with a clear v18.2.0 boundary",
+        "At least one core conclusion is easy to scan through intentional emphasis or an equally effective structure; the test does not require a fixed number of bold phrases",
+        "A version boundary, common misconception, teaching-model limitation, or concrete analogy uses a callout only when the block adds a findability function, with a type, title, and removal-test rationale",
+        "Code blocks, tables, links, diagrams, footnotes, embeds, or other Markdown features appear only when their declared reader role justifies them, and no decorative format quota is invented",
+        "The note preserves the analogy and boundary conditions instead of flattening every block into ordinary prose",
+        "The final report records format_plan evidence and treats clarity/accuracy reviewer results or manual fallback states truthfully",
+        "The output satisfies the existing frontmatter, Chinese prose, evidence, anchored-link, heading, safe-write, and review lifecycle requirements"
+      ]
     }
   ]
 }
