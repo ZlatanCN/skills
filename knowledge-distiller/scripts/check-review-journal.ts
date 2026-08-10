@@ -7,10 +7,10 @@ import * as os from "node:os";
 import { evidence, exitForGate, finding, isRecord, type Evidence, type Finding } from "./lib/evidence.ts";
 
 const EXECUTION_STATES = new Set(["pending", "active", "completed", "failed", "unknown"]);
-const LIVENESS_STATES = new Set(["unobserved", "healthy", "unknown", "live", "terminal", "suspected_stall"]);
+const LIVENESS_STATES = new Set(["unobserved", "healthy", "suspected_stall", "terminal"]);
 const PARENT_STATES = new Set(["waiting", "deferred", "closed"]);
-const CANCEL_STATES = new Set(["not_requested", "none", "cancel_requested", "canceled_confirmed", "unknown", "superseded"]);
-const QUALITY_RESULTS = new Set(["clean", "findings", "actionable", "unverified", "protocol_invalid", "unavailable", "manual_checked"]);
+const CANCEL_STATES = new Set(["not_requested", "cancel_requested", "canceled_confirmed", "unknown", "superseded"]);
+const QUALITY_RESULTS = new Set(["clean", "findings", "unverified", "protocol_invalid", "unavailable"]);
 const ALLOWED_TRANSITIONS: Record<string, Set<string>> = {
   pending: new Set(["pending", "active", "failed", "unknown"]),
   active: new Set(["active", "completed", "failed", "unknown", "deferred"]),
@@ -52,6 +52,7 @@ function check(fileInput: string): Evidence {
   const file = path.resolve(fileInput);
   const findings: Finding[] = [];
   const events = readEvents(file, findings);
+  if (events.length === 0) findings.push(finding("journal-empty", "error", "review journal must contain at least one event"));
   const eventIds = new Set<string>();
   const identities = new Map<string, { cycle_id: string; axis: string; note_path: string; note_revision: number; draft_hash: string }>();
   let previousOrder = 0;
@@ -76,6 +77,9 @@ function check(fileInput: string): Evidence {
     if (draftHash && !/^[a-f0-9]{64}$/i.test(draftHash)) findings.push(finding("journal-hash-invalid", "error", "draft_hash must be a SHA-256 hex digest", { line }));
     if (axis && !new Set(["clarity", "accuracy", "both", "system"]).has(axis)) findings.push(finding("journal-axis-invalid", "error", `unsupported axis ${axis}`, { line }));
     if (!requiredString(event, "observed_at", line, findings)) findings.push(finding("journal-time-missing", "error", "observed_at is required for auditability", { line }));
+    if (!requiredString(event, "observability", line, findings)) findings.push(finding("journal-observability-missing", "error", "observability is required for every event", { line }));
+    if (event.evidence === undefined || event.evidence === null) findings.push(finding("journal-evidence-missing", "error", "evidence is required for every event", { line }));
+    if (!nonBlank(event.client_dispatch_id) && !nonBlank(event.provider_operation_id)) findings.push(finding("journal-dispatch-identity-missing", "error", "each event needs a client_dispatch_id or provider_operation_id", { line }));
 
     const identityKey = `${cycleId}\u0000${attemptId}`;
     const identity = { cycle_id: cycleId, axis, note_path: notePath, note_revision: Number(event.note_revision), draft_hash: draftHash };
@@ -95,6 +99,10 @@ function check(fileInput: string): Evidence {
       const hasFindings = Array.isArray(event.findings) ? event.findings.length > 0 : nonBlank(event.findings);
       const partial = event.source_coverage === "partial" || (Array.isArray(event.unverified) && event.unverified.length > 0) || nonBlank(event.unverified);
       if (hasFindings || partial) findings.push(finding("journal-clean-contradiction", "error", "quality_result=clean contradicts findings, partial coverage, or unverified claims", { line }));
+      if (event.source_coverage !== "complete") findings.push(finding("journal-clean-coverage-missing", "error", "quality_result=clean requires source_coverage=complete", { line }));
+      if (!(typeof event.claims_checked === "number" && event.claims_checked > 0) && !nonBlank(event.claims_checked)) findings.push(finding("journal-clean-claims-missing", "error", "quality_result=clean requires claims_checked", { line }));
+      if (!nonBlank(event.after_state) && !nonBlank(event.reader_after_state) && !nonBlank(event.teach_back)) findings.push(finding("journal-clean-after-state-missing", "error", "quality_result=clean requires reader after-state evidence", { line }));
+      if (!nonBlank(event.provider_operation_id) && !nonBlank(event.client_dispatch_id)) findings.push(finding("journal-clean-identity-missing", "error", "quality_result=clean requires reviewer identity evidence", { line }));
     }
     if (eventType === "report_closed") {
       if (closeIndex >= 0) findings.push(finding("journal-close-duplicate", "error", "review report may have only one report_closed event", { line }));
@@ -133,16 +141,18 @@ function selfTest(): number {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "knowledge-distiller-review-journal-"));
   try {
     const file = path.join(root, "journal.jsonl");
-    const base = { cycle_id: "cycle-1", attempt_id: "attempt-1", axis: "clarity", note_path: "/tmp/Note.md", note_revision: 1, draft_hash: "a".repeat(64), observed_at: "2026-08-10T00:00:00Z", provider_execution_state: "pending", provider_liveness: "unknown", parent_wait_state: "waiting", cancel_state: "none", quality_result: "unavailable" };
+    const base = { cycle_id: "cycle-1", attempt_id: "attempt-1", axis: "clarity", note_path: "/tmp/Note.md", note_revision: 1, draft_hash: "a".repeat(64), client_dispatch_id: "dispatch-1", provider_operation_id: "provider-1", observed_at: "2026-08-10T00:00:00Z", observability: "provider-status", evidence: { source: "self-test" }, provider_execution_state: "pending", provider_liveness: "unobserved", parent_wait_state: "waiting", cancel_state: "not_requested", quality_result: "unavailable" };
     const events = [
       { ...base, event_id: "e1", order: 1, event_type: "dispatch", state_before: "pending", state_after: "active" },
-      { ...base, event_id: "e2", order: 2, event_type: "result", state_before: "active", state_after: "completed", provider_execution_state: "completed", provider_liveness: "terminal", quality_result: "clean", findings: [], source_coverage: "complete", unverified: "—" },
+      { ...base, event_id: "e2", order: 2, event_type: "result", state_before: "active", state_after: "completed", provider_execution_state: "completed", provider_liveness: "terminal", quality_result: "clean", findings: [], source_coverage: "complete", claims_checked: 3, after_state: "explain", unverified: "—" },
       { ...base, event_id: "e3", order: 3, event_type: "report_closed", state_before: "completed", state_after: "closed", parent_wait_state: "closed", cutoff_order: 2 },
     ];
     fs.writeFileSync(file, events.map((event) => JSON.stringify(event)).join("\n") + "\n", "utf8");
     if (check(file).gate !== "passed") throw new Error("valid journal should pass");
     fs.writeFileSync(file, events.map((event, index) => JSON.stringify(index === 1 ? { ...event, quality_result: "clean", findings: ["contradiction"] } : event)).join("\n") + "\n", "utf8");
     if (check(file).gate !== "failed") throw new Error("contradictory clean result should fail");
+    fs.writeFileSync(file, "", "utf8");
+    if (check(file).gate !== "failed") throw new Error("empty journal should fail closed");
     console.log("review-journal checker self-test: PASS");
     return 0;
   } finally {

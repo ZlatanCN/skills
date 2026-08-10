@@ -40,19 +40,19 @@ function check(fileInput: string, portable: boolean, strict: boolean): Evidence 
     }
   }
 
-  for (let i = 0; i < surface.lines.length; i += 1) {
-    const line = surface.lines[i];
+  const bodyLineMap = new Map(surface.body_lines);
+  for (const [lineNumber, line] of surface.body_lines) {
     if (/^\s*(?:>\s*)+\[![A-Za-z0-9_-]+\][+-]?/.test(line)) {
-      const next = surface.lines[i + 1] ?? "";
+      const next = bodyLineMap.get(lineNumber + 1) ?? "";
       if (next.trim() && !/^\s*>/.test(next)) {
         findings.push(finding("callout-prefix-missing", strict ? "error" : "warning", "content immediately after a callout opener is missing the required > prefix", {
           path: file,
-          line: i + 2,
+          line: lineNumber + 1,
         }));
       }
     }
     if (/\]\(\s*javascript:/i.test(line) || /<\s*(?:script|iframe)\b/i.test(line)) {
-      findings.push(finding("unsafe-markup-surface", "error", "note contains a script-like or javascript URL surface", { path: file, line: i + 1 }));
+      findings.push(finding("unsafe-markup-surface", "error", "note contains a script-like or javascript URL surface", { path: file, line: lineNumber }));
     }
   }
 
@@ -132,6 +132,10 @@ function selfTest(): number {
       "",
       "```ts",
       "const x = 1;",
+      "```",
+      "",
+      "```html",
+      "<script>const example = true;</script>",
       "```",
       "",
       "```mermaid",

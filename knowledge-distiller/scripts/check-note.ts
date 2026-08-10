@@ -18,7 +18,19 @@ function runChecker(script: string, args: string[], input?: string): ChildRun {
   const child = spawnSync(process.execPath, [command, ...args, "--json"], { encoding: "utf8", input });
   const stdout = child.stdout ?? "";
   try {
-    return { result: JSON.parse(stdout) as Evidence, status: child.status, stderr: child.stderr ?? "" };
+    const parsed = JSON.parse(stdout) as Evidence;
+    if (child.status !== exitForGate(parsed.gate)) {
+      return {
+        status: child.status,
+        stderr: child.stderr ?? "",
+        result: {
+          ...parsed,
+          gate: "unavailable",
+          findings: [...parsed.findings, finding("checker-exit-mismatch", "error", "checker exit code contradicts its JSON gate", { evidence: { exit_code: child.status, gate: parsed.gate } })],
+        },
+      };
+    }
+    return { result: parsed, status: child.status, stderr: child.stderr ?? "" };
   } catch (error) {
     return {
       status: child.status,

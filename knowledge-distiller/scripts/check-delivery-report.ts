@@ -8,7 +8,8 @@ import { evidence, exitForGate, finding, isRecord, readJsonInput, nonEmptyString
 
 const WRITE_STATES = new Set(["written", "updated", "unchanged", "not_written", "possibly_partial"]);
 const GATES = new Set(["passed", "failed", "unavailable"]);
-const REVIEW_RESULTS = new Set(["clean", "findings", "unverified", "protocol_invalid", "unavailable", "manual_checked"]);
+const REVIEW_RESULTS = new Set(["clean", "findings", "unverified", "protocol_invalid", "unavailable"]);
+const REQUIRED_HARD_GATES = ["write_readback", "preservation", "heading", "mechanical_link", "semantic_link", "evidence", "render"];
 const SUCCESS_LABELS = new Set(["双轴审查通过", "已交付；部分审查由人工复核", "已交付；存在未决项"]);
 
 function check(input: string): Evidence {
@@ -37,6 +38,9 @@ function check(input: string): Evidence {
     else gateValues.push(String(value));
   }
   if (gateObject && Object.keys(gateObject).length === 0) findings.push(finding("delivery-gates-empty", "error", "hard_gates must name every required hard gate"));
+  for (const name of REQUIRED_HARD_GATES) {
+    if (!gateObject || !(name in gateObject)) findings.push(finding("delivery-gate-missing", "error", `hard_gates.${name} is required`));
+  }
 
   const review = isRecord(report.review) ? report.review : undefined;
   if (!review) findings.push(finding("delivery-review-missing", "error", "review must be an object"));
@@ -47,6 +51,11 @@ function check(input: string): Evidence {
     const result = String(axis?.quality_result ?? "");
     if (!REVIEW_RESULTS.has(result)) findings.push(finding("delivery-review-result-invalid", "error", `review.${name}.quality_result is missing or unsupported`));
     else results[name] = result;
+  }
+  const manualFallback = review?.manual_fallback === true;
+  for (const name of resultNames) {
+    const axis = isRecord(review?.[name]) ? review?.[name] as Record<string, unknown> : undefined;
+    if (axis?.fallback !== undefined && axis.fallback !== "manual_checked") findings.push(finding("delivery-fallback-invalid", "error", `review.${name}.fallback must be manual_checked when present`));
   }
   const journal = isRecord(review?.journal) ? review?.journal as Record<string, unknown> : undefined;
   if (!journal) findings.push(finding("delivery-journal-missing", "error", "review.journal must be an object"));
@@ -65,7 +74,7 @@ function check(input: string): Evidence {
   const bothClean = results.clarity === "clean" && results.accuracy === "clean";
   const journalClosed = journal?.gate === "passed" && journal.closed === true;
   const hasBlocker = blockers.length > 0 || openItems.some((item) => isRecord(item) && ["reader_blocker", "accuracy_blocker"].includes(String(item.classification)));
-  const reviewUncertain = report.review_uncertain === true || journal?.gate === "unavailable";
+  const reviewUncertain = report.review_uncertain === true || (journal?.gate === "unavailable" && !manualFallback);
 
   if (label === "双轴审查通过" && !(written && allHardPassed && bothClean && journalClosed && !hasBlocker && !reviewUncertain)) {
     findings.push(finding("delivery-success-overclaim", "error", "双轴审查通过 requires confirmed write, all hard gates passed, both valid clean results, closed journal, and no blockers"));
@@ -74,6 +83,12 @@ function check(input: string): Evidence {
   if (written && !allHardPassed && SUCCESS_LABELS.has(label)) findings.push(finding("delivery-gate-overclaim", "error", "a success delivery label cannot hide failed or unavailable hard gates"));
   if (reviewUncertain && SUCCESS_LABELS.has(label)) findings.push(finding("delivery-review-overclaim", "error", "an uncertain review state cannot use a success delivery label"));
   if (hasBlocker && SUCCESS_LABELS.has(label)) findings.push(finding("delivery-blocker-overclaim", "error", "reader/accuracy blockers cannot use a success delivery label"));
+  if (label === "已交付；部分审查由人工复核" && !(manualFallback && results.clarity === "unavailable" && results.accuracy === "unavailable" && review?.clarity?.fallback === "manual_checked" && review?.accuracy?.fallback === "manual_checked" && !hasBlocker)) {
+    findings.push(finding("delivery-manual-fallback-overclaim", "error", "partial manual-review delivery requires explicit manual_checked fallback for both unavailable axes"));
+  }
+  if (label === "已交付；存在未决项" && openItems.some((item) => isRecord(item) && ["reader_blocker", "accuracy_blocker"].includes(String(item.classification)))) {
+    findings.push(finding("delivery-open-blocker-overclaim", "error", "存在未决项 cannot contain reader or accuracy blockers"));
+  }
   if (report.write_status === "possibly_partial" && !label.includes("不确定")) findings.push(finding("delivery-partial-overclaim", "error", "possibly_partial writes must be reported as uncertain"));
   if (report.write_status === "not_written" && SUCCESS_LABELS.has(label)) findings.push(finding("delivery-not-written-overclaim", "error", "not_written cannot use a success delivery label"));
 
@@ -98,14 +113,27 @@ function selfTest(): number {
       label: "双轴审查通过",
       write_status: "updated",
       note_path: "/tmp/Note.md",
-      hard_gates: { read_back: "passed", heading: "passed", links: "passed", format_plan: "passed" },
-      review: { clarity: { quality_result: "clean" }, accuracy: { quality_result: "clean" }, journal: { gate: "passed", closed: true } },
+      hard_gates: { write_readback: "passed", preservation: "passed", heading: "passed", mechanical_link: "passed", semantic_link: "passed", evidence: "passed", render: "passed" },
+      review: { clarity: { quality_result: "clean" }, accuracy: { quality_result: "clean" }, journal: { gate: "passed", closed: true, events: 3 } },
       open_blockers: [],
       open_items: [],
     };
     fs.writeFileSync(file, JSON.stringify(report), "utf8");
     if (check(file).gate !== "passed") throw new Error("valid delivery report should pass");
-    fs.writeFileSync(file, JSON.stringify({ ...report, hard_gates: { read_back: "failed" } }), "utf8");
+    fs.writeFileSync(file, JSON.stringify({ ...report, hard_gates: { bogus: "passed" } }), "utf8");
+    if (check(file).gate !== "failed") throw new Error("incomplete hard-gate set should fail");
+    fs.writeFileSync(file, JSON.stringify({
+      ...report,
+      label: "已交付；部分审查由人工复核",
+      review: {
+        clarity: { quality_result: "unavailable", fallback: "manual_checked" },
+        accuracy: { quality_result: "unavailable", fallback: "manual_checked" },
+        manual_fallback: true,
+        journal: { gate: "unavailable", closed: false },
+      },
+    }), "utf8");
+    if (check(file).gate !== "passed") throw new Error("explicit two-axis manual fallback should pass");
+    fs.writeFileSync(file, JSON.stringify({ ...report, hard_gates: { ...report.hard_gates, write_readback: "failed" } }), "utf8");
     if (check(file).gate !== "failed") throw new Error("failed hard gate must reject clean delivery");
     console.log("delivery-report checker self-test: PASS");
     return 0;
@@ -142,4 +170,3 @@ try {
   console.error(`ERROR: ${(error as Error).message}`);
   process.exitCode = 2;
 }
-

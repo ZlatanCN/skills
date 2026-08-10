@@ -33,7 +33,7 @@
 
 命令退出码统一为：`0 = passed`、`1 = failed`、`2 = unavailable/调用错误`。保留 JSON 原文、目标文件 SHA-256、命令、版本、退出码和时间戳。
 
-## 2. 内容门：一个入口，四个专责检查器
+## 2. 内容门：一个入口，五个专责检查器
 
 实际笔记写入前后运行：
 
@@ -86,7 +86,7 @@ node scripts/check-note.ts \
 node scripts/check-review-journal.ts --journal "$JOURNAL" --json
 ```
 
-脚本验证 JSONL 可解析、`event_id` 唯一、`order` 单调、cycle/attempt/path/revision/hash/axis 身份不漂移、状态转移合法、枚举值合法、`clean` 不得与 findings/partial/unverified 矛盾、`report_closed` 唯一且 cutoff 有效；关闭后的结果只能标记为 `late_ignored`。它不判断 reviewer 的事实判断是否正确，也不把 parent timeout 推断成 provider failure。
+脚本验证 JSONL 可解析、`event_id` 唯一、`order` 单调、cycle/attempt/path/revision/hash/axis 身份不漂移、dispatch/provider identity、observability、evidence 字段存在、状态转移合法、枚举值合法、`clean` 具备 complete coverage/claims/after-state 且不得与 findings/partial/unverified 矛盾、`report_closed` 唯一且 cutoff 有效；空 journal 失败，关闭后的结果只能标记为 `late_ignored`。它不判断 reviewer 的事实判断是否正确，也不把 parent timeout 推断成 provider failure。
 
 ## 4. 交付门：阻止成功标签越权
 
@@ -96,11 +96,13 @@ node scripts/check-review-journal.ts --journal "$JOURNAL" --json
 node scripts/check-delivery-report.ts --report "$DELIVERY_JSON" --json
 ```
 
-`knowledge-distiller.delivery.v1` 至少包含 `write_status`、`hard_gates`、clarity/accuracy 的 `quality_result`、journal 状态、open blockers 和最终 `label`。脚本验证：
+`knowledge-distiller.delivery.v1` 至少包含 `write_status`、完整的 `hard_gates`（`write_readback`、`preservation`、`heading`、`mechanical_link`、`semantic_link`、`evidence`、`render`）、clarity/accuracy 的 `quality_result`、journal 状态、open blockers 和最终 `label`。脚本验证：
 
 - `双轴审查通过` 必须同时拥有 confirmed write、所有 hard gates 通过、两个合法 clean 结果、已关闭 journal 且无 blocker；
 - hard gate 失败/不可用、审查不确定、写入可能部分完成或存在 reader/accuracy blocker 时，不得使用成功标签；
 - `possibly_partial`、`not_written` 等写状态必须落到对应的非成功标签。
+
+人工 fallback 不把 `manual_checked` 塞进 provider 的 `quality_result`；应记录 `quality_result: unavailable` 和轴级 `fallback: manual_checked`，并在 `review.manual_fallback` 明示两轴均已完成 fallback。
 
 ## 5. 不要机械化的部分
 

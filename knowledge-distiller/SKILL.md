@@ -331,7 +331,7 @@ For an existing note, classify each old paragraph as `keep`, `rewrite`, `move`, 
 before changing it. Preservation is the default: a paragraph with no current Teaching Model role becomes `defer`, not
 delete. `delete` is an explicit exception allowed only for an incorrect, duplicate, out-of-scope, or explicitly retired
 paragraph, with a recorded reason and user-requested full-recomposition scope when applicable. For every update, record a preservation diff with
-`old_hash`, unchanged byte ranges, changed ranges, and the operation for each changed unit. This is how structural
+`old_hash`, unchanged/changed line ranges, exact draft hash, and the operation for each changed unit. This is how structural
 recomposition and preservation of unrelated content remain compatible and auditable.
 Do not add a duplicate `# Title` when the filename is
 the implicit title. In the implicit convention, major chapters are `#`; in an explicit-title convention, the matching

@@ -86,6 +86,8 @@ function check(recordInput: string, originalInput?: string, draftInput?: string)
   if (!originalInput || !draftInput) findings.push(finding("preservation-path-missing", "error", "original and draft paths are required"));
 
   let hunks: Hunk[] = [];
+  let originalLineCount = 0;
+  let draftLineCount = 0;
   if (originalInput && draftInput) {
     const original = path.resolve(originalInput);
     const draft = path.resolve(draftInput);
@@ -96,7 +98,12 @@ function check(recordInput: string, originalInput?: string, draftInput?: string)
       const draftHash = fileHash(draft);
       if (record.original_hash !== originalHash) findings.push(finding("preservation-original-hash-mismatch", "error", "original_hash does not match original bytes", { path: original, evidence: { expected: originalHash, actual: record.original_hash } }));
       if (record.draft_hash !== draftHash) findings.push(finding("preservation-draft-hash-mismatch", "error", "draft_hash does not match draft bytes", { path: draft, evidence: { expected: draftHash, actual: record.draft_hash } }));
-      hunks = diffHunks(lines(original), lines(draft));
+      const originalLines = lines(original);
+      const draftLines = lines(draft);
+      originalLineCount = originalLines.length;
+      draftLineCount = draftLines.length;
+      if (originalLineCount * draftLineCount > 25_000_000) findings.push(finding("preservation-too-large", "error", "line diff is too large for the bounded checker; use a smaller revision or manual fallback", { evidence: { original_lines: originalLineCount, draft_lines: draftLineCount } }));
+      else hunks = diffHunks(originalLines, draftLines);
     }
   }
 
@@ -112,6 +119,12 @@ function check(recordInput: string, originalInput?: string, draftInput?: string)
     for (const field of ["original_start", "original_end", "draft_start", "draft_end"]) {
       if (!Number.isInteger(unit[field]) || Number(unit[field]) < 0) findings.push(finding("preservation-range-invalid", "error", `changed_units[${index}].${field} must be a non-negative integer`));
     }
+    const originalStart = Number(unit.original_start ?? 0);
+    const originalEnd = Number(unit.original_end ?? 0);
+    const draftStart = Number(unit.draft_start ?? 0);
+    const draftEnd = Number(unit.draft_end ?? 0);
+    const validRange = (start: number, end: number, max: number): boolean => (start === 0 && end === 0) || (start > 0 && end >= start && end <= max);
+    if (!validRange(originalStart, originalEnd, originalLineCount) || !validRange(draftStart, draftEnd, draftLineCount)) findings.push(finding("preservation-range-out-of-bounds", "error", `changed_units[${index}] is outside the actual line counts`, { evidence: { original_lines: originalLineCount, draft_lines: draftLineCount, original_start: originalStart, original_end: originalEnd, draft_start: draftStart, draft_end: draftEnd } }));
   });
   for (const hunk of hunks) {
     if (!units.some((unit) => isRecord(unit) && rangeCovers(unit, hunk))) findings.push(finding("preservation-hunk-uncovered", "error", "an actual changed line hunk is missing from changed_units", { evidence: hunk }));
@@ -149,6 +162,14 @@ function selfTest(): number {
     if (check(record, original, draft).gate !== "passed") throw new Error("valid preservation record should pass");
     fs.writeFileSync(record, JSON.stringify({ ...JSON.parse(fs.readFileSync(record, "utf8")), changed_units: [] }), "utf8");
     if (check(record, original, draft).gate !== "failed") throw new Error("uncovered diff should fail");
+    fs.writeFileSync(record, JSON.stringify({
+      schema_version: "knowledge-distiller.preservation.v1",
+      scope: "targeted_update",
+      original_hash: fileHash(original),
+      draft_hash: fileHash(draft),
+      changed_units: [{ original_start: 1, original_end: 999999, draft_start: 1, draft_end: 999999, operation: "rewrite", reason: "invalid range" }],
+    }), "utf8");
+    if (check(record, original, draft).gate !== "failed") throw new Error("out-of-bounds range should fail");
     console.log("preservation checker self-test: PASS");
     return 0;
   } finally {
@@ -188,4 +209,3 @@ try {
   console.error(`ERROR: ${(error as Error).message}`);
   process.exitCode = 2;
 }
-
