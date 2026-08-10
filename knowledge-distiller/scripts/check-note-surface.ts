@@ -111,13 +111,16 @@ function mermaidHeader(body: string): MermaidHeader {
 }
 
 function hasFlowchartEndRisk(body: string): boolean {
+  const unquotedBody = body
+    .replaceAll(/"(?:\\.|[^"\\\r\n])*"/gu, "")
+    .replaceAll(/`[^`\r\n]*`/gu, "");
   const unquotedEdgeLabels = body.replaceAll(
     /\|[^|\r\n]*["`][^|\r\n]*["`][^|\r\n]*\|/gu,
     ""
   );
   return (
     /(?:\[|\(|\u007B)\s*end\s*(?:\]|\)|\})/u.test(body) ||
-    /(?:^|\s)end@\u007B/mu.test(body) ||
+    /(?:^|\s)end@\u007B/mu.test(unquotedBody) ||
     /(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})\s*(?:\|[^|\r\n]*\|\s*)?end(?:\s|$|:)/mu.test(
       body
     ) ||
@@ -475,6 +478,7 @@ function selfTest(): number {
         "  A --> B",
         '  B --> C["end"]',
         '  C --> D["end@{ shape: rect }"]',
+        '  D --> E["contains end@{ shape: rect }"]',
         "```",
         "",
         "```mermaid",
@@ -574,6 +578,7 @@ function selfTest(): number {
         'A -->|"end"| B',
         "B -->|`end`| C",
         'C --> D["end@{ shape: rect }"]',
+        'D --> E["contains end@{ shape: rect }"]',
         "```",
       ].join("\n"),
       "utf-8"
