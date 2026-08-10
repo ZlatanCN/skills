@@ -386,7 +386,8 @@ node scripts/check-note.ts \
 For an update, append `--original "<original-path>" --preservation "<preservation-json>"`; for a new note do not
 invent a preservation record.
 
-This aggregate owns the five note-local gates and emits one evidence envelope. `check-wikilinks.ts` remains available
+This aggregate owns the four new-note gates, or five gates for an update when preservation is supplied, and emits one
+evidence envelope. `check-wikilinks.ts` remains available
 for focused diagnostics, but do not attribute the aggregate result to a checker that was not run. `passed` is a
 mechanical pass only; semantic link audit, claim evidence, preservation meaning and render success remain separate.
 An unavailable child checker is `unavailable`, not an empty successful result; without a complete equivalent it blocks
