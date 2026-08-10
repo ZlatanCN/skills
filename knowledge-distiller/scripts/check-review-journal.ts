@@ -11,6 +11,7 @@ const LIVENESS_STATES = new Set(["unobserved", "healthy", "suspected_stall", "te
 const PARENT_STATES = new Set(["waiting", "deferred", "closed"]);
 const CANCEL_STATES = new Set(["not_requested", "cancel_requested", "canceled_confirmed", "unknown", "superseded"]);
 const QUALITY_RESULTS = new Set(["clean", "findings", "unverified", "protocol_invalid", "unavailable"]);
+const QUALITY_EVENT_TYPES = new Set(["result", "review_result", "manual_fallback_completed", "manual_fallback", "review_completed"]);
 const ALLOWED_TRANSITIONS: Record<string, Set<string>> = {
   pending: new Set(["pending", "active", "failed", "unknown"]),
   active: new Set(["active", "completed", "failed", "unknown", "deferred"]),
@@ -96,6 +97,8 @@ function check(fileInput: string, allowOpen = false): Evidence {
       if (event[field] !== undefined && !allowed.has(String(event[field]))) findings.push(finding("journal-enum-invalid", "error", `${field} has an unsupported value`, { line, evidence: { value: event[field] } }));
     }
     if (event.quality_result === "clean") {
+      if (!QUALITY_EVENT_TYPES.has(eventType)) findings.push(finding("journal-clean-event-type-invalid", "error", "quality_result=clean must come from a result or completed fallback event", { line }));
+      if (event.provider_execution_state !== "completed" || event.state_after !== "completed") findings.push(finding("journal-clean-nonterminal", "error", "quality_result=clean requires provider_execution_state=completed and state_after=completed", { line }));
       const hasFindings = Array.isArray(event.findings) ? event.findings.length > 0 : nonBlank(event.findings);
       const partial = event.source_coverage === "partial" || (Array.isArray(event.unverified) && event.unverified.length > 0) || nonBlank(event.unverified);
       if (hasFindings || partial) findings.push(finding("journal-clean-contradiction", "error", "quality_result=clean contradicts findings, partial coverage, or unverified claims", { line }));
@@ -120,8 +123,12 @@ function check(fileInput: string, allowOpen = false): Evidence {
   });
 
   if (closeIndex >= 0) {
+    if (!events.some((event) => event.event_type !== "report_closed" && event.event_type !== "late_ignored")) findings.push(finding("journal-close-without-lifecycle", "error", "report_closed must follow at least one real lifecycle event"));
     const closeOrder = Number(events[closeIndex].order);
     if (cutoffOrder > closeOrder) findings.push(finding("journal-cutoff-invalid", "error", "cutoff_order cannot be after report_closed", { line: closeIndex + 1 }));
+    events.forEach((event, index) => {
+      if (event.quality_result === "clean" && Number(event.order) > cutoffOrder) findings.push(finding("journal-clean-after-cutoff", "error", "a clean result must be at or before report_closed.cutoff_order", { line: index + 1, evidence: { order: event.order, cutoff_order: cutoffOrder } }));
+    });
     events.forEach((event, index) => {
       if (index > closeIndex && event.event_type !== "late_ignored" && event.state_after !== "late_ignored") findings.push(finding("journal-event-after-close", "error", "only late_ignored events may follow report_closed", { line: index + 1 }));
     });
@@ -164,6 +171,12 @@ function selfTest(): number {
     if (check(file).gate !== "failed") throw new Error("contradictory clean result should fail");
     fs.writeFileSync(file, "", "utf8");
     if (check(file).gate !== "failed") throw new Error("empty journal should fail closed");
+    fs.writeFileSync(file, JSON.stringify({ ...events[2] }) + "\n", "utf8");
+    if (check(file).gate !== "failed") throw new Error("close-only journal should fail");
+    fs.writeFileSync(file, events.map((event, index) => JSON.stringify(index === 0 ? { ...event, event_type: "dispatch", quality_result: "clean", source_coverage: "complete", claims_checked: 3, after_state: "explain", teach_back: "reader can explain", C1: "—", C2: "—", C3: "—", C4: "—", C5: "—" } : event)).join("\n") + "\n", "utf8");
+    if (check(file).gate !== "failed") throw new Error("dispatch event cannot masquerade as a clean result");
+    fs.writeFileSync(file, events.map((event, index) => JSON.stringify(index === 1 ? { ...event, order: 4 } : index === 2 ? { ...event, order: 5, cutoff_order: 2 } : event)).join("\n") + "\n", "utf8");
+    if (check(file).gate !== "failed") throw new Error("a clean result after cutoff must fail");
     console.log("review-journal checker self-test: PASS");
     return 0;
   } finally {

@@ -33,10 +33,16 @@ function items(value: unknown, name: string, findings: Finding[]): PlanItem[] {
 }
 
 function cover(occurrences: Array<{ line: number; raw?: string }>, entries: PlanItem[], kind: string, findings: Finding[], requiredKind?: string): void {
-  const usable = entries.filter((entry) => entry.decision === "keep" && (!requiredKind || entry.kind === requiredKind));
+  const usable = entries.filter((entry) => !requiredKind || entry.kind === requiredKind);
   for (const occurrence of occurrences) {
     const matches = usable.filter((entry) => entry.line === occurrence.line && (!occurrence.raw || !entry.raw || entry.raw === occurrence.raw));
-    if (matches.length === 0) findings.push(finding("plan-surface-uncovered", "error", `${kind} at line ${occurrence.line} is not covered by a retained format-plan item`, { line: occurrence.line, evidence: { kind, raw: occurrence.raw } }));
+    if (matches.length === 0) {
+      findings.push(finding("plan-surface-uncovered", "error", `${kind} at line ${occurrence.line} is not covered by a format-plan item`, { line: occurrence.line, evidence: { kind, raw: occurrence.raw } }));
+      continue;
+    }
+    if (!matches.some((entry) => entry.decision === "keep")) {
+      findings.push(finding("plan-surface-not-retained", "error", `${kind} at line ${occurrence.line} is present in the draft but every matching decision is plain/remove`, { line: occurrence.line, evidence: { kind, raw: occurrence.raw, decisions: matches.map((entry) => entry.decision) } }));
+    }
   }
 }
 
@@ -154,6 +160,10 @@ function selfTest(): number {
     const planFile = path.join(root, "plan.json");
     fs.writeFileSync(planFile, JSON.stringify(plan), "utf8");
     if (check(planFile, note).gate !== "passed") throw new Error("valid format plan should pass");
+    fs.writeFileSync(planFile, JSON.stringify({ ...plan, emphasis_targets: [{ line: 2, raw: "**结论**", decision: "keep", reader_function: "扫描段落结论" }, { line: 99, decision: "remove", reader_function: "避免装饰性强调", removal_test: "删除后不损失扫描路径" }] }), "utf8");
+    if (check(planFile, note).gate !== "passed") throw new Error("an absent remove candidate should not fail current-surface coverage");
+    fs.writeFileSync(planFile, JSON.stringify({ ...plan, emphasis_targets: [{ line: 2, raw: "**结论**", decision: "plain", reader_function: "扫描段落结论", removal_test: "改为正文后仍保留结论" }] }), "utf8");
+    if (check(planFile, note).gate !== "failed") throw new Error("a present plain decision must not masquerade as retained syntax");
     fs.writeFileSync(planFile, JSON.stringify({ ...plan, emphasis_targets: [] }), "utf8");
     if (check(planFile, note).gate !== "failed") throw new Error("uncovered format surface should fail");
     console.log("format-plan checker self-test: PASS");

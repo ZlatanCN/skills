@@ -530,6 +530,12 @@ node scripts/check-delivery-report.ts --report "<delivery-json>" --json
 ```
 
 The checker is the final anti-overclaim gate. A prose label cannot override its failed or unavailable result.
+For `written`/`updated`, the record must identify `artifact_kind`, the absolute `note_path`, and the final read-back
+`final_hash`. A passed journal must additionally carry its evidence-file path and SHA-256; the checker re-runs the
+journal checker and binds each clean axis to a matching event, attempt, note path, and draft hash. `preservation:
+not_applicable` is legal only for `artifact_kind: new_note`, which must also carry a hash-bound creation probe proving
+the exact target was absent before the write; an update must use the preservation checker and every written artifact
+must report `write_readback: passed`.
 
 ```text
 ✅ 笔记已创建/更新: <absolute-or-vault-relative-path>（N 轮修订）

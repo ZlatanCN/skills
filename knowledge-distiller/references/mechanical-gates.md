@@ -76,7 +76,7 @@ node scripts/check-note.ts \
 }
 ```
 
-每个实际保留的格式表面必须有 `line`、`decision: keep`、`reader_function`；改为正文或删除的候选必须写 `removal_test`。这能阻止漏记，不会把“存在记录”伪装成“语义选择正确”。
+每个实际出现在 draft 中的格式表面必须有匹配的 `line` 记录，而且只能由 `decision: keep` 覆盖；若当前表面仍存在却标成 `plain/remove`，脚本会失败，避免把未执行的编辑伪装成已完成。尚未出现在 draft 中、但被考虑过的 plain/remove 候选可以保留在计划中，但必须写 `removal_test`。这能同时阻止漏记和“存在记录即完成”的假通过。
 
 ## 3. 审查门：事件流而不是字符串状态
 
@@ -87,7 +87,7 @@ node scripts/check-review-journal.ts --journal "$JOURNAL" --allow-open --json
 # before report_closed, omit --allow-open
 ```
 
-脚本验证 JSONL 可解析、`event_id` 唯一、`order` 单调、cycle/attempt/path/revision/hash/axis 身份不漂移、dispatch/provider identity、observability、evidence 字段存在、状态转移合法、枚举值合法、`clean` 具备 complete coverage/claims/after-state 且不得与 findings/partial/unverified 矛盾、`report_closed` 唯一且 cutoff 有效；空 journal 失败，关闭后的结果只能标记为 `late_ignored`。它不判断 reviewer 的事实判断是否正确，也不把 parent timeout 推断成 provider failure。
+脚本验证 JSONL 可解析、`event_id` 唯一、`order` 单调、cycle/attempt/path/revision/hash/axis 身份不漂移、dispatch/provider identity、observability、evidence 字段存在、状态转移合法、枚举值合法、`clean` 只能出现在结果/完成 fallback 事件且具备 complete coverage/claims/after-state、clean 结果不得越过 `report_closed.cutoff_order`、`report_closed` 唯一且必须位于至少一个真实生命周期事件之后；空 journal 失败，关闭后的结果只能标记为 `late_ignored`。它不判断 reviewer 的事实判断是否正确，也不把 parent timeout 推断成 provider failure。
 
 ## 4. 交付门：阻止成功标签越权
 
@@ -97,11 +97,12 @@ node scripts/check-review-journal.ts --journal "$JOURNAL" --allow-open --json
 node scripts/check-delivery-report.ts --report "$DELIVERY_JSON" --json
 ```
 
-`knowledge-distiller.delivery.v1` 至少包含 `write_status`、完整的 `hard_gates`（`write_readback`、`preservation`、`heading`、`mechanical_link`、`semantic_link`、`evidence`、`render`；新笔记的 preservation 可为 `not_applicable`）、clarity/accuracy 的 `quality_result`、journal 状态、open blockers 和最终 `label`。脚本验证：
+`knowledge-distiller.delivery.v1` 至少包含 `write_status`、`artifact_kind: new_note|updated_note`、写入产物的绝对 `note_path` 与 `final_hash`、完整的 `hard_gates`（`write_readback`、`preservation`、`heading`、`mechanical_link`、`semantic_link`、`evidence`、`render`；写入/更新必须 `write_readback: passed`，且只有 `new_note` 的 preservation 可为 `not_applicable`）、clarity/accuracy 的 `quality_result`、journal 状态、open blockers 和最终 `label`。新笔记还必须提供带 SHA-256 的 `creation_probe`，其证据文件要明确证明同一目标在写入前不存在；更新则不能用 `new_note` 规避 preservation。
 
 - `双轴审查通过` 必须同时拥有 confirmed write、所有 hard gates 通过、两个合法 clean 结果、已关闭 journal 且无 blocker；
 - hard gate 失败/不可用、审查不确定、写入可能部分完成或存在 reader/accuracy blocker 时，不得使用成功标签；
 - `possibly_partial`、`not_written` 等写状态必须落到对应的非成功标签。
+- 当 journal 为 `passed` 时，报告必须携带 journal 文件路径和 SHA-256；脚本会重新运行 journal checker、比对事件数量/关闭游标，并要求两个 clean 轴的 attempt、draft hash、note path 以及 `source_coverage`、claims、after-state、C1–C5/A1 结果都能在同一份真实事件流中逐字段对齐。
 
 人工 fallback 不把 `manual_checked` 塞进 provider 的 `quality_result`；应记录 `quality_result: unavailable` 和轴级 `fallback: manual_checked`，并在 `review.manual_fallback` 明示两轴均已完成 fallback。
 
