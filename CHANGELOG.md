@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.4.0] - 2026-08-10
+
+### 其他
+- knowledge-distiller: narrow optional review axes
+- config: allow TypeScript extension imports
+- knowledge-distiller: fix TypeScript diagnostics
+- knowledge-distiller: finalize paired judge record
+- knowledge-distiller: correct paired evaluation count
+- knowledge-distiller: record final mechanical-gate evaluation
+- knowledge-distiller: close review and delivery false passes
+- knowledge-distiller: bind final delivery to review evidence
+- knowledge-distiller: close mechanical false-pass paths
+- knowledge-distiller: cover nested callout syntax
+- knowledge-distiller: clarify update-only preservation gate
+- knowledge-distiller: strengthen surface gate regression
+- knowledge-distiller: refactor mechanical gate system
+- knowledge-distiller: record final HEAD full test
+- knowledge-distiller: record writing format validation
+- knowledge-distiller: add formatting regression eval
+- knowledge-distiller: preserve legacy format roles
+- knowledge-distiller: align diagram review states
+- knowledge-distiller: close format review coverage
+- knowledge-distiller: bind writing style to review contract
+- knowledge-distiller: centralize Obsidian writing rules
+
+
 ## [0.3.0] - 2026-08-10
 
 ### 新增
