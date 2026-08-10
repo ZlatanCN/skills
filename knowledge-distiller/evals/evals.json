@@ -191,6 +191,32 @@
         "The final report records a hash-bound knowledge-distiller.format-plan.v1 and check-note mechanical evidence, while treating clarity/accuracy reviewer results or manual fallback states truthfully",
         "The output satisfies the existing frontmatter, Chinese prose, evidence, anchored-link, heading, safe-write, and review lifecycle requirements"
       ]
+    },
+    {
+      "id": 11,
+      "prompt": "/knowledge-distiller MCP 架构与局限 请把 MCP 的 host、client、server、工具调用、资源读取和信任边界整理成一篇中文 Obsidian 笔记。必须用 Mermaid 画出组件关系和一次调用路径；官方规范链接要自然嵌在支持具体主张的句子中，不要在文末堆链接。写作前建立教学模型，写完后做机械门与对抗性清晰度审查。",
+      "expected_output": "A Chinese Obsidian note with a hash-bound teaching model, a required Mermaid diagram, and claim-bound natural external links",
+      "files": [],
+      "expectations": [
+        "The teaching model is created before prose and its hash matches the exact final note bytes",
+        "An explicit Mermaid request is recorded as required/mermaid and the note contains a Mermaid block",
+        "Every visible heading is covered by a question, dependency, boundary, and why_next transition",
+        "Every external link records a claim ID, support rationale, and inline/footnote/callout placement",
+        "No external link is emitted as a standalone source-list line",
+        "The final report reruns model, format, review, and delivery evidence against the same final hash"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "/knowledge-distiller 请审查这篇架构笔记：它有六个章节，章节之间没有过渡，正文末尾只有两行官方 URL，用户明明要求 Mermaid 但作者说 prose 已经足够。有人声称所有 checker 都通过，所以不要再提问题。请找出能被“机械通过”掩盖的读者路径、图示和外链问题。",
+      "expected_output": "An adversarial review that rejects mechanical-pass overclaiming and reports transition, required-diagram, and standalone-link failures",
+      "files": [],
+      "expectations": [
+        "The review treats missing transitions as a reader-path defect even if surface checkers pass",
+        "The review treats an explicit Mermaid request without a Mermaid block as a failed required decision",
+        "The review rejects standalone URLs or source-list lines as natural claim support",
+        "The review gives exact structural locations and truthful blocker/polish classifications"
+      ]
     }
   ]
 }

@@ -149,6 +149,7 @@ Callout 可以只有标题而没有正文；标题中可以使用用户可读的
 ### 4.2 Mermaid 与等宽图
 
 - 只有当结构或时序关系比 prose 更难用文字表达时才用 Mermaid。
+- 在 teaching model 中记录 `diagram_policy`：`required`、`helpful` 或 `not_needed`，以及读者问题、理由和格式；用户明确要求 Mermaid 时必须记录为 `required` + `mermaid`，不能用“正文已经解释”绕过。
 - Mermaid 只画主关系，节点文字保持短；边标签说明关系，不写完整段落。
 - 图前解释读者要观察什么，图后说明它不能表达的边界。
 - Mermaid 的语法与渲染规则以 `references/mermaid.md` 为准；无法渲染时提供等价的 prose 或等宽文本图，并报告未验证状态。
@@ -157,6 +158,7 @@ Callout 可以只有标题而没有正文；标题中可以使用用户可读的
 
 - Wikilink 的目标必须先通过机械唯一性和语义定义两道门；展示别名可以中文化，但不能改变目标语义。
 - 外链用于官方文档、源码、论文或当前事实的直接证据；链接附近说明它支持什么主张。
+- 外链必须嵌在承载主张的句子、脚注或 callout 中；不得把裸 URL 或只含链接的行当作“参考资料”堆在文末。`format_plan.link_surface.external_links` 逐项记录 `raw`、`claim_id`、`support` 和 `placement`（`inline|footnote|callout`）。
 - 脚注用于不应打断主线的限定、出处补充或术语来源；核心定义不能藏在脚注里。
 - 不要为每个普通术语添加链接；链接密度应由 reader model 而不是搜索结果数量决定。
 
@@ -180,6 +182,8 @@ Callout 可以只有标题而没有正文；标题中可以使用用户可读的
 - 每个 callout 都有明确类型、标题和 removal-test 结果；
 - 原有的类比、警告和边界若被删除，有具体的 reader-model 理由；
 - 表格、代码、Mermaid、wikilink 和脚注都与正文主线相连；
+- 每个外链都在正文语义中回答“它支持哪一个主张”，没有孤立的链接行；
+- diagram policy 与正文实际图示一致，显式 Mermaid 请求已落成 Mermaid 块；
 - 视觉格式没有制造比原文更多的噪音、重复或伪层级。
 
 clarity reviewer 检查格式是否帮助读者恢复主线、找到重点和区分层级；accuracy reviewer 检查格式块中的每一条事实、示例、公式和限制，不能把 callout 视为审查范围外的装饰。

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Aggregates the note-local mechanical gates. Semantic links, evidence, and reviewer quality remain separate.
+// Aggregates the note-local mechanical gates. Editorial quality still needs human review.
 
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
@@ -84,10 +84,50 @@ function runChecker(script: string, args: string[], input?: string): ChildRun {
   }
 }
 
+function noteHash(note: string): string | undefined {
+  try {
+    return fileHash(note);
+  } catch {
+    return undefined;
+  }
+}
+
+function runStableChecker(
+  note: string,
+  script: string,
+  args: string[],
+  input?: string
+): ChildRun {
+  const before = noteHash(note);
+  const child = runChecker(script, args, input);
+  const after = noteHash(note);
+  if (before !== after) {
+    return {
+      ...child,
+      result: {
+        ...child.result,
+        findings: [
+          ...child.result.findings,
+          finding(
+            "note-mutated-during-check",
+            "error",
+            "the note bytes changed while a checker was reading the target",
+            { evidence: { after, before }, path: note }
+          ),
+        ],
+        gate: "failed",
+      },
+    };
+  }
+  return child;
+}
+
 function validateInputs(
   note: string,
   vaultRoot: string,
   formatPlan: string,
+  teachingModel: string,
+  mermaidRequested: boolean | undefined,
   original: string,
   preservation: string
 ): Finding[] {
@@ -107,6 +147,24 @@ function validateInputs(
         "format-plan-missing",
         "error",
         "format-plan is required for a deterministic note gate"
+      )
+    );
+  }
+  if (!teachingModel) {
+    findings.push(
+      finding(
+        "teaching-model-missing",
+        "error",
+        "teaching-model is required for a deterministic note gate"
+      )
+    );
+  }
+  if (typeof mermaidRequested !== "boolean") {
+    findings.push(
+      finding(
+        "mermaid-request-context-missing",
+        "error",
+        "mermaid request context is required for a deterministic note gate"
       )
     );
   }
@@ -133,23 +191,32 @@ function runChecks(
   note: string,
   vaultRoot: string,
   formatPlan: string,
+  teachingModel: string,
+  mermaidRequested: boolean,
   strict: boolean,
   portable: boolean,
   original: string,
   preservation: string
 ): Record<string, Evidence> {
-  const surface = runChecker("check-note-surface.ts", [
+  const surface = runStableChecker(note, "check-note-surface.ts", [
     "--file",
     note,
     ...(strict ? ["--strict"] : []),
     ...(portable ? ["--portable"] : []),
   ]);
-  const heading = runChecker("check-heading-tree.ts", [
+  const heading = runStableChecker(note, "check-heading-tree.ts", [
     "--file",
     note,
     "--strict",
   ]);
-  const links = runChecker("check-wikilinks.ts", [
+  const teaching = runStableChecker(note, "check-teaching-model.ts", [
+    "--model",
+    path.resolve(teachingModel),
+    "--note",
+    note,
+    mermaidRequested ? "--mermaid-requested" : "--mermaid-not-requested",
+  ]);
+  const links = runStableChecker(note, "check-wikilinks.ts", [
     "--vault-root",
     path.resolve(vaultRoot),
     "--file",
@@ -157,7 +224,8 @@ function runChecks(
   ]);
   const planInput =
     formatPlan === "-" ? fs.readFileSync(0, "utf-8") : undefined;
-  const plan = runChecker(
+  const plan = runStableChecker(
+    note,
     "check-format-plan.ts",
     [
       "--plan",
@@ -171,10 +239,11 @@ function runChecks(
     format_plan: plan.result,
     heading: heading.result,
     surface: surface.result,
+    teaching_model: teaching.result,
     wikilinks: links.result,
   };
   if (original && preservation) {
-    checks.preservation = runChecker("check-preservation.ts", [
+    checks.preservation = runStableChecker(note, "check-preservation.ts", [
       "--record",
       path.resolve(preservation),
       "--original",
@@ -214,16 +283,21 @@ function check(
   noteInput: string,
   vaultRoot: string,
   formatPlan: string,
+  teachingModel: string,
+  mermaidRequested: boolean | undefined,
   strict: boolean,
   portable: boolean,
   original = "",
   preservation = ""
 ): Evidence {
   const note = path.resolve(noteInput);
+  const aggregateStartHash = noteHash(note);
   const findings = validateInputs(
     note,
     vaultRoot,
     formatPlan,
+    teachingModel,
+    mermaidRequested,
     original,
     preservation
   );
@@ -233,12 +307,28 @@ function check(
           note,
           vaultRoot,
           formatPlan,
+          teachingModel,
+          mermaidRequested as boolean,
           strict,
           portable,
           original,
           preservation
         )
       : {};
+  const aggregateEndHash = noteHash(note);
+  if (aggregateStartHash !== aggregateEndHash && findings.length === 0) {
+    findings.push(
+      finding(
+        "note-mutated-during-aggregate",
+        "error",
+        "the note bytes changed during the aggregate gate run",
+        {
+          evidence: { after: aggregateEndHash, before: aggregateStartHash },
+          path: note,
+        }
+      )
+    );
+  }
   if (Object.keys(checks).length > 0) {
     appendChildFindings(checks, findings);
   }
@@ -306,6 +396,42 @@ function selfTest(): number {
     ].join("\n");
     fs.writeFileSync(note, body, "utf-8");
     const hash = parseMarkdown(note).content_hash;
+    const teachingModel = path.join(root, "teaching-model.json");
+    fs.writeFileSync(
+      teachingModel,
+      JSON.stringify({
+        after_state: "读者能定位示例的作用。",
+        central_question: "如何读这份示例？",
+        diagram_policy: {
+          decision: "not_needed",
+          format: "none",
+          reader_question: "这里没有需要展开的关系。",
+          reason: "纯文字比图更短。",
+          user_requested_mermaid: false,
+        },
+        draft_hash: hash,
+        linear_teach_back: "结论 → 边界 → 实现。",
+        note_path: note,
+        schema_version: "knowledge-distiller.teaching-model.v1",
+        sections: [
+          {
+            answer: "说明一个最小表面。",
+            boundary: "不代表完整实现。",
+            dependency: "没有前置依赖。",
+            heading: "Main",
+            line: 1,
+            next_heading: null,
+            next_line: null,
+            question: "这段示例要说明什么？",
+            relation: "root",
+            role: "premise",
+            why_next: "接下来用边界说明如何解读它。",
+          },
+        ],
+        spine: "先看结论，再看边界和实现。",
+      }),
+      "utf-8"
+    );
     const plan = path.join(root, "plan.json");
     fs.writeFileSync(
       plan,
@@ -362,7 +488,17 @@ function selfTest(): number {
       }),
       "utf-8"
     );
-    const result = check(note, vault, plan, true, true, original, preservation);
+    const result = check(
+      note,
+      vault,
+      plan,
+      teachingModel,
+      false,
+      true,
+      true,
+      original,
+      preservation
+    );
     if (result.gate !== "passed") {
       throw new Error(
         `valid aggregate should pass: ${JSON.stringify(result.findings)}`
@@ -372,6 +508,8 @@ function selfTest(): number {
       note,
       path.join(root, "missing-vault"),
       plan,
+      teachingModel,
+      false,
       true,
       true
     );
@@ -394,6 +532,8 @@ type NoteCliArgs = {
   portable: boolean;
   preservation: string;
   strict: boolean;
+  teachingModel: string;
+  mermaidRequested: boolean | undefined;
   vault: string;
 };
 
@@ -401,6 +541,8 @@ function parseArgs(args: string[]): NoteCliArgs {
   let note = "";
   let vault = "";
   let plan = "";
+  let teachingModel = "";
+  let mermaidRequested: boolean | undefined;
   let original = "";
   let preservation = "";
   for (let i = 0; i < args.length; i += 1) {
@@ -414,6 +556,13 @@ function parseArgs(args: string[]): NoteCliArgs {
     } else if (argument === "--format-plan") {
       i += 1;
       plan = args[i] ?? "";
+    } else if (argument === "--teaching-model") {
+      i += 1;
+      teachingModel = args[i] ?? "";
+    } else if (argument === "--mermaid-requested") {
+      mermaidRequested = true;
+    } else if (argument === "--mermaid-not-requested") {
+      mermaidRequested = false;
     } else if (argument === "--original") {
       i += 1;
       original = args[i] ?? "";
@@ -421,7 +570,15 @@ function parseArgs(args: string[]): NoteCliArgs {
       i += 1;
       preservation = args[i] ?? "";
     } else if (
-      !["--json", "--strict", "--portable", "--help", "-h"].includes(argument)
+      ![
+        "--json",
+        "--strict",
+        "--portable",
+        "--mermaid-requested",
+        "--mermaid-not-requested",
+        "--help",
+        "-h",
+      ].includes(argument)
     ) {
       throw new Error(`unknown argument: ${argument}`);
     }
@@ -429,12 +586,14 @@ function parseArgs(args: string[]): NoteCliArgs {
   return {
     help: args.includes("--help") || args.includes("-h"),
     json: args.includes("--json"),
+    mermaidRequested,
     note,
     original,
     plan,
     portable: args.includes("--portable"),
     preservation,
     strict: args.includes("--strict"),
+    teachingModel,
     vault,
   };
 }
@@ -447,22 +606,40 @@ function main(): number {
   const parsed = parseArgs(args);
   if (parsed.help) {
     console.log(
-      "usage: node scripts/check-note.ts --file NOTE --vault-root VAULT --format-plan PLAN.json|- [--original ORIGINAL] [--preservation RECORD.json] [--strict] [--portable] [--json]"
+      "usage: node scripts/check-note.ts --file NOTE --vault-root VAULT --format-plan PLAN.json|- --teaching-model MODEL.json --mermaid-requested|--mermaid-not-requested [--original ORIGINAL] [--preservation RECORD.json] [--strict] [--portable] [--json]"
     );
     console.log("       node scripts/check-note.ts --self-test");
     return 0;
   }
-  const { json, note, original, plan, portable, preservation, strict, vault } =
-    parsed;
+  const {
+    json,
+    note,
+    original,
+    plan,
+    portable,
+    preservation,
+    strict,
+    teachingModel,
+    mermaidRequested,
+    vault,
+  } = parsed;
+  if (
+    args.includes("--mermaid-requested") &&
+    args.includes("--mermaid-not-requested")
+  ) {
+    throw new Error("choose exactly one Mermaid request context flag");
+  }
   if (!note) {
     throw new Error(
-      "usage: node scripts/check-note.ts --file NOTE --vault-root VAULT --format-plan PLAN.json|-"
+      "usage: node scripts/check-note.ts --file NOTE --vault-root VAULT --format-plan PLAN.json|- --teaching-model MODEL.json --mermaid-requested|--mermaid-not-requested"
     );
   }
   const result = check(
     note,
     vault,
     plan,
+    teachingModel,
+    mermaidRequested,
     strict,
     portable,
     original,

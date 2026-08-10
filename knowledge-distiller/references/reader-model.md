@@ -127,3 +127,14 @@ Read the body from top to bottom without following links. Stop if any of these i
 
 After the read, state the spine in one sentence and the role of each top-level section in one short clause. If that
 cannot be done from the note alone, revise the structure before polishing sentences or adding facts.
+
+## 6. Bind the model to the draft
+
+Before prose is composed, author the blueprint that will become `knowledge-distiller.teaching-model.v1`; it is not a
+post-hoc summary. At the Phase 5 draft boundary, bind that blueprint to the exact target path and draft bytes, then
+run `check-teaching-model.ts` before the format and delivery gates. Its `sections` must cover every visible heading
+exactly once, and each section must carry `question`, `answer`, `dependency`, `boundary`, `role`, `relation`,
+`why_next`, `next_heading`, and the line of the next heading. The terminal section explicitly sets `next_heading` and
+`next_line` to `null`. Record `diagram_policy`
+explicitly; an explicit user request for Mermaid is a hard `required` decision and cannot be replaced by prose alone.
+Any later body change invalidates the model and requires a new exact hash.
