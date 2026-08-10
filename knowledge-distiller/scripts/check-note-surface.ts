@@ -14,6 +14,7 @@ import {
 import type { Evidence, Finding } from "./lib/evidence.ts";
 import { canonicalCalloutType, parseMarkdown } from "./lib/markdown.ts";
 
+// Keep this allowlist aligned with §1 of references/mermaid.md.
 const SUPPORTED_MERMAID_TYPES = [
   "flowchart",
   "graph",
@@ -60,28 +61,82 @@ const SUPPORTED_MERMAID_TYPES = [
   "railroad-ebnf",
   "railroad-abnf",
   "railroad-peg",
+  "flowchart-elk",
   "info",
+  "error",
 ] as const;
 const SUPPORTED_MERMAID_TYPE_SET = new Set<string>(SUPPORTED_MERMAID_TYPES);
 
-function firstMermaidDeclaration(body: string): string {
-  const lines = body.split(/\r?\n/u);
-  const firstIndex = lines.findIndex((line) => line.trim());
-  if (firstIndex === -1) {
-    return "";
-  }
-  if (lines[firstIndex]?.trim() !== "---") {
-    return lines[firstIndex]?.trim() ?? "";
-  }
-  const closingIndex = lines.findIndex(
-    (line, index) => index > firstIndex && line.trim() === "---"
-  );
+type MermaidHeader = {
+  after_frontmatter: string;
+  declaration: string;
+  frontmatter: "none" | "valid" | "unterminated";
+};
+
+function firstMeaningfulMermaidLine(lines: string[]): string {
   return (
     lines
-      .slice(closingIndex === -1 ? firstIndex : closingIndex + 1)
-      .find((line) => line.trim())
+      .find((line) => {
+        const trimmed = line.trim();
+        return trimmed.length > 0 && !trimmed.startsWith("%%");
+      })
       ?.trim() ?? ""
   );
+}
+
+function mermaidHeader(body: string): MermaidHeader {
+  const lines = body.split(/\r?\n/u);
+  if (lines[0] !== "---") {
+    return {
+      after_frontmatter: body,
+      declaration: firstMeaningfulMermaidLine(lines),
+      frontmatter: "none",
+    };
+  }
+  const closingIndex = lines.findIndex(
+    (line, index) => index > 0 && line === "---"
+  );
+  if (closingIndex === -1) {
+    return {
+      after_frontmatter: body,
+      declaration: "",
+      frontmatter: "unterminated",
+    };
+  }
+  const afterFrontmatter = lines.slice(closingIndex + 1).join("\n");
+  return {
+    after_frontmatter: afterFrontmatter,
+    declaration: firstMeaningfulMermaidLine(afterFrontmatter.split(/\r?\n/u)),
+    frontmatter: "valid",
+  };
+}
+
+function hasFlowchartEndRisk(body: string): boolean {
+  const unquotedEdgeLabels = body.replaceAll(
+    /\|[^|\r\n]*"[^|\r\n]*"[^|\r\n]*\|/gu,
+    ""
+  );
+  return (
+    /(?:\[|\(|\u007B)\s*end\s*(?:\]|\)|\})/u.test(body) ||
+    /\bend@\u007B/mu.test(body) ||
+    /(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})\s*(?:\|[^|\r\n]*\|\s*)?end(?:\s|$|:)/mu.test(
+      body
+    ) ||
+    /(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})\s*(?:\|[^|\r\n]*\|\s*)?end(?:\[|\(|\u007B)/mu.test(
+      body
+    ) ||
+    /(?:^|\s)end(?:\[|\(|\u007B)[^\r\n]*\s+(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})/mu.test(
+      body
+    ) ||
+    /(?:^|\s)end\s+(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})/mu.test(
+      body
+    ) ||
+    /\|[^|\r\n]*\bend\b[^|\r\n]*\|/mu.test(unquotedEdgeLabels)
+  );
+}
+
+function hasSequenceEndRisk(body: string): boolean {
+  return /:\s*end(?:\s|$)/mu.test(body);
 }
 
 function collectFenceFindings(
@@ -173,40 +228,56 @@ function collectMermaidFindings(
 ): void {
   for (const block of blocks) {
     const { body } = block;
-    const first = firstMermaidDeclaration(body);
+    const header = mermaidHeader(body);
+    const first = header.declaration;
     const firstToken = first.split(/\s+/u)[0] ?? "";
     if (!SUPPORTED_MERMAID_TYPE_SET.has(firstToken)) {
       const caseHint = SUPPORTED_MERMAID_TYPES.find(
         (type) => type.toLowerCase() === firstToken.toLowerCase()
       );
+      let typeMessage: string;
+      if (header.frontmatter === "unterminated") {
+        typeMessage =
+          "Mermaid frontmatter is not closed; add a second --- before the diagram declaration";
+      } else if (caseHint) {
+        typeMessage = `Mermaid diagram type ${JSON.stringify(firstToken)} is not spelled exactly; use ${caseHint}; see references/mermaid.md §1`;
+      } else {
+        typeMessage = `Mermaid diagram type ${JSON.stringify(firstToken)} is not supported; see references/mermaid.md §1 for supported declarations`;
+      }
       findings.push(
-        finding(
-          "mermaid-type-unsupported",
-          "error",
-          caseHint
-            ? `Mermaid diagram type ${JSON.stringify(firstToken)} is not canonical; use ${caseHint}`
-            : `Mermaid diagram type ${JSON.stringify(firstToken)} is not supported`,
-          {
-            evidence: {
-              first_line: first,
-              supported: [...SUPPORTED_MERMAID_TYPES],
-            },
-            line: block.line,
-            path: file,
-          }
-        )
+        finding("mermaid-type-unsupported", "error", typeMessage, {
+          evidence: {
+            first_line: first,
+            supported: [...SUPPORTED_MERMAID_TYPES],
+          },
+          line: block.line,
+          path: file,
+        })
       );
     }
-    const forbidden: [RegExp, string][] = [
-      [/^\s*click\b/imu, "click interactions"],
-      [/\bcallback\s*\(/iu, "callbacks"],
-      [/javascript\s*:/iu, "javascript URL"],
-      [/^\s*%%\s*\{(?:init|initialize)\b/imu, "init directive"],
-      [/^\s*config\b/imu, "config directive"],
-      [/<\s*\/?\s*[A-Za-z][^>\r\n]*>/iu, "raw HTML"],
+    const forbidden: { body: string; label: string; pattern: RegExp }[] = [
+      { body, label: "click interactions", pattern: /^\s*click\b/imu },
+      { body, label: "callbacks", pattern: /\bcallback\s*\(/iu },
+      { body, label: "javascript URL", pattern: /javascript\s*:/iu },
+      { body, label: "external URL", pattern: /\bhttps?:\/\/\S+/iu },
+      {
+        body,
+        label: "init directive",
+        pattern: /^\s*%%\s*\{\s*(?:init|initialize)\s*:/mu,
+      },
+      {
+        body: header.after_frontmatter,
+        label: "config directive",
+        pattern: /^\s*config\s*:/imu,
+      },
+      {
+        body,
+        label: "raw HTML",
+        pattern: /<\s*\/?\s*[A-Za-z][^>\r\n]*>/iu,
+      },
     ];
-    for (const [pattern, label] of forbidden) {
-      if (pattern.test(body)) {
+    for (const { body: forbiddenBody, label, pattern } of forbidden) {
+      if (pattern.test(forbiddenBody)) {
         findings.push(
           finding(
             "mermaid-unsafe-syntax",
@@ -217,19 +288,30 @@ function collectMermaidFindings(
         );
       }
     }
+    const flowchartEndRisk = hasFlowchartEndRisk(body);
+    const sequenceEndRisk =
+      firstToken === "sequenceDiagram" && hasSequenceEndRisk(body);
     if (
-      (firstToken === "flowchart" || firstToken === "graph") &&
-      (/(?:\[|\(|\{|\|)\s*end\s*(?:\]|\)|\})/u.test(body) ||
-        /(?:^|(?:-->|---|-.->|-\.\.->|==>|~~~)\s*(?:\|[^|\r\n]*\|\s*)?)end(?:\s|$|:)/mu.test(
-          body
-        ) ||
-        /(?:^|\s)end\s+(?:-->|---|-.->|-\.\.->|==>|~~~)/mu.test(body))
+      (firstToken === "flowchart" ||
+        firstToken === "graph" ||
+        firstToken === "flowchart-elk") &&
+      flowchartEndRisk
     ) {
       findings.push(
         finding(
           "mermaid-unquoted-end",
           strict ? "error" : "warning",
           "flowchart uses end as an unquoted label or node value",
+          { line: block.line, path: file }
+        )
+      );
+    }
+    if (sequenceEndRisk) {
+      findings.push(
+        finding(
+          "mermaid-sequence-end",
+          strict ? "error" : "warning",
+          "sequence diagram uses lowercase end as message or note text",
           { line: block.line, path: file }
         )
       );
@@ -389,6 +471,27 @@ function selfTest(): number {
         "```",
         "",
         "```mermaid",
+        "%% comment before the declaration",
+        "flowchart LR",
+        "  A --> B",
+        '  B --> C["end"]',
+        "```",
+        "",
+        "```mermaid",
+        "flowchart LR",
+        "  subgraph Group",
+        "    X --> Y",
+        "  end",
+        "```",
+        "",
+        "```mermaid",
+        "sequenceDiagram",
+        "  alt 条件",
+        "    A->>B: 继续",
+        "  end",
+        "```",
+        "",
+        "```mermaid",
         "timeline",
         "  2026 : 扩展 Mermaid 类型",
         "```",
@@ -402,6 +505,8 @@ function selfTest(): number {
         "```mermaid",
         "---",
         "title: Safe frontmatter",
+        "config:",
+        "  theme: neutral",
         "---",
         "flowchart LR",
         "  A --> End",
@@ -430,10 +535,45 @@ function selfTest(): number {
       "A -->|done| end",
       "A -..-> end",
       "A ~~~ end",
+      "A -...-> end",
+      'A --> end["Done"]',
+      "A -->|end| B",
+      'A --> B["https://example.com"]',
       "%%{init: {'theme': 'forest'}}%%",
+      "%%{",
+      "  initialize:",
+      "    theme: forest",
+      "}%%",
       "click A callback()",
       "```",
     ]);
+    assertSurfaceFailed(root, "sequence-risk", [
+      "```mermaid",
+      "sequenceDiagram",
+      "  A->>B: end",
+      "```",
+    ]);
+    for (const [name, edge] of [
+      ["dotted-double", "A -..-> end"],
+      ["dotted-triple", "A -...-> end"],
+      ["expanded-shape", "A --> end@{ shape: rect }"],
+    ] as const) {
+      assertSurfaceFailed(root, name, [
+        "```mermaid",
+        "flowchart LR",
+        edge,
+        "```",
+      ]);
+    }
+    const quotedEdge = path.join(root, "quoted-edge.md");
+    fs.writeFileSync(
+      quotedEdge,
+      ["```mermaid", "flowchart LR", 'A -->|"end"| B', "```"].join("\n"),
+      "utf-8"
+    );
+    if (check(quotedEdge, true, true).gate !== "passed") {
+      throw new Error("quoted edge label should pass");
+    }
     assertSurfaceFailed(root, "case-sensitive", [
       "```mermaid",
       "c4context",
@@ -443,6 +583,21 @@ function selfTest(): number {
       "```mermaid",
       "flowchart LR",
       'A["<b>raw</b>"]',
+      "```",
+    ]);
+    assertSurfaceFailed(root, "unterminated-frontmatter", [
+      "```mermaid",
+      "---",
+      "title: Missing close",
+      "flowchart LR",
+      "```",
+    ]);
+    assertSurfaceFailed(root, "indented-frontmatter", [
+      "```mermaid",
+      "  ---",
+      "title: Not frontmatter",
+      "  ---",
+      "flowchart LR",
       "```",
     ]);
     console.log("note-surface checker self-test: PASS");

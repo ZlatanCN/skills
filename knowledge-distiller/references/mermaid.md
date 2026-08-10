@@ -8,11 +8,12 @@
 
 一个图只承担一个主要问题。下面的“常用”是长期知识笔记的默认选择；“进阶”适合问题本身要求这种表达；“专用”不是禁用，而是只有在它比通用图更精确时才使用。
 
-注意：这里的层级表示教学适配，不是 renderer 兼容承诺。`进阶` 和 `专用` 类型默认按 `Mermaid 渲染未验证` 处理，除非已经在目标 Obsidian 阅读视图中打开确认。
+注意：这里的层级表示教学适配，不是 renderer 兼容承诺。`常用` 只表示基础语法候选，仍需确认目标阅读视图；`进阶` 和 `专用` 默认未验证，状态定义见第 4 节。
 
 | 层级 | 读者要回答的问题 | 类型 | 适合表达 | 不要拿它代替 |
 | --- | --- | --- | --- | --- |
 | 常用 | 有哪些组件、边界、步骤或数据路径？ | `flowchart`（`graph` 为兼容别名） | 架构、流程、因果链、决策和分层 | 时间轴、类模型 |
+| 进阶 | 流程图规模较大，需要 ELK 布局吗？ | `flowchart-elk` | 更复杂流程的布局实验 | 仍可用普通 `flowchart` 表达的简单关系 |
 | 进阶 | 谁负责每个步骤，交接发生在哪里？ | `swimlane-beta` | 按团队、角色、阶段划分的流程 | 没有所有权问题的普通流程 |
 | 常用 | 谁先调用谁，期间发生了什么？ | `sequenceDiagram` | 请求/响应、协作、生命周期中的一次交互 | 静态组件关系 |
 | 常用 | 对象有哪些状态，什么事件触发转移？ | `stateDiagram-v2`（旧版 `stateDiagram`） | 生命周期、协议状态、状态机 | 一次性的执行步骤 |
@@ -44,6 +45,7 @@
 | 专用 | 参与者之间的时序如何用简洁语法表达？ | `zenuml` | ZenUML 风格交互 | 普通静态关系 |
 | 专用 | 语法规则如何展开成可读的轨道图？ | `railroad-diagram` / `railroad-ebnf` / `railroad-abnf` / `railroad-peg` | 语法、文法和 parser 教学 | 普通业务流程 |
 | 专用 | Mermaid 的诊断/元信息如何展示？ | `info` | 特殊 renderer 或调试场景 | 普通知识图表 |
+| 专用 | 需要显式展示渲染错误状态吗？ | `error` | Mermaid 错误占位或诊断场景 | 普通知识图表 |
 
 `flowchart` 是默认兜底，不是万能答案。先问“读者要看关系、时间、数量、状态、层级还是边界”，再选类型；同一篇笔记可以有多个图，但每个图只能有一个主问题。
 
@@ -69,9 +71,9 @@ flowchart TB
 
 ### 2.2 已知破图风险
 
-- 在 `flowchart` 和 `sequenceDiagram` 中，不要把 `end` 当成未加引号的节点 ID 或标签；使用不同 ID，或写成 `"结束"`。
+- 在 `flowchart` / `graph` 中，不要把小写 `end` 当成未加引号的节点 ID 或标签；使用不同 ID，或写成 `"结束"`。`sequenceDiagram` 的消息/Note 文本也不要裸写小写 `end`；`alt`、`loop` 等结构性 `end` 是合法闭合语法。`swimlane-beta` 用 `end` 关闭泳道同样是合法语法。
 - `flowchart` 的连接符后不要紧贴小写 `o` 或 `x`，否则可能被解释成圆边或叉边；需要文字时加空格或改用大写。
-- 普通知识笔记只保留静态图：禁止 `click`、callback、`javascript:`、外部 URL、raw HTML、`%%{init}%%`、`config` 和嵌入 JavaScript。
+- 普通知识笔记只保留静态图：禁止 `click`、callback、`javascript:`、外部 URL、raw HTML、`%%{init...}%%` / `%%{initialize...}%%` 和图体内的 `config:` 指令。frontmatter 中的 `config:` 只有在目标 renderer 已验证时才使用。
 - 不使用 emoji，不让颜色成为唯一语义，不依赖 renderer 特有的 CSS。
 - Obsidian 内部链接应放在图旁边的 Markdown 正文。只有已在目标 Obsidian 渲染器验证过节点映射时，才允许在 `flowchart` 使用 `class NodeId internal-link;`；不在 `sequenceDiagram`、`stateDiagram-v2` 或其他类型中套用这个例外。
 
@@ -81,7 +83,7 @@ flowchart TB
 
 | 类型族 | 画之前确认 | 画之后检查 |
 | --- | --- | --- |
-| `flowchart` / `graph` | 每条箭头是关系、因果还是顺序；边界是否真的需要 `subgraph` | 小写 `end`、`o/x` 风险；交叉是否超过可追踪范围 |
+| `flowchart` / `graph` / `flowchart-elk` | 每条箭头是关系、因果还是顺序；边界是否真的需要 `subgraph` | 小写 `end`、`o/x` 风险；交叉是否超过可追踪范围 |
 | `swimlane-beta` | 每条泳道是否代表同一种所有权；交接是否是主要问题 | 泳道用 `end` 关闭是合法结构；只检查跨泳道交接是否清楚 |
 | `sequenceDiagram` / `zenuml` | 参与者是否真的参与；是否只保留关键交互 | 不要把完整日志倾倒进图；消息方向和响应关系要对称 |
 | `stateDiagram-v2` / `stateDiagram` | 状态是稳定状态，不是瞬时动作；每个转移有触发条件 | 有初始/终态时明确写出；避免把状态名写成长句 |
@@ -104,7 +106,7 @@ flowchart TB
 2. **未验证**：类型声明属于 Mermaid 官方语法范围，但当前环境没有确认目标 renderer；交付时必须写 `Mermaid 渲染未验证`，并保留一句正文解释。
 3. **不适合**：即使能渲染，也没有回答本笔记的主要问题；改用表格、列表、正文或更简单的图。
 
-对于 `*-beta`、`C4Context`、`architecture-beta`、`eventmodeling` 等较新的或专用类型，默认按“未验证”处理，除非本次任务实际打开了目标阅读视图。不要因为 checker 通过就省略 fallback。
+对于 `*-beta`、`C4Context`、`architecture-beta`、`eventmodeling` 等较新的或专用类型，默认按“未验证”处理；`flowchart-elk` 依赖可选的 ELK/large-features 能力，`zenuml` 属于外部集成，也默认未验证。除非本次任务实际打开了目标阅读视图，否则不要因为 checker 通过就省略 fallback。
 
 每张图都要有一句邻近正文解释。复杂图在目标 renderer 支持时可补 `accTitle` 和 `accDescr`，但它们不能替代正文 fallback。
 
@@ -123,12 +125,12 @@ flowchart TB
 - [ ] 删除图会让解释明显变长或变不清楚；否则删掉图。
 - [ ] 类型与问题匹配，没有把 flowchart 当万能容器。
 - [ ] 标识符稳定，展示标签在有歧义时加引号，边标签短。
-- [ ] 没有未加引号的 `end`、意外保留语法、emoji 或仅靠颜色传达的语义。
-- [ ] 没有 `click`、callback、外部 URL、raw HTML、`%%{init}%%`、`config` 或嵌入 JavaScript。
+- [ ] `flowchart` / `graph` 没有小写裸 `end` 节点或标签；sequence/swimlane 的结构性 `end` 保留且位置正确。
+- [ ] 没有 `click`、callback、外部 URL、raw HTML、`%%{init...}%%`、`%%{initialize...}%%`、图体内 `config:` 或嵌入 JavaScript。
 - [ ] 类型专属约束已检查，数据图有单位/来源，坐标图有轴含义，时间图有一致时间格式。
 - [ ] 术语已在附近正文定义或链接；图不会成为孤立的术语表。
 - [ ] 图足够小，读者不需要追踪过多交叉线或不相关分支。
-- [ ] 已运行 Mermaid parser 或打开 Obsidian 阅读视图；没有 renderer 时，明确写 `Mermaid 渲染未验证` 并保留文字解释。
+- [ ] parser 通过只代表语法可解析，不代表 Obsidian 兼容；未打开目标阅读视图时，按第 4 节把渲染风险写入 `format_plan.render_risks`。
 
 ## 6. 最小可复用骨架
 
@@ -246,4 +248,4 @@ requirementDiagram
 ```
 ````
 
-专用类型不需要全部背下来。先用本节矩阵确定问题，再查对应的 [Mermaid syntax reference](https://mermaid.js.org/intro/syntax-reference.html)；若目标 Obsidian 视图没有实际验证，就按未验证 fallback 交付。
+专用类型不需要全部背下来。先用本节矩阵确定问题，再查对应的 [Mermaid syntax reference](https://mermaid.js.org/intro/syntax-reference.html)；渲染状态和 fallback 按第 4 节执行。
