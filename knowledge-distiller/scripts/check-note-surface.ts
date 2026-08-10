@@ -63,7 +63,6 @@ const SUPPORTED_MERMAID_TYPES = [
   "railroad-peg",
   "flowchart-elk",
   "info",
-  "error",
 ] as const;
 const SUPPORTED_MERMAID_TYPE_SET = new Set<string>(SUPPORTED_MERMAID_TYPES);
 
@@ -113,19 +112,19 @@ function mermaidHeader(body: string): MermaidHeader {
 
 function hasFlowchartEndRisk(body: string): boolean {
   const unquotedEdgeLabels = body.replaceAll(
-    /\|[^|\r\n]*"[^|\r\n]*"[^|\r\n]*\|/gu,
+    /\|[^|\r\n]*["`][^|\r\n]*["`][^|\r\n]*\|/gu,
     ""
   );
   return (
     /(?:\[|\(|\u007B)\s*end\s*(?:\]|\)|\})/u.test(body) ||
-    /\bend@\u007B/mu.test(body) ||
+    /(?:^|\s)end@\u007B/mu.test(body) ||
     /(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})\s*(?:\|[^|\r\n]*\|\s*)?end(?:\s|$|:)/mu.test(
       body
     ) ||
-    /(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})\s*(?:\|[^|\r\n]*\|\s*)?end(?:\[|\(|\u007B)/mu.test(
+    /(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})\s*(?:\|[^|\r\n]*\|\s*)?end(?:\[|\(|\u007B|@\u007B)/mu.test(
       body
     ) ||
-    /(?:^|\s)end(?:\[|\(|\u007B)[^\r\n]*\s+(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})/mu.test(
+    /(?:^|\s)end(?:\[|\(|\u007B|@\u007B)[^\r\n]*\s+(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})/mu.test(
       body
     ) ||
     /(?:^|\s)end\s+(?:-->|-{3,}(?:>|-)?|-\.+(?:->|-)|={2,}(?:>|-)?|~{3,})/mu.test(
@@ -475,6 +474,7 @@ function selfTest(): number {
         "flowchart LR",
         "  A --> B",
         '  B --> C["end"]',
+        '  C --> D["end@{ shape: rect }"]',
         "```",
         "",
         "```mermaid",
@@ -568,7 +568,14 @@ function selfTest(): number {
     const quotedEdge = path.join(root, "quoted-edge.md");
     fs.writeFileSync(
       quotedEdge,
-      ["```mermaid", "flowchart LR", 'A -->|"end"| B', "```"].join("\n"),
+      [
+        "```mermaid",
+        "flowchart LR",
+        'A -->|"end"| B',
+        "B -->|`end`| C",
+        'C --> D["end@{ shape: rect }"]',
+        "```",
+      ].join("\n"),
       "utf-8"
     );
     if (check(quotedEdge, true, true).gate !== "passed") {
