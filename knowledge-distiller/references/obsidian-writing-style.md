@@ -81,6 +81,14 @@
 
 Callout 内的每一行都必须保持 `>` 前缀。Callout 原生支持 Markdown、wikilink、embed、列表、代码块和多段文字；嵌套 callout 也有明确语法，但超过两层时优先拆成普通正文，避免读者失去层级。
 
+嵌套示例：
+
+```markdown
+> [!question] 这个结论适用于所有 renderer 吗？
+> > [!warning] 不适用于所有 renderer
+> > 这里的示例只覆盖 React DOM 的教学模型。
+```
+
 Callout 可以只有标题而没有正文；标题中可以使用用户可读的自定义文字。类型标识不区分大小写；未注册的类型在没有自定义 CSS/插件时会回退为 `note`。依赖 CSS snippet 或社区插件定义的自定义类型时，必须把它标记为 vault-specific，不得把它当成跨环境稳定语法。
 
 ### 3.2 类型、别名与用途
