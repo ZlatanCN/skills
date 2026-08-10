@@ -17,38 +17,42 @@ import { canonicalCalloutType, parseMarkdown } from "./lib/markdown.ts";
 const SUPPORTED_MERMAID_TYPES = [
   "flowchart",
   "graph",
-  "sequencediagram",
-  "statediagram",
-  "statediagram-v2",
-  "classdiagram",
-  "erdiagram",
+  "swimlane-beta",
+  "sequenceDiagram",
+  "classDiagram",
+  "stateDiagram-v2",
+  "erDiagram",
   "mindmap",
   "timeline",
   "gantt",
   "journey",
-  "quadrantchart",
+  "quadrantChart",
   "pie",
+  "xychart",
   "xychart-beta",
+  "sankey",
   "sankey-beta",
-  "requirementdiagram",
-  "c4context",
-  "c4container",
-  "c4component",
-  "c4dynamic",
-  "c4deployment",
+  "requirementDiagram",
+  "gitGraph",
+  "C4Context",
+  "C4Container",
+  "C4Component",
+  "C4Dynamic",
+  "C4Deployment",
   "architecture-beta",
+  "block",
   "block-beta",
+  "packet",
   "packet-beta",
   "kanban",
-  "gitgraph",
   "radar-beta",
   "treemap-beta",
-  "venn",
+  "venn-beta",
   "eventmodeling",
-  "ishikawa",
-  "wardley",
-  "cynefin",
-  "treeview",
+  "ishikawa-beta",
+  "wardley-beta",
+  "cynefin-beta",
+  "treeView-beta",
   "zenuml",
 ] as const;
 const SUPPORTED_MERMAID_TYPE_SET = new Set<string>(SUPPORTED_MERMAID_TYPES);
@@ -146,8 +150,7 @@ function collectMermaidFindings(
       body
         .split(/\r?\n/u)
         .find((line) => line.trim())
-        ?.trim()
-        .toLowerCase() ?? "";
+        ?.trim() ?? "";
     const firstToken = first.split(/\s+/u)[0] ?? "";
     if (!SUPPORTED_MERMAID_TYPE_SET.has(firstToken)) {
       findings.push(
@@ -167,8 +170,8 @@ function collectMermaidFindings(
       );
     }
     const forbidden: [RegExp, string][] = [
-      [/\bclick\b/iu, "click interactions"],
-      [/\bcallback\b/iu, "callbacks"],
+      [/^\s*click\b/imu, "click interactions"],
+      [/\bcallback\s*\(/iu, "callbacks"],
       [/javascript\s*:/iu, "javascript URL"],
       [/^\s*%%\s*\{init\}/imu, "init directive"],
       [/^\s*config\b/imu, "config directive"],
@@ -188,7 +191,11 @@ function collectMermaidFindings(
     }
     if (
       (firstToken === "flowchart" || firstToken === "graph") &&
-      /(?:\[|\(|\{|\|)\s*end\s*(?:\]|\)|\})/iu.test(body)
+      (/(?:\[|\(|\{|\|)\s*end\s*(?:\]|\)|\})/iu.test(body) ||
+        /(?:^|(?:-->|---|-.->|==>)\s*(?:\|[^|\r\n]*\|\s*)?)end(?:\s|$|:)/imu.test(
+          body
+        ) ||
+        /(?:^|\s)end\s+(?:-->|---|-.->|==>)/imu.test(body))
     ) {
       findings.push(
         finding(
@@ -305,6 +312,18 @@ function check(
   );
 }
 
+function assertSurfaceFailed(
+  root: string,
+  name: string,
+  lines: string[]
+): void {
+  const file = path.join(root, `${name}.md`);
+  fs.writeFileSync(file, lines.join("\n"), "utf-8");
+  if (check(file, true, true).gate !== "failed") {
+    throw new Error(`${name} surface should fail`);
+  }
+}
+
 function selfTest(): number {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "knowledge-distiller-surface-")
@@ -337,6 +356,8 @@ function selfTest(): number {
         "```mermaid",
         "flowchart TB",
         '  A["开始"] --> B["结束"]',
+        '  B --> C["click to retry"]',
+        '  C --> D["callback handler"]',
         "```",
         "",
         "```mermaid",
@@ -345,7 +366,7 @@ function selfTest(): number {
         "```",
         "",
         "```mermaid",
-        "xychart-beta",
+        "xychart",
         '  title "趋势"',
         "  line [1, 2, 3]",
         "```",
@@ -361,22 +382,24 @@ function selfTest(): number {
       throw new Error("valid surface should pass, including nested callouts");
     }
 
-    const invalid = path.join(root, "invalid.md");
-    fs.writeFileSync(
-      invalid,
-      [
-        "# Main",
-        "> [!custom] bad",
-        "```mermaid",
-        "unsupportedDiagram",
-        "click A callback()",
-        "```",
-      ].join("\n"),
-      "utf-8"
-    );
-    if (check(invalid, true, true).gate !== "failed") {
-      throw new Error("invalid surface should fail");
-    }
+    assertSurfaceFailed(root, "unsupported", [
+      "```mermaid",
+      "unsupportedDiagram",
+      "```",
+    ]);
+    assertSurfaceFailed(root, "unsafe", [
+      "```mermaid",
+      "flowchart TB",
+      "A --> end",
+      "A -->|done| end",
+      "click A callback()",
+      "```",
+    ]);
+    assertSurfaceFailed(root, "case-sensitive", [
+      "```mermaid",
+      "c4context",
+      "```",
+    ]);
     console.log("note-surface checker self-test: PASS");
     return 0;
   } finally {
