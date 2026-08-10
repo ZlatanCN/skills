@@ -47,7 +47,7 @@ node scripts/check-note.ts \
 
 | Checker | 机械负责 | 明确不负责 |
 | --- | --- | --- |
-| `check-note-surface.ts` | frontmatter/code fence 是否闭合；代码语言标记；表格形状；callout 类型与前缀；危险 HTML/URL；Mermaid 禁止语法与基本类型；强调分隔符 | 解释是否正确、callout 是否值得保留、图是否回答读者问题 |
+| `check-note-surface.ts` | frontmatter/code fence 是否闭合；代码语言标记；表格形状；callout 类型与前缀；危险 HTML/URL；Mermaid 支持的类型声明、禁止语法与 `flowchart` 保留字风险；强调分隔符 | 解释是否正确、callout 是否值得保留、图是否回答读者问题 |
 | `check-heading-tree.ts` | H1 根、层级跳跃、隐含文件名标题约定、重复标题提示 | 章节是否构成好的教学模型 |
 | `check-wikilinks.ts` | canonical manifest、containment、排除目录、唯一文件、唯一 heading/block anchor、frontmatter/fence/code 排除 | 目标是否真的定义当前概念、链接是否改善主线 |
 | `check-format-plan.ts` | `format_plan` 的 hash、字段、决策枚举和逐行覆盖所有实际格式表面；Mermaid 渲染状态 | 选择的视觉形式是否最适合读者 |

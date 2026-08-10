@@ -1,148 +1,234 @@
 # Mermaid Reference for Knowledge Notes
 
-本文件负责 Mermaid 的教学取舍、语法约束和渲染 fallback；`check-note-surface.ts` 只机械拦截基本类型、危险指令和明显的保留字风险，不能证明图的因果关系正确或已经渲染成功。
+本文件负责 Mermaid 的选型、语法约束、兼容性分层和渲染 fallback。`check-note-surface.ts` 只检查图类型声明、危险指令和少量已知语法风险；它不能证明图的因果关系正确、数据可信或已经在目标 Obsidian 版本中渲染成功。
 
-Read this reference only when a diagram materially improves the note. A diagram is a compressed explanation,
-not a decoration or a requirement to satisfy. If the same relationship is clearer in two short sentences, skip
-the diagram.
+只在图能压缩一个重要关系时使用它。若两三句话比图更清楚，就不要为了“有图”而画图。
 
-## 1. Choose the diagram by the question
+## 1. 先按读者问题选类型
 
-| Question the reader needs answered | Diagram |
-| --- | --- |
-| What components, layers, or data paths exist? | `flowchart` |
-| What happens first, next, and in response to what? | `sequenceDiagram` |
-| What states exist and what causes transitions? | `stateDiagram-v2` |
+一个图只承担一个主要问题。下面的“常用”是长期知识笔记的默认选择；“进阶”适合问题本身要求这种表达；“专用”不是禁用，而是只有在它比通用图更精确时才使用。
 
-Prefer one primary question per diagram. A diagram may combine inseparable boundaries and flows when that makes
-the system easier to understand. Split it when unrelated concerns, crossings, or detail density make the reader
-lose the main relationship. Use `TB` for a top-down hierarchy, `LR` for a left-to-right pipeline, and whichever
-direction keeps the smallest useful diagram readable.
+| 层级 | 读者要回答的问题 | 类型 | 适合表达 | 不要拿它代替 |
+| --- | --- | --- | --- | --- |
+| 常用 | 有哪些组件、边界、步骤或数据路径？ | `flowchart`（`graph` 为兼容别名） | 架构、流程、因果链、决策、分层、泳道式边界 | 时间轴、类模型 |
+| 常用 | 谁先调用谁，期间发生了什么？ | `sequenceDiagram` | 请求/响应、协作、生命周期中的一次交互 | 静态组件关系 |
+| 常用 | 对象有哪些状态，什么事件触发转移？ | `stateDiagram-v2` | 生命周期、协议状态、状态机 | 一次性的执行步骤 |
+| 常用 | 哪些类型、接口和关系构成模型？ | `classDiagram` | 类、接口、继承、组合、依赖 | 运行时调用顺序 |
+| 常用 | 哪些实体如何关联，基数是什么？ | `erDiagram` | 表、实体、字段关系、基数 | 面向对象继承 |
+| 常用 | 一个主题如何拆成概念层级？ | `mindmap` | 知识树、分类、脑图 | 有方向的流程 |
+| 常用 | 事件、版本或阶段如何沿时间展开？ | `timeline` | 历史、演进、里程碑、版本线 | 任务排期 |
+| 常用 | 一组任务何时开始、结束、依赖什么？ | `gantt` | 计划、阶段、依赖和并行工作 | 概念流程或因果解释 |
+| 常用 | 用户或角色在每一阶段体验如何？ | `journey` | 旅程步骤、体验分数、痛点 | 系统内部调用 |
+| 常用 | 对象按两个明确维度如何分布？ | `quadrantChart` | 取舍、定位、风险/收益、优先级 | 没有量纲的主观排名 |
+| 常用 | 总量由哪些部分组成？ | `pie` | 构成比例、预算、占比 | 有时间轴的趋势 |
+| 进阶 | 数值如何随类别或时间变化？ | `xychart-beta` | 有单位、有来源的柱状图/折线图 | 没有数据依据的印象判断 |
+| 进阶 | 数量如何从来源流向多个去向？ | `sankey-beta` | 资源、流量、预算、用户流转 | 只有“先后关系”的流程 |
+| 进阶 | 需求如何映射到实现、验证和风险？ | `requirementDiagram` | 需求追踪、验证覆盖、依赖 | 普通功能列表 |
+| 进阶 | 系统边界、参与者、容器和部署节点是什么？ | `C4Context` / `C4Container` / `C4Component` / `C4Dynamic` / `C4Deployment` | C4 context、容器、组件、动态关系和部署视角 | 细粒度执行流程 |
+| 进阶 | 云、服务和部署边界如何连接？ | `architecture-beta` | 部署拓扑、基础设施、服务分区 | 业务因果链 |
+| 进阶 | 结构由哪些规则化区块组成？ | `block-beta` | 模块布局、硬件/逻辑区块 | 任意节点关系 |
+| 进阶 | 协议或数据包的字段如何排列？ | `packet-beta` | 位段、报文头、协议布局 | 实体关系 |
+| 进阶 | 工作项在列之间如何流动？ | `kanban` | 工作流看板、阶段和卡片 | 学习内容的章节树 |
+| 进阶 | 分支、合并和提交如何演化？ | `gitGraph` | Git 历史、发布线、分支策略 | 通用时间线 |
+| 专用 | 多个能力维度的轮廓如何比较？ | `radar-beta` | 多维能力/指标轮廓 | 精确统计图表 |
+| 专用 | 总量如何按层级分解？ | `treemap-beta` | 目录、预算、资源层级 | 任意树状知识结构 |
+| 专用 | 哪些集合相交，交集意味着什么？ | `venn` | 集合关系、共同条件 | 因果和流程 |
+| 专用 | 事件、命令、聚合和读模型如何协作？ | `eventmodeling` | Event Modeling 工作坊产物 | 简单业务流程 |
+| 专用 | 一个结果由哪些原因树枝造成？ | `ishikawa` | 根因分析、鱼骨图 | 多步骤执行过程 |
+| 专用 | 能力如何沿价值链和演进阶段分布？ | `wardley` | Wardley Map | 普通架构图 |
+| 专用 | 不确定性和复杂性应如何分类？ | `cynefin` | Cynefin 决策框架 | 事实流程图 |
+| 专用 | 树节点如何展开和浏览？ | `treeview` | 文件/目录/层级浏览 | 有方向的执行流程 |
+| 专用 | 参与者之间的时序如何用简洁语法表达？ | `zenuml` | ZenUML 风格交互 | 普通静态关系 |
 
-## 2. Keep syntax and labels safe
+`flowchart` 是默认兜底，不是万能答案。先问“读者要看关系、时间、数量、状态、层级还是边界”，再选类型；同一篇笔记可以有多个图，但每个图只能有一个主问题。
 
-Use a fenced block with the correct diagram type:
+Mermaid 的官方语法参考列出了比 Obsidian 帮助页示例更完整的图类型清单，并规定每个图定义都以类型声明开头。Obsidian 官方帮助页明确展示了 Mermaid 图表，并特别举例了流程图、时序图和时间线；因此本 reference 允许更宽的类型集合，但不会把“checker 接受声明”冒充成“目标阅读视图已验证”。参见 [Mermaid diagram syntax](https://mermaid.js.org/intro/syntax-reference.html) 和 [Obsidian advanced syntax](https://obsidian.md/help/advanced-syntax)。
 
-````markdown
-```mermaid
-flowchart TB
-    A["开始"] --> B["结束"]
-```
-````
+## 2. 共同安全规则
 
-Rules:
-
-- Use stable ASCII identifiers for nodes (`Gateway`, `DB`, `Decision`); put Chinese and punctuation in quoted
-  display labels (`Gateway["API 网关"]`).
-- Quote labels containing punctuation, brackets, parentheses, question marks, colons, or arrows. This keeps
-  prose separate from Mermaid syntax and reduces parser ambiguity.
-- Do not use `end` as an unquoted node ID or label. Mermaid treats it specially in flowcharts; use a different
-  identifier or quote/capitalize the label.
-- Avoid an unspaced lowercase `o` or `x` immediately after a flowchart connector; Mermaid can interpret those
-  forms as circle or cross edges. Add a space or capitalize the character when that text is intentional.
-- Keep edge labels short. If an edge needs a paragraph of explanation, move that explanation into prose.
-- Prefer basic nodes, edges, subgraphs, participants, and state transitions. Avoid experimental syntax when a
-  simpler construct conveys the same relationship.
-- Keep diagrams static in ordinary knowledge notes: do not use `click`, callbacks, external URLs, raw HTML,
-  `%%{init}%%`, `config` directives, or embedded JavaScript. These features make the note dependent on renderer
-  settings and can turn content into an interaction surface.
-- Do not use emoji. Do not rely on color alone. Omit custom colors and CSS by default; if a local convention
-  requires them, verify contrast in both light and dark reading views and preserve the same distinction with
-  labels or shapes.
-- Define and link concepts in the surrounding prose. Do not put raw `[[wikilink]]` text inside a label. If a
-  diagram genuinely needs in-graph navigation, use Obsidian's `class NodeId internal-link;` convention only in
-  a `flowchart`, only after verifying the target Obsidian renderer's node-to-note mapping, and only when the node
-  ID resolves to the intended note. Do not use this convention in `sequenceDiagram` or `stateDiagram-v2`; use a
-  normal Markdown wikilink in the surrounding prose instead. If the mapping is uncertain, omit the in-graph
-  link. This is an advanced navigation exception, not the definition mechanism.
-
-Node shape communicates role in a flowchart:
-
-- rectangle `A["..."]` — process, service, or ordinary step;
-- cylinder `DB[("...")]` — database or persistent storage;
-- diamond `D{"..."}` — decision;
-- `subgraph` — a boundary or grouping, not a component.
-
-Do not assign a shape merely for visual variety. If role does not matter, use the rectangle.
-
-## 3. Keep terminology readable
-
-The surrounding prose owns definitions. Introduce or link the important term before the diagram, then use the
-same short label in the diagram. Do not turn a node into a glossary entry by putting a long bilingual definition
-inside it. Preserve conventional English names such as `API`, `RAG`, and `LLM` when that is how engineers write
-them.
-
-The diagram should be understandable without color. Its nodes, arrows, edge labels, and grouping must carry the
-meaning on their own.
-
-## 4. Preflight before delivery
-
-Check every diagram:
-
-- [ ] It answers one concrete structural or temporal question.
-- [ ] Removing it would make the explanation less clear or materially longer.
-- [ ] The diagram type matches the question.
-- [ ] Node IDs are stable and simple; display labels are quoted where needed.
-- [ ] There is no unquoted `end`, accidental reserved syntax, emoji, or theme-specific style; color is not the
-  sole encoding and any custom colors passed the both-theme check.
-- [ ] There is no `click`, callback, external URL, raw HTML, `%%{init}%%`, `config`, or embedded JavaScript.
-- [ ] Shape semantics are consistent and edge labels are short.
-- [ ] Important terms are defined or linked in nearby prose, not hidden in the diagram.
-- [ ] It is small enough to scan; split it if the reader must trace too many crossings or unrelated branches.
-- [ ] A Mermaid parser or Obsidian reading view was used when available. If no renderer is available, report
-  `Mermaid 渲染未验证` in Phase 8 and keep a one-sentence textual explanation in the note.
-
-Obsidian bundles its own Mermaid version. Prefer the basic syntax in this reference rather than assuming that the
-latest Mermaid documentation and the installed Obsidian renderer support the same features. If a feature-specific
-syntax is necessary, check the target renderer and consult the relevant official page for [flowcharts](https://mermaid.js.org/syntax/flowchart.html),
-[sequence diagrams](https://mermaid.js.org/syntax/sequenceDiagram.html), or [state diagrams](https://mermaid.js.org/syntax/stateDiagram.html).
-
-Every diagram needs a one-sentence textual explanation in nearby prose. For a complex diagram, also add Mermaid's
-`accTitle` and `accDescr` when the target renderer supports them. The prose is the fallback for readers who cannot
-see or render the diagram.
-
-## 5. Safe examples
-
-### Flowchart — architecture or data flow
+### 2.1 结构和标签
 
 ````markdown
 ```mermaid
 flowchart TB
-    User["用户"] --> Gateway["API 网关"]
-    Gateway --> Service["应用服务"]
-    Service --> DB[("数据库")]
-    Service --> Decision{"缓存命中？"}
-    Decision -->|是| Cache[("缓存")]
-    Decision -->|否| Upstream["上游服务"]
+    Gateway["API 网关"] --> Service["应用服务"]
 ```
 ````
 
-### Sequence diagram — interaction order
+- 使用稳定的 ASCII 标识符（如 `Gateway`、`DB`、`Decision`）；中文、括号、冒号、问号和箭头放进带引号的展示标签。
+- 保持边标签短。需要一段解释时，把解释放到图旁边的正文，不要把节点或边写成段落。
+- `flowchart` 使用 `TB` 表示自上而下，`LR` 表示从左到右；选择能让最小图保持可扫描的方向。
+- 不要把形状当装饰。流程图中矩形表示普通步骤/服务，圆柱表示持久化，菱形表示决策，`subgraph` 表示边界或分组。
+- 术语先在正文定义或链接，图里只重复稳定的短名。不要把 raw `[[wikilink]]` 塞进 Mermaid 标签。
+- 图应脱离颜色仍然可读。默认不写自定义颜色、CSS 或主题；必须使用时，用形状/文字重复编码，并在浅色和深色阅读视图检查对比度。
+
+### 2.2 已知破图风险
+
+- 在 `flowchart` 和 `sequenceDiagram` 中，不要把 `end` 当成未加引号的节点 ID 或标签；使用不同 ID，或写成 `"结束"`。
+- `flowchart` 的连接符后不要紧贴小写 `o` 或 `x`，否则可能被解释成圆边或叉边；需要文字时加空格或改用大写。
+- 普通知识笔记只保留静态图：禁止 `click`、callback、`javascript:`、外部 URL、raw HTML、`%%{init}%%`、`config` 和嵌入 JavaScript。
+- 不使用 emoji，不让颜色成为唯一语义，不依赖 renderer 特有的 CSS。
+- Obsidian 内部链接应放在图旁边的 Markdown 正文。只有已在目标 Obsidian 渲染器验证过节点映射时，才允许在 `flowchart` 使用 `class NodeId internal-link;`；不在 `sequenceDiagram`、`stateDiagram-v2` 或其他类型中套用这个例外。
+
+## 3. 各类型的最小约束
+
+| 类型 | 画之前确认 | 画之后检查 |
+| --- | --- | --- |
+| `flowchart` / `graph` | 每条箭头是关系、因果还是顺序；边界是否真的需要 `subgraph` | `end`、`o/x` 风险；交叉是否超过读者能追踪的范围 |
+| `sequenceDiagram` / `zenuml` | 参与者是否真的参与；是否只保留关键交互 | 不要把完整日志倾倒进图；消息方向和响应关系要对称 |
+| `stateDiagram-v2` | 状态是稳定状态，不是瞬时动作；每个转移有触发条件 | 有初始/终态时明确写出；避免把状态名写成长句 |
+| `classDiagram` | 需要表达的是类型/接口关系，而不是一次运行过程 | 只保留影响理解的属性和关系；不要复制整段代码 |
+| `erDiagram` | 实体、关系和基数是否有真实数据语义 | 不要用继承语义替代实体关系；字段只列关键字段 |
+| `mindmap` / `treeview` | 层级是否比列表更能帮助记忆或导航 | 每层短而平行；不要把无关系的名词堆成树 |
+| `timeline` / `gantt` / `gitGraph` | 时间轴是否是问题本身；日期、版本或依赖是否可解释 | 时间格式统一；不要把概念分类伪装成排期 |
+| `journey` | 角色、阶段和评分含义是否明确 | 说明分数尺度；不要把系统内部实现画成体验旅程 |
+| `quadrantChart` / `radar-beta` | 轴、量纲和比较对象是否可复述 | 避免虚假的精确位置；正文解释“为什么在这里” |
+| `pie` / `xychart-beta` / `sankey-beta` / `treemap-beta` | 数值、单位、总量、时间范围和来源是否存在 | 不制造小数精度；数据变化时同步更新图和来源 |
+| `requirementDiagram` | 需求追踪是否是主要问题 | 需求、实现、验证节点要有可追踪关系 |
+| `C4Context` / `architecture-beta` | 读者是否需要系统/部署边界 | 不把业务步骤和部署拓扑混在同一张图 |
+| `block-beta` / `packet-beta` | 位置、区块或位段本身是否有意义 | 保持布局规则一致；字段/区块标签要短 |
+| `kanban` | 列是否代表稳定工作状态 | 卡片只写工作项；不要把它当知识目录 |
+| `venn` / `ishikawa` / `wardley` / `cynefin` / `eventmodeling` | 该方法的概念是否真的被正文采用 | 解释集合、原因、价值链或框架含义，不能只贴图不解释 |
+
+这些约束是选型和人工语义检查，不是 parser 的完整替代。图类型、禁止语法和 `flowchart` 的 `end` 风险由机械 checker 负责；关系是否正确、数据是否有来源、图是否值得存在，仍由作者和双轴审查负责。
+
+## 4. 兼容性与 fallback
+
+把类型分成三种状态，而不是假设所有 Mermaid 版本完全一致：
+
+1. **已验证**：在目标 Obsidian 阅读视图中打开并确认无语法错误、无明显裁切；可以正常交付。
+2. **未验证**：类型声明属于 Mermaid 官方语法范围，但当前环境没有确认目标 renderer；交付时必须写 `Mermaid 渲染未验证`，并保留一句正文解释。
+3. **不适合**：即使能渲染，也没有回答本笔记的主要问题；改用表格、列表、正文或更简单的图。
+
+对于 `*-beta`、`C4Context`、`architecture-beta`、`eventmodeling` 等较新的或专用类型，默认按“未验证”处理，除非本次任务实际打开了目标阅读视图。不要因为 checker 通过就省略 fallback。
+
+每张图都要有一句邻近正文解释。复杂图在目标 renderer 支持时可补 `accTitle` 和 `accDescr`，但它们不能替代正文 fallback。
+
+## 5. 交付前 preflight
+
+- [ ] 图回答一个具体的结构、时间、状态、数量、层级或边界问题。
+- [ ] 删除图会让解释明显变长或变不清楚；否则删掉图。
+- [ ] 类型与问题匹配，没有把 flowchart 当万能容器。
+- [ ] 标识符稳定，展示标签在有歧义时加引号，边标签短。
+- [ ] 没有未加引号的 `end`、意外保留语法、emoji 或仅靠颜色传达的语义。
+- [ ] 没有 `click`、callback、外部 URL、raw HTML、`%%{init}%%`、`config` 或嵌入 JavaScript。
+- [ ] 类型专属约束已检查，数据图有单位/来源，坐标图有轴含义，时间图有一致时间格式。
+- [ ] 术语已在附近正文定义或链接；图不会成为孤立的术语表。
+- [ ] 图足够小，读者不需要追踪过多交叉线或不相关分支。
+- [ ] 已运行 Mermaid parser 或打开 Obsidian 阅读视图；没有 renderer 时，明确写 `Mermaid 渲染未验证` 并保留文字解释。
+
+## 6. 最小可复用骨架
+
+### 6.1 关系/流程
+
+````markdown
+```mermaid
+flowchart LR
+    Input["输入"] --> Decision{"满足条件？"}
+    Decision -->|是| Output["输出"]
+    Decision -->|否| Retry["修正后重试"]
+```
+````
+
+### 6.2 交互/状态
 
 ````markdown
 ```mermaid
 sequenceDiagram
     participant C as 客户端
-    participant G as API 网关
-    participant A as 认证服务
-    C->>G: 请求
-    G->>A: 校验令牌
-    A-->>G: 通过
-    G-->>C: 响应
+    participant S as 服务
+    C->>S: 请求
+    S-->>C: 响应
 ```
 ````
-
-### State diagram — state transitions
 
 ````markdown
 ```mermaid
 stateDiagram-v2
-    state "慢启动" as SlowStart
-    state "拥塞避免" as CongestionAvoidance
-    state "快速恢复" as FastRecovery
-    [*] --> SlowStart
-    SlowStart --> CongestionAvoidance: 达到阈值
-    CongestionAvoidance --> FastRecovery: 检测到丢包
-    FastRecovery --> CongestionAvoidance: 收到新确认
+    [*] --> Pending
+    Pending --> Active: 开始
+    Active --> Done: 完成
+    Done --> [*]
 ```
 ````
+
+### 6.3 模型/层级/时间
+
+````markdown
+```mermaid
+classDiagram
+    class Note
+    class Reference
+    Note --> Reference : cites
+```
+````
+
+````markdown
+```mermaid
+mindmap
+  root((知识主题))
+    概念
+    机制
+    边界
+```
+````
+
+````markdown
+```mermaid
+timeline
+    title API 演进
+    2024 : 发布 v1
+    2025 : 增加批量接口
+```
+````
+
+### 6.4 数据/比较
+
+````markdown
+```mermaid
+quadrantChart
+    title 方案比较
+    x-axis 成本低 --> 成本高
+    y-axis 收益低 --> 收益高
+    "方案 A": [0.25, 0.75]
+    "方案 B": [0.70, 0.60]
+```
+````
+
+````markdown
+```mermaid
+xychart-beta
+    title "请求量趋势"
+    x-axis [一月, 二月, 三月]
+    y-axis "请求数" 0 --> 100
+    line [20, 45, 70]
+```
+````
+
+### 6.5 边界/追踪
+
+````markdown
+```mermaid
+C4Context
+    Person(reader, "读者", "使用知识库")
+    System(vault, "知识库", "保存和连接笔记")
+    Rel(reader, vault, "阅读")
+```
+````
+
+````markdown
+```mermaid
+requirementDiagram
+    requirement readable {
+        id: R1
+        verifMethod: test
+        text: 笔记应可扫描
+    }
+    element checklist {
+        type: implementation
+    }
+    readable - verifies -> checklist
+```
+````
+
+专用类型不需要全部背下来。先用本节矩阵确定问题，再查对应的 [Mermaid syntax reference](https://mermaid.js.org/intro/syntax-reference.html)；若目标 Obsidian 视图没有实际验证，就按未验证 fallback 交付。

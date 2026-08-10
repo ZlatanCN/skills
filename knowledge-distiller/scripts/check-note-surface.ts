@@ -14,6 +14,45 @@ import {
 import type { Evidence, Finding } from "./lib/evidence.ts";
 import { canonicalCalloutType, parseMarkdown } from "./lib/markdown.ts";
 
+const SUPPORTED_MERMAID_TYPES = [
+  "flowchart",
+  "graph",
+  "sequencediagram",
+  "statediagram",
+  "statediagram-v2",
+  "classdiagram",
+  "erdiagram",
+  "mindmap",
+  "timeline",
+  "gantt",
+  "journey",
+  "quadrantchart",
+  "pie",
+  "xychart-beta",
+  "sankey-beta",
+  "requirementdiagram",
+  "c4context",
+  "c4container",
+  "c4component",
+  "c4dynamic",
+  "c4deployment",
+  "architecture-beta",
+  "block-beta",
+  "packet-beta",
+  "kanban",
+  "gitgraph",
+  "radar-beta",
+  "treemap-beta",
+  "venn",
+  "eventmodeling",
+  "ishikawa",
+  "wardley",
+  "cynefin",
+  "treeview",
+  "zenuml",
+] as const;
+const SUPPORTED_MERMAID_TYPE_SET = new Set<string>(SUPPORTED_MERMAID_TYPES);
+
 function collectFenceFindings(
   file: string,
   strict: boolean,
@@ -109,9 +148,8 @@ function collectMermaidFindings(
         .find((line) => line.trim())
         ?.trim()
         .toLowerCase() ?? "";
-    if (
-      !/^(?:flowchart|graph|sequencediagram|statediagram-v2)\b/u.test(first)
-    ) {
+    const firstToken = first.split(/\s+/u)[0] ?? "";
+    if (!SUPPORTED_MERMAID_TYPE_SET.has(firstToken)) {
       findings.push(
         finding(
           "mermaid-type-unsupported",
@@ -120,7 +158,7 @@ function collectMermaidFindings(
           {
             evidence: {
               first_line: first,
-              supported: ["flowchart", "sequenceDiagram", "stateDiagram-v2"],
+              supported: [...SUPPORTED_MERMAID_TYPES],
             },
             line: block.line,
             path: file,
@@ -149,7 +187,7 @@ function collectMermaidFindings(
       }
     }
     if (
-      /^(?:flowchart|graph)\b/iu.test(first) &&
+      (firstToken === "flowchart" || firstToken === "graph") &&
       /(?:\[|\(|\{|\|)\s*end\s*(?:\]|\)|\})/iu.test(body)
     ) {
       findings.push(
@@ -301,6 +339,20 @@ function selfTest(): number {
         '  A["开始"] --> B["结束"]',
         "```",
         "",
+        "```mermaid",
+        "timeline",
+        "  2026 : 扩展 Mermaid 类型",
+        "```",
+        "",
+        "```mermaid",
+        "xychart-beta",
+        '  title "趋势"',
+        "  line [1, 2, 3]",
+        "```",
+        "",
+        ...SUPPORTED_MERMAID_TYPES.filter(
+          (type) => !["flowchart", "timeline", "xychart-beta"].includes(type)
+        ).map((type) => ["```mermaid", type, "```"].join("\n")),
       ].join("\n"),
       "utf-8"
     );
@@ -316,8 +368,7 @@ function selfTest(): number {
         "# Main",
         "> [!custom] bad",
         "```mermaid",
-        "flowchart TB",
-        'A["x"] --> B["end"]',
+        "unsupportedDiagram",
         "click A callback()",
         "```",
       ].join("\n"),
