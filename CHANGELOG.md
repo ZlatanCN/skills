@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2] - 2026-08-10
+
+### 其他
+- chore(knowledge-distiller): record review protocol optimization
+- optimize knowledge-distiller: centralize review lifecycle
+
+
 ## [0.4.1] - 2026-08-10
 
 ### 修复
