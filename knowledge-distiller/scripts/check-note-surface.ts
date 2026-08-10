@@ -20,6 +20,8 @@ const SUPPORTED_MERMAID_TYPES = [
   "swimlane-beta",
   "sequenceDiagram",
   "classDiagram",
+  "classDiagram-v2",
+  "stateDiagram",
   "stateDiagram-v2",
   "erDiagram",
   "mindmap",
@@ -54,8 +56,33 @@ const SUPPORTED_MERMAID_TYPES = [
   "cynefin-beta",
   "treeView-beta",
   "zenuml",
+  "railroad-diagram",
+  "railroad-ebnf",
+  "railroad-abnf",
+  "railroad-peg",
+  "info",
 ] as const;
 const SUPPORTED_MERMAID_TYPE_SET = new Set<string>(SUPPORTED_MERMAID_TYPES);
+
+function firstMermaidDeclaration(body: string): string {
+  const lines = body.split(/\r?\n/u);
+  const firstIndex = lines.findIndex((line) => line.trim());
+  if (firstIndex === -1) {
+    return "";
+  }
+  if (lines[firstIndex]?.trim() !== "---") {
+    return lines[firstIndex]?.trim() ?? "";
+  }
+  const closingIndex = lines.findIndex(
+    (line, index) => index > firstIndex && line.trim() === "---"
+  );
+  return (
+    lines
+      .slice(closingIndex === -1 ? firstIndex : closingIndex + 1)
+      .find((line) => line.trim())
+      ?.trim() ?? ""
+  );
+}
 
 function collectFenceFindings(
   file: string,
@@ -146,18 +173,19 @@ function collectMermaidFindings(
 ): void {
   for (const block of blocks) {
     const { body } = block;
-    const first =
-      body
-        .split(/\r?\n/u)
-        .find((line) => line.trim())
-        ?.trim() ?? "";
+    const first = firstMermaidDeclaration(body);
     const firstToken = first.split(/\s+/u)[0] ?? "";
     if (!SUPPORTED_MERMAID_TYPE_SET.has(firstToken)) {
+      const caseHint = SUPPORTED_MERMAID_TYPES.find(
+        (type) => type.toLowerCase() === firstToken.toLowerCase()
+      );
       findings.push(
         finding(
           "mermaid-type-unsupported",
           "error",
-          "Mermaid block does not start with a supported diagram type",
+          caseHint
+            ? `Mermaid diagram type ${JSON.stringify(firstToken)} is not canonical; use ${caseHint}`
+            : `Mermaid diagram type ${JSON.stringify(firstToken)} is not supported`,
           {
             evidence: {
               first_line: first,
@@ -173,9 +201,9 @@ function collectMermaidFindings(
       [/^\s*click\b/imu, "click interactions"],
       [/\bcallback\s*\(/iu, "callbacks"],
       [/javascript\s*:/iu, "javascript URL"],
-      [/^\s*%%\s*\{init\}/imu, "init directive"],
+      [/^\s*%%\s*\{(?:init|initialize)\b/imu, "init directive"],
       [/^\s*config\b/imu, "config directive"],
-      [/<\s*script\b/iu, "embedded script"],
+      [/<\s*\/?\s*[A-Za-z][^>\r\n]*>/iu, "raw HTML"],
     ];
     for (const [pattern, label] of forbidden) {
       if (pattern.test(body)) {
@@ -191,11 +219,11 @@ function collectMermaidFindings(
     }
     if (
       (firstToken === "flowchart" || firstToken === "graph") &&
-      (/(?:\[|\(|\{|\|)\s*end\s*(?:\]|\)|\})/iu.test(body) ||
-        /(?:^|(?:-->|---|-.->|==>)\s*(?:\|[^|\r\n]*\|\s*)?)end(?:\s|$|:)/imu.test(
+      (/(?:\[|\(|\{|\|)\s*end\s*(?:\]|\)|\})/u.test(body) ||
+        /(?:^|(?:-->|---|-.->|-\.\.->|==>|~~~)\s*(?:\|[^|\r\n]*\|\s*)?)end(?:\s|$|:)/mu.test(
           body
         ) ||
-        /(?:^|\s)end\s+(?:-->|---|-.->|==>)/imu.test(body))
+        /(?:^|\s)end\s+(?:-->|---|-.->|-\.\.->|==>|~~~)/mu.test(body))
     ) {
       findings.push(
         finding(
@@ -371,6 +399,14 @@ function selfTest(): number {
         "  line [1, 2, 3]",
         "```",
         "",
+        "```mermaid",
+        "---",
+        "title: Safe frontmatter",
+        "---",
+        "flowchart LR",
+        "  A --> End",
+        "```",
+        "",
         ...SUPPORTED_MERMAID_TYPES.filter(
           (type) => !["flowchart", "timeline", "xychart-beta"].includes(type)
         ).map((type) => ["```mermaid", type, "```"].join("\n")),
@@ -392,12 +428,21 @@ function selfTest(): number {
       "flowchart TB",
       "A --> end",
       "A -->|done| end",
+      "A -..-> end",
+      "A ~~~ end",
+      "%%{init: {'theme': 'forest'}}%%",
       "click A callback()",
       "```",
     ]);
     assertSurfaceFailed(root, "case-sensitive", [
       "```mermaid",
       "c4context",
+      "```",
+    ]);
+    assertSurfaceFailed(root, "raw-html", [
+      "```mermaid",
+      "flowchart LR",
+      'A["<b>raw</b>"]',
       "```",
     ]);
     console.log("note-surface checker self-test: PASS");

@@ -13,10 +13,10 @@
 | 层级 | 读者要回答的问题 | 类型 | 适合表达 | 不要拿它代替 |
 | --- | --- | --- | --- | --- |
 | 常用 | 有哪些组件、边界、步骤或数据路径？ | `flowchart`（`graph` 为兼容别名） | 架构、流程、因果链、决策和分层 | 时间轴、类模型 |
-| 常用 | 谁负责每个步骤，交接发生在哪里？ | `swimlane-beta` | 按团队、角色、阶段划分的流程 | 没有所有权问题的普通流程 |
+| 进阶 | 谁负责每个步骤，交接发生在哪里？ | `swimlane-beta` | 按团队、角色、阶段划分的流程 | 没有所有权问题的普通流程 |
 | 常用 | 谁先调用谁，期间发生了什么？ | `sequenceDiagram` | 请求/响应、协作、生命周期中的一次交互 | 静态组件关系 |
-| 常用 | 对象有哪些状态，什么事件触发转移？ | `stateDiagram-v2` | 生命周期、协议状态、状态机 | 一次性的执行步骤 |
-| 常用 | 哪些类型、接口和关系构成模型？ | `classDiagram` | 类、接口、继承、组合、依赖 | 运行时调用顺序 |
+| 常用 | 对象有哪些状态，什么事件触发转移？ | `stateDiagram-v2`（旧版 `stateDiagram`） | 生命周期、协议状态、状态机 | 一次性的执行步骤 |
+| 常用 | 哪些类型、接口和关系构成模型？ | `classDiagram`（兼容 `classDiagram-v2`） | 类、接口、继承、组合、依赖 | 运行时调用顺序 |
 | 常用 | 哪些实体如何关联，基数是什么？ | `erDiagram` | 表、实体、字段关系、基数 | 面向对象继承 |
 | 常用 | 一个主题如何拆成概念层级？ | `mindmap` | 知识树、分类、脑图 | 有方向的流程 |
 | 常用 | 事件、版本或阶段如何沿时间展开？ | `timeline` | 历史、演进、里程碑、版本线 | 任务排期 |
@@ -42,6 +42,8 @@
 | 专用 | 不确定性和复杂性应如何分类？ | `cynefin-beta` | Cynefin 决策框架 | 事实流程图 |
 | 专用 | 树节点如何展开和浏览？ | `treeView-beta` | 文件/目录/层级浏览 | 有方向的执行流程 |
 | 专用 | 参与者之间的时序如何用简洁语法表达？ | `zenuml` | ZenUML 风格交互 | 普通静态关系 |
+| 专用 | 语法规则如何展开成可读的轨道图？ | `railroad-diagram` / `railroad-ebnf` / `railroad-abnf` / `railroad-peg` | 语法、文法和 parser 教学 | 普通业务流程 |
+| 专用 | Mermaid 的诊断/元信息如何展示？ | `info` | 特殊 renderer 或调试场景 | 普通知识图表 |
 
 `flowchart` 是默认兜底，不是万能答案。先问“读者要看关系、时间、数量、状态、层级还是边界”，再选类型；同一篇笔记可以有多个图，但每个图只能有一个主问题。
 
@@ -79,17 +81,18 @@ flowchart TB
 
 | 类型族 | 画之前确认 | 画之后检查 |
 | --- | --- | --- |
-| `flowchart` / `graph` / `swimlane-beta` | 每条箭头是关系、因果还是顺序；泳道是否代表同一种所有权 | `end`、`o/x` 风险；交叉和跨泳道交接是否可追踪 |
+| `flowchart` / `graph` | 每条箭头是关系、因果还是顺序；边界是否真的需要 `subgraph` | 小写 `end`、`o/x` 风险；交叉是否超过可追踪范围 |
+| `swimlane-beta` | 每条泳道是否代表同一种所有权；交接是否是主要问题 | 泳道用 `end` 关闭是合法结构；只检查跨泳道交接是否清楚 |
 | `sequenceDiagram` / `zenuml` | 参与者是否真的参与；是否只保留关键交互 | 不要把完整日志倾倒进图；消息方向和响应关系要对称 |
-| `stateDiagram-v2` | 状态是稳定状态，不是瞬时动作；每个转移有触发条件 | 有初始/终态时明确写出；避免把状态名写成长句 |
-| `classDiagram` / `erDiagram` | 是类型关系还是实体/基数关系；不要混用两种语义 | 只保留关键属性/字段；不要复制整段代码或伪造基数 |
+| `stateDiagram-v2` / `stateDiagram` | 状态是稳定状态，不是瞬时动作；每个转移有触发条件 | 有初始/终态时明确写出；避免把状态名写成长句 |
+| `classDiagram` / `classDiagram-v2` / `erDiagram` | 是类型关系还是实体/基数关系；不要混用两种语义 | 只保留关键属性/字段；不要复制整段代码或伪造基数 |
 | `mindmap` / `treeView-beta` | 层级是否比列表更能帮助记忆或导航 | 每层短而平行；不要把无关系的名词堆成树 |
 | `timeline` / `gantt` / `gitGraph` | 时间轴、排期或版本线是否是问题本身 | 日期、版本和依赖格式统一；不要把概念分类伪装成排期 |
 | `journey` / `quadrantChart` / `radar-beta` | 角色、阶段、轴和量纲是否能复述 | 说明评分尺度；避免虚假的精确位置；正文解释判断依据 |
 | `pie` / `xychart` / `sankey` / `treemap-beta` | 数值、单位、总量、时间范围和来源是否存在 | 不制造小数精度；数据变化时同步更新图和来源 |
 | `requirementDiagram` / `C4*` / `architecture-beta` | 需求追踪、系统边界或部署拓扑是否是主要问题 | 保持需求-验证、系统-容器、服务-资源的边界，不混入业务步骤 |
 | `block` / `packet` / `kanban` | 位置、区块、位段或列是否有稳定语义 | 布局规则一致；字段/卡片标签短；不要把看板当知识目录 |
-| `venn-beta` / `ishikawa-beta` / `wardley-beta` / `cynefin-beta` / `eventmodeling` | 方法本身是否已在正文采用 | 解释集合、原因、价值链或框架含义，不能只贴图不解释 |
+| `venn-beta` / `ishikawa-beta` / `wardley-beta` / `cynefin-beta` / `eventmodeling` / `railroad-*` | 方法或语法模型本身是否已在正文采用 | 解释集合、原因、价值链或语法含义，不能只贴图不解释 |
 
 这些约束是选型和人工语义检查，不是 parser 的完整替代。图类型、禁止语法和 `flowchart` 的 `end` 风险由机械 checker 负责；关系是否正确、数据是否有来源、图是否值得存在，仍由作者和双轴审查负责。
 
@@ -104,6 +107,15 @@ flowchart TB
 对于 `*-beta`、`C4Context`、`architecture-beta`、`eventmodeling` 等较新的或专用类型，默认按“未验证”处理，除非本次任务实际打开了目标阅读视图。不要因为 checker 通过就省略 fallback。
 
 每张图都要有一句邻近正文解释。复杂图在目标 renderer 支持时可补 `accTitle` 和 `accDescr`，但它们不能替代正文 fallback。
+
+如果没有目标 renderer，把风险写进 `format_plan.render_risks`，例如：
+
+```json
+{
+  "render_status": "unavailable",
+  "render_risks": ["Mermaid 渲染未验证"]
+}
+```
 
 ## 5. 交付前 preflight
 
