@@ -1,6 +1,9 @@
 # runtime / machine-local artifacts — never publish
-state.json
-knowledge-distiller-workspace/
+/knowledge-distiller/state.json
+/knowledge-distiller/knowledge-distiller-workspace/
+/knowledge-distiller/evals/
+/knowledge-distiller/results.tsv
+/knowledge-distiller/test-prompts.json
 .DS_Store
 node_modules/
-.idea
+.idea/
