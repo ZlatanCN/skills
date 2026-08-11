@@ -453,12 +453,6 @@ function selfTest(): number {
         "```",
         "",
         "```mermaid",
-        "xychart",
-        '  title "趋势"',
-        "  line [1, 2, 3]",
-        "```",
-        "",
-        "```mermaid",
         "---",
         "title: Safe frontmatter",
         "config:",
@@ -468,9 +462,10 @@ function selfTest(): number {
         "  A --> End",
         "```",
         "",
-        ...SUPPORTED_MERMAID_TYPES.filter(
-          (type) => !["flowchart", "timeline", "xychart-beta"].includes(type)
-        ).map((type) => ["```mermaid", type, "```"].join("\n")),
+        ["```mermaid", "sequenceDiagram", "```"].join("\n"),
+        ["```mermaid", "stateDiagram-v2", "```"].join("\n"),
+        ["```mermaid", "classDiagram", "```"].join("\n"),
+        ["```mermaid", "erDiagram", "```"].join("\n"),
       ].join("\n"),
       "utf-8"
     );

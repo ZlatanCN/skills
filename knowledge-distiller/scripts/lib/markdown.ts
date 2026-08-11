@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 
-import { fileHash } from "./evidence.ts";
+import { sha256 } from "./evidence.ts";
 
 export type Heading = {
   line: number;
@@ -43,7 +43,7 @@ export type Surface = {
   callouts: Callout[];
   tables: Table[];
   wikilinks: { line: number; raw: string }[];
-  external_links: { line: number; raw: string }[];
+  external_links: { line: number; raw: string; text?: string }[];
   footnotes: { line: number; raw: string }[];
   emphasis: {
     line: number;
@@ -80,51 +80,11 @@ export const CALLOUT_ALIASES = new Map<string, string>(
 export const SUPPORTED_MERMAID_TYPES = [
   "flowchart",
   "graph",
-  "swimlane-beta",
   "sequenceDiagram",
   "classDiagram",
-  "classDiagram-v2",
-  "stateDiagram",
   "stateDiagram-v2",
   "erDiagram",
-  "mindmap",
   "timeline",
-  "gantt",
-  "journey",
-  "quadrantChart",
-  "pie",
-  "xychart",
-  "xychart-beta",
-  "sankey",
-  "sankey-beta",
-  "requirementDiagram",
-  "gitGraph",
-  "C4Context",
-  "C4Container",
-  "C4Component",
-  "C4Dynamic",
-  "C4Deployment",
-  "architecture-beta",
-  "block",
-  "block-beta",
-  "packet",
-  "packet-beta",
-  "kanban",
-  "radar-beta",
-  "treemap-beta",
-  "venn-beta",
-  "eventmodeling",
-  "ishikawa-beta",
-  "wardley-beta",
-  "cynefin-beta",
-  "treeView-beta",
-  "zenuml",
-  "railroad-diagram",
-  "railroad-ebnf",
-  "railroad-abnf",
-  "railroad-peg",
-  "flowchart-elk",
-  "info",
 ] as const;
 
 export const SUPPORTED_MERMAID_TYPE_SET = new Set<string>(
@@ -312,6 +272,64 @@ function collectTable(
   }
 }
 
+function collectCallout(
+  lineNumber: number,
+  line: string,
+  quoteDepth: number,
+  state: ParseState
+): void {
+  const callout = line.match(
+    /^\s*(?<prefix>(?:>\s*)+)\[!(?<type>[A-Za-z0-9_-]+)\](?<fold>[+-]?)(?:[ \t]+(?<title>.*?))?\s*$/u
+  );
+  if (!callout?.groups) {
+    return;
+  }
+  const { fold, prefix, title, type } = callout.groups;
+  let calloutFold: Callout["fold"] = "none";
+  if (fold === "+") {
+    calloutFold = "open";
+  } else if (fold === "-") {
+    calloutFold = "closed";
+  }
+  state.callouts.push({
+    depth: Math.max(0, (prefix.match(/>/gu)?.length ?? quoteDepth) - 1),
+    fold: calloutFold,
+    line: lineNumber,
+    title: (title ?? "").trim(),
+    type: type.toLowerCase(),
+  });
+}
+
+function collectLinks(
+  lineNumber: number,
+  visible: string,
+  state: ParseState
+): void {
+  for (const match of visible.matchAll(/\[\[(?<raw>[^\]\n]+)\]\]/gu)) {
+    if (match.groups?.raw) {
+      state.wikilinks.push({ line: lineNumber, raw: match.groups.raw });
+    }
+  }
+  for (const match of visible.matchAll(
+    /\[(?<text>[^\]\n]*)\]\((?<url>https?:\/\/[^\s)\]>]+)\)|(?<bare>https?:\/\/[^\s)\]>]+)/gu
+  )) {
+    const raw = match.groups?.url ?? match.groups?.bare ?? "";
+    if (!raw) {
+      continue;
+    }
+    const text = match.groups?.text;
+    state.externalLinks.push({
+      line: lineNumber,
+      raw,
+      ...(text ? { text } : {}),
+    });
+  }
+  for (const match of visible.matchAll(/\[\^[^\]\n]+\]/gu)) {
+    state.footnotes.push({ line: lineNumber, raw: match[0] });
+  }
+  state.emphasis.push(...collectEmphasis(lineNumber, visible));
+}
+
 function collectBodyLine(
   lineNumber: number,
   line: string,
@@ -337,39 +355,9 @@ function collectBodyLine(
     }
   }
 
-  const callout = line.match(
-    /^\s*(?<prefix>(?:>\s*)+)\[!(?<type>[A-Za-z0-9_-]+)\](?<fold>[+-]?)(?:[ \t]+(?<title>.*?))?\s*$/u
-  );
-  if (callout?.groups) {
-    const { fold, prefix, title, type } = callout.groups;
-    let calloutFold: Callout["fold"] = "none";
-    if (fold === "+") {
-      calloutFold = "open";
-    } else if (fold === "-") {
-      calloutFold = "closed";
-    }
-    state.callouts.push({
-      depth: Math.max(0, (prefix.match(/>/gu)?.length ?? quoteDepth) - 1),
-      fold: calloutFold,
-      line: lineNumber,
-      title: (title ?? "").trim(),
-      type: type.toLowerCase(),
-    });
-  }
-
+  collectCallout(lineNumber, line, quoteDepth, state);
   collectTable(lineNumber, visible, nextLine, state);
-  for (const match of visible.matchAll(/\[\[(?<raw>[^\]\n]+)\]\]/gu)) {
-    if (match.groups?.raw) {
-      state.wikilinks.push({ line: lineNumber, raw: match.groups.raw });
-    }
-  }
-  for (const match of visible.matchAll(/https?:\/\/[^\s)\]>]+/gu)) {
-    state.externalLinks.push({ line: lineNumber, raw: match[0] });
-  }
-  for (const match of visible.matchAll(/\[\^[^\]\n]+\]/gu)) {
-    state.footnotes.push({ line: lineNumber, raw: match[0] });
-  }
-  state.emphasis.push(...collectEmphasis(lineNumber, visible));
+  collectLinks(lineNumber, visible, state);
 }
 
 function processLine(
@@ -469,7 +457,7 @@ export function parseMarkdown(file: string): Surface {
     body_lines: state.bodyLines,
     bytes: bytes.byteLength,
     callouts: state.callouts,
-    content_hash: fileHash(file),
+    content_hash: sha256(bytes),
     emphasis: state.emphasis,
     external_links: state.externalLinks,
     fences: state.fences,

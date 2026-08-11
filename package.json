@@ -4,6 +4,7 @@
   "scripts": {
     "check": "ultracite check",
     "fix": "ultracite fix",
+    "typecheck": "tsc --noEmit",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -12,6 +13,7 @@
     "lint-staged": "^17.3.0",
     "oxfmt": "^0.62.0",
     "oxlint": "^1.77.0",
+    "typescript": "^7.0.2",
     "ultracite": "7.10.2"
   }
 }

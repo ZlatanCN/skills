@@ -1,195 +1,51 @@
-# Obsidian 写作与 Markdown 表达规范
+# Obsidian writing style
 
-本文件是 `knowledge-distiller` 的唯一格式规范来源。它回答两个不同的问题：
+Use the simplest surface that preserves the reader's job. This is a style reference, not a format inventory.
 
-1. Obsidian/Markdown 能表达什么；
-2. 哪种表达方式最适合当前读者、概念和教学关系。
+## Defaults
 
-语法能力不是使用配额。不要为了“覆盖语法”机械地给每篇笔记塞粗体、斜体、表格或 callout；但也不能因为普通段落最省事，就让所有视觉层级消失。格式是教学模型的一部分，必须服务于定位、理解、比较、记忆或执行。
+- Ordinary paragraphs explain concepts and causal relationships.
+- Headings state the question or decision a section resolves.
+- One paragraph has one main job.
+- Numbered lists express order or decisions; unordered lists express parallel items.
+- Tables compare one aligned axis; move long explanations into prose.
+- Code blocks show executable syntax or clearly labelled teaching pseudocode.
+- Mermaid shows a relationship, state transition, sequence, or structure that prose would make longer.
+- Wikilinks connect to an actual defining passage in the vault.
 
-## 1. 格式决策顺序
+Ask “what would the reader lose if this formatting disappeared?” If the answer is nothing, use a paragraph.
 
-写作前，先从 teaching model 中标出每个段落或块的主要读者作用，再选择表达形式：
+## Emphasis and callouts
 
-| 读者作用 | 首选形式 | 不应替代的东西 |
-| --- | --- | --- |
-| 解释一个核心概念 | 普通段落 + 视扫描需要突出关键短语 | 不要用标题或 callout 代替完整定义 |
-| 突出结论、约束或关键差异 | `**粗体**` | 不要整段加粗 |
-| 标记版本边界、前提、不确定性 | `info` / `note` callout | 不要把限制藏在句末括号里 |
-| 提醒常见误解、风险或错误直觉 | `warning` / `danger` callout | 不要只靠一句“注意”带过 |
-| 给抽象机制提供可验证的场景或类比 | `example` callout | 不要把类比伪装成真实实现 |
-| 引导读者回答一个关键问题 | `question` callout 或普通问题句 | 不要增加没有后续用途的提问 |
-| 对比同一主轴上的多个对象 | 表格 | 不要用表格拼接不同主轴 |
-| 展示可执行实现 | 带语言标记的代码块 | 不要让伪代码看起来像可直接运行的补丁 |
-| 表达结构、时序或状态转移 | Mermaid 或等宽文本图 | 不要用图替代正文因果解释 |
-| 连接 vault 中定义过的概念 | 语义有依据的 wikilink | 不要只因为标题相似就链接 |
+- Bold a conclusion, constraint, or key difference; never bold a whole paragraph.
+- Use inline code for identifiers, commands, filenames, exact syntax, and state values.
+- Use italics sparingly for a qualifier; do not use it as a definition or code.
+- Use `info` for scope, version, or precondition boundaries.
+- Use `warning` or `danger` for common wrong intuitions and risky actions.
+- Use `example` for a concrete scenario or analogy.
 
-格式选择至少要能回答：**读者为什么需要这个视觉标记，去掉它会损失什么？**
-
-## 2. 语法表面与语义职责
-
-### 2.1 强调与行内表达
-
-| 语法 | 形式 | 适用语义 | 反模式 |
-| --- | --- | --- | --- |
-| 粗体 | `**关键判断**` | 结论、不可违反的约束、对比后的落点、段落中最值得扫描的短语 | 整段加粗、把所有术语都加粗、用粗体伪造标题 |
-| 斜体 | `*限定语*` | 少量语气限定、读者应暂时保留的解释、第一次出现的非核心外语短语 | 连续多句斜体、用斜体表示定义或代码 |
-| 行内代码 | `` `Fiber` `` | 标识符、字段、命令、文件名、精确语法、状态值 | 把普通中文术语全部包成代码 |
-| 高亮 | `==检索目标==` | 需要回看或在长文中快速定位的极少数词句 | 把高亮当第二种粗体，整段标记 |
-| 删除线 | `~~旧说法~~` | 仅在明确记录演进、错误修正或迁移说明时使用 | 在最终教学正文中保留编辑痕迹 |
-
-优先级通常是：**段落结论用粗体，精确符号用行内代码，限定条件用普通句子或 callout**。不要同时给同一短语加粗、斜体、高亮和代码。
-
-一篇长技术笔记完全没有粗体并非自动失败，但必须在格式自检中确认：核心结论、关键差异和边界条件仍然容易扫描。若这些信息只能靠读完整段落才能找到，说明格式计划不完整。
-
-### 2.2 标题与段落
-
-- 文件名是否承担隐含标题，必须遵守本次笔记的标题约定；不要同时制造重复的根标题。
-- 标题表达读者要解决的问题或决策，不要只重复产品名或内部函数名。
-- 标题层级表达教学关系：子问题必须比父问题深一级，平行问题保持同级。
-- 一个段落只承担一个主要工作：定义、因果、例子、边界、比较或过渡。
-- 不要用连续空行、装饰线或大量短句制造虚假的层级。
-
-### 2.3 列表、引用与表格
-
-- 有顺序的因果、步骤或决策使用编号列表；无顺序的并列项使用无序列表。
-- 列表项应保持同一语法层级和同一比较轴；不要把解释段落拆成没有谓语的关键词堆。
-- 普通引用 `>` 用于短引文或需要保留原话边界的内容；带 `[!type]` 的引用块属于 callout，有独立语义规则。
-- 表格只承载可对齐的字段。表格前后用正文说明比较轴、结论和局限；不要把完整论证塞进单元格。
-- 如果表格单元格需要多句长段落，改用分节说明或列表。
-
-## 3. Callout 完整规范
-
-### 3.1 基本语法
-
-标准形式是：
+Every callout needs an independent reader function. Keep the main argument in ordinary prose. Do not nest beyond two
+levels, rely on custom CSS, or use a callout as decoration.
 
 ```markdown
-> [!info] 版本边界
-> 本文以 React v18.2.0 为学习对象；示例是教学模型，不是完整源码补丁。
+> [!warning] Boundary
+> This example describes the mechanism, not a complete production implementation.
 ```
 
-可选标题必须紧跟类型；没有标题时使用默认标题。Callout 可以折叠：
+## Links and sources
 
-```markdown
-> [!example]+ 一个具体场景
-> 默认展开的示例内容。
+External links belong in the sentence, footnote, or callout that states the supported claim. Do not append a bare URL or
+a source-title link list at the end. The clickable text should be natural wording from the claim; RFC sections, papers,
+and versioned specifications may use their citation as the anchor.
 
-> [!warning]- 常见误解
-> 默认折叠的补充警告。
-```
+Do not link every ordinary term. Link density follows the reader model, not the number of search results.
 
-Callout 内的每一行都必须保持 `>` 前缀。Callout 原生支持 Markdown、wikilink、embed、列表、代码块和多段文字；嵌套 callout 也有明确语法，但超过两层时优先拆成普通正文，避免读者失去层级。
+## Diagrams and code
 
-嵌套示例：
+Explain what the reader should observe before a diagram and what it cannot express after it. Keep node IDs ASCII,
+labels short and quoted when ambiguous, and never put raw wikilinks in Mermaid labels.
 
-```markdown
-> [!question] 这个结论适用于所有 renderer 吗？
-> > [!warning] 不适用于所有 renderer
-> > 这里的示例只覆盖 React DOM 的教学模型。
-```
+For static Obsidian notes, do not use Mermaid `click`, callbacks, external URLs, raw HTML, init/config directives, or
+embedded JavaScript. If the target renderer was not opened, report `Mermaid 渲染未验证`.
 
-Callout 可以只有标题而没有正文；标题中可以使用用户可读的自定义文字。类型标识不区分大小写；未注册的类型在没有自定义 CSS/插件时会回退为 `note`。依赖 CSS snippet 或社区插件定义的自定义类型时，必须把它标记为 vault-specific，不得把它当成跨环境稳定语法。
-
-### 3.2 类型、别名与用途
-
-以下类型是可用的语义集合；别名只用于迁移已有笔记或匹配读者熟悉的词，不要在同一 skill 中随意混用。
-
-| 主类型 | 常见别名 | 用途 |
-| --- | --- | --- |
-| `note` | — | 一般补充说明或需要保留的旁注 |
-| `abstract` | `summary`, `tldr` | 摘要、全局概览、先给读者的短结论 |
-| `info` | — | 定义、版本边界、范围、上下文 |
-| `todo` | — | 尚未完成的行动或待核对项；最终交付前通常应消化掉 |
-| `tip` | `hint`, `important` | 记忆抓手、实践建议、快捷判断 |
-| `success` | `check`, `done` | 已验证的结果或成功条件 |
-| `question` | `help`, `faq` | 引导问题、读者常见疑问、需要回答的入口 |
-| `warning` | `caution`, `attention` | 常见误解、边界、可能导致错误推理的简化 |
-| `failure` | `fail`, `missing` | 失败结果、缺失条件、未满足的前置 |
-| `danger` | `error` | 高风险动作、错误会造成不可逆或严重后果的边界 |
-| `bug` | — | 已知缺陷、反例、与预期不符的行为 |
-| `example` | — | 类比、具体输入输出、场景化解释 |
-| `quote` | `cite` | 外部原话或需要保留出处边界的引文 |
-
-类型必须与内容的主要读者作用匹配。一个关于版本限制的块用 `info`，即使它也让人“注意”；一个展示错误直觉的块用 `warning`，即使它同时是一个例子。不要把所有块都标成 `info`。
-
-### 3.3 什么时候必须考虑 Callout
-
-在 teaching model 中出现以下内容时，必须明确评估 callout，而不是默认写成普通段落：
-
-1. 读者容易把教学模型误认为完整实现；
-2. 机制有版本、环境、renderer 或前置条件边界；
-3. 一个类比显著降低抽象理解成本；
-4. 一个反例或错误直觉值得在扫描时立即看到；
-5. 一条操作建议会改变读者接下来的选择；
-6. 一个未决或未验证事实必须和已证实事实隔离。
-
-这不是“每节至少一个 callout”的配额。没有独立读者作用的装饰块应删除；有独立作用的原有 callout 不能仅因“平铺更简洁”而删除。
-
-### 3.4 Callout removal test
-
-逐个把 callout 想象成普通段落，检查：
-
-- 去掉块样式后，读者是否仍能在同样位置发现这条边界、风险、例子或决策提示；
-- 这个块是否有明确的类型，而不是把普通段落换了颜色；
-- 标题是否提供检索价值，而不是重复下一句正文；
-- 内容是否足够短，主体论证是否仍在正文中完成。
-
-若四项都表明样式没有额外价值，改为普通段落；若去掉后会让读者错过重要边界或例子，保留并修正类型/标题。
-
-## 4. 代码、公式、图与链接
-
-### 4.1 代码和公式
-
-- 代码块必须标注语言；伪代码标为 `text` 或 `ts` 并在块前说明它是教学模型。
-- 代码中出现的字段、状态和函数名应与正文一致；示例不能引用正文未定义的成员。
-- 公式中的每个符号在附近定义；公式解释“为什么这样算”，不要只展示结果。
-- 需要表达差异时，代码块旁边用粗体结论或短表格指出变化点，不要要求读者自行 diff 两段代码。
-
-### 4.2 Mermaid 与等宽图
-
-- 只有当结构或时序关系比 prose 更难用文字表达时才用 Mermaid。
-- 在 teaching model 中记录 `diagram_policy`：`required`、`helpful` 或 `not_needed`，以及读者问题、理由和格式；用户明确要求 Mermaid 时必须记录为 `required` + `mermaid`，不能用“正文已经解释”绕过。
-- Mermaid 只画主关系，节点文字保持短；边标签说明关系，不写完整段落。
-- 图前解释读者要观察什么，图后说明它不能表达的边界。
-- Mermaid 的语法与渲染规则以 `references/mermaid.md` 为准；无法渲染时提供等价的 prose 或等宽文本图，并报告未验证状态。
-
-### 4.3 Wikilink、外链与脚注
-
-- Wikilink 的目标必须先通过机械唯一性和语义定义两道门；展示别名可以中文化，但不能改变目标语义。
-- 外链用于官方文档、源码、论文或当前事实的直接证据；链接附近说明它支持什么主张。
-- 外链必须嵌在承载主张的句子、脚注或 callout 中；不得把裸 URL 或只含链接的行当作“参考资料”堆在文末。`format_plan.link_surface.external_links` 逐项记录 `raw`、`claim_id`、`support` 和 `placement`（`inline|footnote|callout`）。
-- 脚注用于不应打断主线的限定、出处补充或术语来源；核心定义不能藏在脚注里。
-- 不要为每个普通术语添加链接；链接密度应由 reader model 而不是搜索结果数量决定。
-
-## 5. 一次格式审查
-
-在 draft 阶段建立机器可读的 `knowledge-distiller.format-plan.v1`，字段、逐行覆盖规则和调用方式以
-`references/mechanical-gates.md` §2.1 为准。这里保留的是语义要求：
-
-- `emphasis_targets` 说明哪些结论/差异需要粗体或其他行内强调；
-- `callout_candidates` 说明候选块的类型、标题、读者作用、保留/改为正文的决定；
-- `code_table_diagram_map` 说明每个代码块/表格/图解决什么问题；
-- `link_surface` 说明 wikilink、外链、脚注的作用和边界；
-- `render_risks` 说明嵌套、长表格、Mermaid、特殊 Markdown 的风险。
-
-运行 `references/mechanical-gates.md` §2 的 canonical `check-note.ts` 命令，让代码验证 hash、字段和实际格式表面的逐行覆盖；代码通过只代表“没有漏记”，不代表格式选择一定有教学价值。
-
-最终检查至少覆盖：
-
-- 核心结论是否能扫描到，而不是全部埋在普通段落里；
-- 粗体、代码、斜体、高亮没有互相抢职责；
-- 每个 callout 都有明确类型、标题和 removal-test 结果；
-- 原有的类比、警告和边界若被删除，有具体的 reader-model 理由；
-- 表格、代码、Mermaid、wikilink 和脚注都与正文主线相连；
-- 每个外链都在正文语义中回答“它支持哪一个主张”，没有孤立的链接行；
-- diagram policy 与正文实际图示一致，显式 Mermaid 请求已落成 Mermaid 块；
-- 视觉格式没有制造比原文更多的噪音、重复或伪层级。
-
-clarity reviewer 检查格式是否帮助读者恢复主线、找到重点和区分层级；accuracy reviewer 检查格式块中的每一条事实、示例、公式和限制，不能把 callout 视为审查范围外的装饰。
-
-## 6. 权威性与冲突处理
-
-本文件是 `knowledge-distiller` 的格式语义来源。`SKILL.md` 只规定读取本文件和满足格式检查的硬门；`references/mechanical-gates.md` 负责脚本职责与机器证据契约；`references/mermaid.md` 负责 Mermaid 的专门语法和渲染约束。
-
-如果格式规范与用户明确要求冲突，遵守用户要求；如果格式偏好与事实、范围、vault 完整性或可渲染性冲突，遵守后者，并在报告中说明未采用的格式方案。
+Define formula symbols near the formula. Code fields, states, and function names must match the surrounding prose.

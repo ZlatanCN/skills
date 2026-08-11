@@ -277,8 +277,9 @@ function checkFile(manifest: Manifest, suppliedFile: string): ErrorItem[] {
     return [{ file, line: 0, message: "file does not exist" }];
   }
   const stat = fs.lstatSync(file);
+  const real = fs.realpathSync(file);
   if (
-    !inside(manifest.rootRealpath, file) ||
+    !inside(manifest.rootRealpath, real) ||
     stat.isSymbolicLink() ||
     !stat.isFile()
   ) {
@@ -291,7 +292,6 @@ function checkFile(manifest: Manifest, suppliedFile: string): ErrorItem[] {
       },
     ];
   }
-  const real = fs.realpathSync(file);
   const current = manifest.notes.find((note) => note.realpath === real);
   if (!current) {
     return [
