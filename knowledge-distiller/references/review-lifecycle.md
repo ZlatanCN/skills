@@ -235,7 +235,7 @@ pending/running provider attempt: slow responses still follow §3's event protoc
 `manual_fallback` is not a provider attempt and does not consume the provider-attempt budget; it consumes the one
 per-axis fallback budget. If the journal itself is unavailable, the delivery record must carry the same budget plus
 `fallback_passes_by_axis: {clarity, accuracy}`; the delivery checker requires exactly one pass for each manually checked
-axis, so an unavailable journal cannot become a retry loop.
+axis and zero for provider axes, so an unavailable journal cannot become a retry loop.
 
 Close when both valid provider outcomes are clean, manual fallback leaves no actionable repair, no new actionable
 information appears, an explicit stop is confirmed, or the revision budget is exhausted. A late result cannot reopen a
@@ -284,7 +284,8 @@ open blocker, stale identity, or uncertain journal closure.
 ## 7. Verbatim reviewer prompts
 
 Substitute only the resolved absolute path, `attempt_id`, and `note_revision`. The local envelope carries `cycle_id` and
-`draft_hash`; preserve all metadata exactly.
+`draft_hash`; preserve all metadata exactly. Before dispatch, build the accuracy packet below from the existing claim
+ledger and body map in memory. It is a bounded reviewer input, not a new persisted artifact.
 
 ### Clarity reviewer
 
@@ -316,11 +317,25 @@ attempt_id: <attempt-id>
 note_revision: <note-revision>
 note_path: <absolute-note-path>
 
-Read references/obsidian-writing-style.md and references/mermaid.md when applicable. Check every material claim in prose,
-tables, callouts, code, diagrams, examples, links, and metadata. For each issue, quote the claim, explain the correction
-or missing qualification, and cite a source you can stand behind.
+accuracy_packet:
+  - claim_id: <ledger-id>
+    body_claim: <reader-facing claim>
+    scope: <version/conditions/boundary>
+    source: <exact source locator or local evidence>
+    support: <supporting range or excerpt>
+    limits: <known qualification, if any>
+    surfaces: [<surface-id>]
 
-Return claims_checked, source_coverage: complete only when every material claim is covered, unverified: — when none, A1: —
-when no issue exists, and result: clean only when all claims are accurate, scoped, and supported. Do not guess; use
-result: findings or result: unverified when evidence is incomplete.
+Treat the packet as the review index, not as truth. Check every packet claim against the exact note bytes and its listed
+source/evidence, including claims expressed in tables, callouts, code comments, diagrams, examples, links, and metadata.
+If a material claim-bearing surface in the note has no packet entry, report it as an accuracy blocker; do not rediscover
+the whole note from scratch. Inspect only the listed sources needed to decide support, scope, and limits. Do not perform
+broad topic research or read unrelated reference files; an inaccessible listed source is `unverified`, not a reason to
+expand the search. For each issue, quote the claim, explain the correction or missing qualification, and cite the source.
+
+Return `claims_checked` equal to the number of packet claims plus any uncovered material surfaces. Use
+`source_coverage: complete` only when every packet claim and every material surface is covered, `unverified: —` when none,
+and `A1: —` when no issue exists. Return `clean` only when all claims are accurate, scoped, and supported. Do not guess;
+use `findings` or `unverified` when evidence is incomplete. Keep the response to the contract fields and concise finding
+records; do not return a general essay.
 ```

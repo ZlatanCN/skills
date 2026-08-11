@@ -127,7 +127,7 @@ node scripts/check-delivery-report.ts --report "$DELIVERY_JSON" --json
 - `write_state: uncertain`、`idle`、`staging` 等写状态必须落到对应的非成功标签。
 - 当 journal 为 `passed` 时，报告必须携带 journal 文件路径和 SHA-256；脚本会重新运行 journal checker、比对事件数量/关闭游标，并要求两个 clean 轴的 attempt、draft hash、note path 以及 `source_coverage`、claims、after-state、C1–C5/A1 结果都能在同一份真实事件流中逐字段对齐。
 
-人工 fallback 不伪装成 provider 结果；轴级直接记录 `outcome: manual_checked`，并由 checker 根据两轴 outcome 推导 fallback 完成。不可用 provider 记录 `outcome: unavailable`，不能同时宣称 clean。若 journal 本身 unavailable，delivery 的 `review.review_budget.fallback_passes_by_axis` 必须证明每个 manual_checked 轴恰好一次 fallback。
+人工 fallback 不伪装成 provider 结果；轴级直接记录 `outcome: manual_checked`，并由 checker 根据两轴 outcome 推导 fallback 完成。不可用 provider 记录 `outcome: unavailable`，不能同时宣称 clean。若 journal 本身 unavailable，delivery 的 `review.review_budget.fallback_passes_by_axis` 必须证明每个 manual_checked 轴恰好一次 fallback、provider 轴为零。
 
 ## 5. 不要机械化的部分
 

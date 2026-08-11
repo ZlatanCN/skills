@@ -1149,7 +1149,8 @@ function validateReviewJournal(
 
 function validUnavailableFallbackBudget(
   budget: Record<string, unknown> | undefined,
-  fallbackPasses: Record<string, unknown> | undefined
+  fallbackPasses: Record<string, unknown> | undefined,
+  manualAxes: string[]
 ): boolean {
   if (!budget || !fallbackPasses) {
     return false;
@@ -1172,7 +1173,9 @@ function validUnavailableFallbackBudget(
   ) {
     return false;
   }
-  return fallbackPasses.clarity === 1 && fallbackPasses.accuracy === 1;
+  return ["clarity", "accuracy"].every(
+    (axis) => fallbackPasses[axis] === (manualAxes.includes(axis) ? 1 : 0)
+  );
 }
 
 function validateUnavailableFallbackBudget(
@@ -1181,11 +1184,13 @@ function validateUnavailableFallbackBudget(
   journal: Record<string, unknown> | undefined,
   findings: Finding[]
 ): void {
-  if (
-    journal?.gate !== "unavailable" ||
-    results.clarity !== "manual_checked" ||
-    results.accuracy !== "manual_checked"
-  ) {
+  if (journal?.gate !== "unavailable") {
+    return;
+  }
+  const manualAxes = ["clarity", "accuracy"].filter(
+    (axis) => results[axis] === "manual_checked"
+  );
+  if (manualAxes.length === 0) {
     return;
   }
   const budget = isRecord(review?.review_budget)
@@ -1194,12 +1199,12 @@ function validateUnavailableFallbackBudget(
   const fallbackPasses = isRecord(budget?.fallback_passes_by_axis)
     ? budget.fallback_passes_by_axis
     : undefined;
-  if (!validUnavailableFallbackBudget(budget, fallbackPasses)) {
+  if (!validUnavailableFallbackBudget(budget, fallbackPasses, manualAxes)) {
     findings.push(
       finding(
         "delivery-manual-fallback-budget-invalid",
         "error",
-        "an unavailable journal with two manual_checked axes must carry one fallback pass per axis within the hard review budget"
+        "an unavailable journal must carry one fallback pass for each manual_checked axis and zero for provider axes within the hard review budget"
       )
     );
   }

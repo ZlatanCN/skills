@@ -552,7 +552,12 @@ the environment provides subagents:
 - `clarity`: reader model, spine, section roles, transitions, terminology, and format roles; extend C5 with the
   hidden-antecedent check across all reader-visible prose surfaces, and classify an unseen-source reply as a
   `reader_blocker` even when its facts are correct;
-- `accuracy`: material claims, source coverage, boundaries, examples, tables, diagrams, and links.
+- `accuracy`: material claims, source coverage, boundaries, examples, tables, diagrams, and links. Before dispatch,
+  derive one in-memory `accuracy_packet` from the claim ledger and body map: one entry per material claim with
+  `claim_id`, `body_claim`, scope/boundary, source locator, support, limits, and mapped `surface_id`s. Include all
+  claims represented by tables, callouts, code comments, Mermaid labels, links, and metadata; do not persist a new packet
+  file. Pass the packet with the exact prompt from the reference. The reviewer checks this bounded index against the final
+  bytes and listed evidence; it must not perform broad rediscovery of the topic.
 
 Pass each reviewer the resolved absolute path, `run_id`, and exact draft identity required by the reference. Wait for both results
 before adjudication. There is no wall-clock deadline: keep `ReviewAttempt`s open until a terminal result, explicit
@@ -602,8 +607,8 @@ edit pass, then rerun the required gates and both reviewers for the new draft. S
 fallback, open blocker, explicit stop, or finite revision-budget boundary.
 
 If the review journal itself is unavailable, include `review.review_budget` with the hard ceilings and
-`fallback_passes_by_axis: {clarity: 1, accuracy: 1}`; the delivery checker requires exactly one exact-draft fallback per
-manually checked axis.
+`fallback_passes_by_axis` with exactly one exact-draft fallback for each `manual_checked` axis and zero for provider axes;
+the delivery checker enforces this per-axis budget.
 
 ## 9. Phase 8 — truthful delivery report
 

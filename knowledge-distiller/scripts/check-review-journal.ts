@@ -902,6 +902,7 @@ function validateBudgetRevision(
 ): void {
   const revisions: number[] = [];
   let previousRevision: number | undefined;
+  const hashesByRevision = new Map<number, string>();
   for (const [index, event] of events.entries()) {
     if (
       event.event_type === "report_closed" ||
@@ -912,6 +913,20 @@ function validateBudgetRevision(
     const revision = Number(event.note_revision);
     if (!Number.isInteger(revision)) {
       continue;
+    }
+    const draftHash = String(event.draft_hash);
+    const priorHash = hashesByRevision.get(revision);
+    if (priorHash && priorHash !== draftHash) {
+      findings.push(
+        finding(
+          "journal-revision-draft-mismatch",
+          "error",
+          "one note_revision must identify one exact draft_hash",
+          { line: index + 1 }
+        )
+      );
+    } else if (/^[a-f0-9]{64}$/iu.test(draftHash)) {
+      hashesByRevision.set(revision, draftHash);
     }
     if (previousRevision !== undefined && revision < previousRevision) {
       findings.push(
@@ -1403,6 +1418,26 @@ function selfTest(): number {
     );
     if (check(file).gate !== "passed") {
       throw new Error("two provider attempts plus one fallback should pass");
+    }
+
+    const openOverBudget = [
+      ...retryThenFallback.slice(0, 4),
+      {
+        ...base,
+        attempt_id: "retry-3",
+        attempt_state: "pending",
+        event_id: "f7",
+        event_type: "dispatch",
+        order: 5,
+      },
+    ];
+    fs.writeFileSync(
+      file,
+      `${openOverBudget.map((event) => JSON.stringify(event)).join("\n")}\n`,
+      "utf-8"
+    );
+    if (check(file, true).gate !== "failed") {
+      throw new Error("open journal over budget must fail closed");
     }
 
     fs.writeFileSync(
