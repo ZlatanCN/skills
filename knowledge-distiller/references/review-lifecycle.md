@@ -47,7 +47,7 @@ draft_hash  → SHA-256 of the exact draft bytes
 A `ReviewCycle` covers one exact note revision and owns two independent attempts:
 
 ```text
-{cycle_id, revision, draft_hash, clarity: ReviewAttempt, accuracy: ReviewAttempt, fallback, events}
+{run_id, cycle_id, revision, draft_hash, clarity: ReviewAttempt, accuracy: ReviewAttempt, fallback, events}
 ```
 
 Each attempt is a discriminated lifecycle. The `result` exists only in the `completed` branch:
@@ -102,6 +102,7 @@ Never represent a gate as `applicable` plus another result. Applicability is alr
 Create a distinct identity for every reviewer invocation:
 
 ```text
+run_id                → locked target generation owning this invocation's artifacts
 cycle_id              → one note revision and its integrated review cycle
 axis                  → clarity | accuracy
 attempt_id            → unique local reviewer invocation
@@ -112,7 +113,7 @@ client_dispatch_id    → local submission identity
 provider_operation_id → provider identity, when actually supplied
 ```
 
-The journal is append-only JSONL. Every event carries the stable identity, `event_id`, strictly increasing `order`,
+The journal is append-only JSONL. Every event carries the stable `run_id`, other identity fields, `event_id`, strictly increasing `order`,
 `event_type`, `observability`, `evidence`, and `observed_at`.
 
 Lifecycle event types are:
@@ -168,7 +169,7 @@ event. A result observed later is `late_ignored` even if the provider started it
 ## 4. Reviewer result protocol
 
 The reviewer reads the exact artifact identified by the envelope and never rewrites it. A provider result is valid only
-when its cycle, attempt, axis, path, revision, and draft hash match the local envelope.
+when its `run_id`, cycle, attempt, axis, path, revision, and draft hash match the local envelope.
 
 ### Clarity
 

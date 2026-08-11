@@ -62,6 +62,7 @@ target          → requested path, canonical path, scope, containment, symlink 
 draft           → path, note_revision, body map, format_plan, content hash, self-check state
 write_tx        → not_applicable | idle | staging | committed(outcome) | uncertain
 review_cycle    → cycle/revision/hash, two ReviewAttempts, fallback, events
+artifacts       → runtime_root, target_key, generation, run_id, manifest, fixed file paths
 delivery        → label, blockers, corrections, mutations, open items
 mechanical_evidence → checker JSON, exact input hashes, gate states, commands, versions, exit codes
 ```
@@ -331,6 +332,39 @@ files. Semantic resolution must show that the target passage defines or material
 record `{target_hash, excerpt, definition_reason, result}`. A mechanical pass is not a semantic pass. If the target
 bytes or meaning change after the scan, invalidate the link ledger and rescan.
 
+### 5B. Run-scoped artifacts and identity
+
+Runtime evidence is not vault content. For `persist`, allocate it only after the Phase 4 target/collision gate in the
+single fixed skill-owned root `<skill-root>/knowledge-distiller-workspace/runs/`, outside the vault and never in the
+current working directory:
+
+```text
+<skill-root>/knowledge-distiller-workspace/runs/<target-key>/<generation>/
+  manifest.json
+  draft.md
+  teaching-model.json
+  format-plan.json
+  review.jsonl
+  delivery.json
+```
+
+`runtime_root` is exactly `<skill-root>/knowledge-distiller-workspace/runs/`; do not select a project-local, current-
+directory, timestamped, or caller-provided output directory. `target-key` is the first 16 hex characters of SHA-256 over the canonical target path. Allocate the next monotonic
+`generation` under an exclusive lock for that target; `run_id` is `<target-key>/<generation>`. File names inside a run
+are fixed: do not add timestamps, UUIDs, `iteration-*` directories, or current-directory outputs. The manifest records
+`run_id`, canonical target, generation, original hash, current draft hash, and every evidence path. Every journal event
+and delivery record must carry the same `run_id`; a stale or mismatched run is invalid even when its individual hashes
+look valid. Keep at most the active run and the last uncertain run; remove older runtime-owned generations only after
+their delivery/report outcome is closed. `state.json` remains the separate fixed setup preference file described in
+Phase 1.
+
+Acquire the target lock before reading an update's `original_hash`, re-check it immediately before replacement, and
+move the Run to `blocked` if the file changed or the lock/generation/manifest cannot be made durable. A crash after
+replacement but before read-back resumes from the manifest and remains `write_state: uncertain`; it never starts a new
+replacement against the same target automatically. The same-directory temporary file required for atomic replacement
+is the only exception to the runtime-root boundary; give it the fixed basename `<note>.knowledge-distiller.tmp` and
+remove it after validation or recovery.
+
 ## 6. Phase 5 — compose from the model
 
 Read `references/reader-model.md`, `references/obsidian-writing-style.md`, and `references/mechanical-gates.md` again. Write from the adjudicated section tree, never in source-return order or as a
@@ -452,6 +486,11 @@ the draft to a same-directory temporary file without replacing the target. Read 
 frontmatter/body boundary, run the heading and wikilink gates against that exact temp, then atomically replace when
 possible. If atomic replacement is unavailable, record that fact and use the safest recoverable replacement.
 
+Before staging, acquire the target lock and create the run-scoped manifest from Phase 5B. Bind every temporary, journal,
+review, and delivery input to its `run_id`; do not reuse an evidence file from another generation. Re-read an update's
+`original_hash` immediately before replacement. A lock or manifest is an execution identity and recovery aid, not a new
+Run or ReviewAttempt state.
+
 Read the final target back, record `final_hash`, rerun all required gates, and set `write_state: committed` with
 `write_outcome: created|updated|unchanged` only after confirmed read-back. If validation fails before replacement,
 discard the temp. If replacement may have occurred but recovery/read-back is uncertain, set `write_state: uncertain`,
@@ -506,7 +545,7 @@ the environment provides subagents:
   `reader_blocker` even when its facts are correct;
 - `accuracy`: material claims, source coverage, boundaries, examples, tables, diagrams, and links.
 
-Pass each reviewer the resolved absolute path and exact draft identity required by the reference. Wait for both results
+Pass each reviewer the resolved absolute path, `run_id`, and exact draft identity required by the reference. Wait for both results
 before adjudication. There is no wall-clock deadline: keep `ReviewAttempt`s open until a terminal result, explicit
 provider failure/stall, confirmed stop, or dispatch/journal failure. Do not call a reviewer unavailable merely because a
 poll is empty, a client wait expires, or the provider is slow. If `write_state` is not `committed`, use the exact-draft
@@ -562,7 +601,7 @@ frontmatter, or metadata change after report generation invalidates `final_hash`
 evidence, review identity, and the delivery result; do not present the older report as if it described the new bytes.
 
 The checker is the final anti-overclaim gate. A prose label cannot override its failed or unavailable result.
-For `write_state: committed`, the record must identify `artifact_kind`, the absolute `note_path`, `write_outcome`, and
+For `write_state: committed`, the record must identify `artifact_kind`, the absolute `note_path`, `run_id`, `write_outcome`, and
 the final read-back `final_hash`. A passed journal must additionally carry its evidence-file path and SHA-256; the
 checker re-runs the journal checker and binds each clean axis to a matching event, attempt, note path, and draft hash.
 `preservation: not_applicable` is legal only for `artifact_kind: new_note`, which must also carry a hash-bound creation
@@ -621,6 +660,8 @@ The following are prohibited because they violate the state contract:
 | Write when policy/target/collision is unresolved | fail closed, clarify, or return in-memory draft |
 | Continue after uncertain replacement/read-back | `write_state: uncertain`, stop writes, disclose recovery state |
 | Treat a client timeout or empty poll as reviewer failure/cancellation | keep the attempt open; only an explicit provider/user event changes state |
+| Reuse a fixed draft/journal/delivery filename across runs without a run identity | allocate a locked target generation and bind every event/report to its `run_id` |
+| Replace an update after another run changed the original bytes | re-check `original_hash` under the target lock and block the replacement |
 | Retry a pending/running attempt on the same revision | use fallback or a new attempt after explicit failure only |
 | Accept a stale/late/mismatched reviewer result | journal it and exclude it from adjudication |
 | Call manual fallback or contradictory payload “clean” | record per-axis evidence and use the truthful label |

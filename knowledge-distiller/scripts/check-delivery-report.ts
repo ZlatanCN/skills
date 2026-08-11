@@ -67,6 +67,7 @@ const SCRIPT_DIR = path.dirname(new URL(import.meta.url).pathname);
 
 type MutableDeliveryReport = {
   schema_version: string;
+  run_id: string;
   label: string;
   write_state: string;
   write_outcome?: string;
@@ -201,8 +202,26 @@ function validateJournalSummary(
   journal: Record<string, unknown>,
   checked: Evidence | undefined,
   journalPath: string,
+  runId: string,
   findings: Finding[]
 ): void {
+  if (journal.run_id !== runId || checked?.metrics?.run_id !== runId) {
+    findings.push(
+      finding(
+        "delivery-journal-run-id-mismatch",
+        "error",
+        "delivery and journal evidence must use the same run_id",
+        {
+          evidence: {
+            checked: checked?.metrics?.run_id,
+            delivery: runId,
+            journal: journal.run_id,
+          },
+          path: journalPath,
+        }
+      )
+    );
+  }
   if (
     checked?.metrics?.closed !== true ||
     checked.metrics.events !== journal.events ||
@@ -235,6 +254,7 @@ function validateCleanAxisBinding(
   events: Record<string, unknown>[],
   notePath: string,
   journalPath: string,
+  runId: string,
   findings: Finding[]
 ): void {
   const matching = events.find(
@@ -243,6 +263,7 @@ function validateCleanAxisBinding(
       event.result === "clean" &&
       event.cycle_id === axisData.cycle_id &&
       event.attempt_id === axisData.attempt_id &&
+      event.run_id === runId &&
       event.note_revision === axisData.note_revision &&
       event.draft_hash === axisData.draft_hash &&
       event.note_path === notePath
@@ -338,6 +359,7 @@ function bindCleanReviews(
       events,
       notePath,
       journalPath,
+      String(report.run_id ?? ""),
       findings
     );
   }
@@ -462,7 +484,13 @@ function bindPassedJournal(
     }
   }
   const checked = runJournalChecker(journalPath, findings);
-  validateJournalSummary(journal, checked, journalPath, findings);
+  validateJournalSummary(
+    journal,
+    checked,
+    journalPath,
+    String(report.run_id ?? ""),
+    findings
+  );
   bindCleanReviews(report, journalPath, results, findings);
 }
 
@@ -589,6 +617,20 @@ function validateArtifact(
     );
   }
   const committed = report.write_state === "committed";
+  if (
+    ["committed", "staging", "uncertain"].includes(
+      String(report.write_state)
+    ) &&
+    !nonEmptyString(report.run_id)
+  ) {
+    findings.push(
+      finding(
+        "delivery-run-id-missing",
+        "error",
+        "a persisted or uncertain artifact must include run_id"
+      )
+    );
+  }
   const written =
     committed && ["created", "updated"].includes(String(report.write_outcome));
   if (committed && !WRITE_OUTCOMES.has(String(report.write_outcome))) {
@@ -1296,8 +1338,15 @@ function selfTest(): number {
           source_coverage: "complete",
           teach_back: "reader can explain",
         },
-        journal: { close_order: 7, closed: true, events: 7, gate: "passed" },
+        journal: {
+          close_order: 7,
+          closed: true,
+          events: 7,
+          gate: "passed",
+          run_id: "target-key/1",
+        },
       },
+      run_id: "target-key/1",
       schema_version: "knowledge-distiller.delivery.v2",
       write_outcome: "updated",
       write_state: "committed",
@@ -1323,6 +1372,7 @@ function selfTest(): number {
       observability: "observed",
       observed_at: "2026-08-10T00:00:00Z",
       provider_operation_id: "provider",
+      run_id: "target-key/1",
     };
     const journalEvents = [
       {
@@ -1419,11 +1469,23 @@ function selfTest(): number {
       events: 7,
       gate: "passed",
       path: journalPath,
+      run_id: report.run_id,
       sha256: fileHash(journalPath),
     };
     fs.writeFileSync(file, JSON.stringify(report), "utf-8");
     if (check(file).gate !== "passed") {
       throw new Error("hash-bound journal and final artifact should pass");
+    }
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        ...report,
+        run_id: "target-key/2",
+      }),
+      "utf-8"
+    );
+    if (check(file).gate !== "failed") {
+      throw new Error("delivery from another generation must fail");
     }
     const probePath = path.join(root, "creation-probe.json");
     fs.writeFileSync(

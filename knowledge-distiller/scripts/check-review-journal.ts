@@ -129,6 +129,7 @@ function readEvents(
 }
 
 type Identity = {
+  run_id: string;
   axis: string;
   cycle_id: string;
   draft_hash: string;
@@ -137,6 +138,7 @@ type Identity = {
 };
 
 type JournalState = {
+  runId: string | undefined;
   closeIndex: number;
   closeOrder: number;
   eventIds: Set<string>;
@@ -314,6 +316,7 @@ function validateEventShape(
 function recordAttemptIdentity(
   event: Record<string, unknown>,
   eventType: string,
+  runId: string,
   cycleId: string,
   attemptId: string,
   axis: string,
@@ -333,6 +336,7 @@ function recordAttemptIdentity(
     draft_hash: draftHash,
     note_path: notePath,
     note_revision: Number(event.note_revision),
+    run_id: runId,
   };
   const prior = state.identities.get(key);
   if (prior && JSON.stringify(prior) !== JSON.stringify(identity)) {
@@ -360,6 +364,7 @@ function validateIdentity(
   validateEventOrder(event, index, state, findings);
 
   const eventType = requiredString(event, "event_type", line, findings);
+  const runId = requiredString(event, "run_id", line, findings);
   const cycleId = requiredString(event, "cycle_id", line, findings);
   const attemptId = requiredString(event, "attempt_id", line, findings);
   const axis = requiredString(event, "axis", line, findings);
@@ -367,10 +372,26 @@ function validateIdentity(
   const draftHash = requiredString(event, "draft_hash", line, findings);
   validateCommon(event, line, findings);
 
+  if (runId) {
+    if (state.runId && state.runId !== runId) {
+      findings.push(
+        finding(
+          "journal-run-id-drift",
+          "error",
+          "all events in one journal must use the same run_id",
+          { line }
+        )
+      );
+    } else if (!state.runId) {
+      state.runId = runId;
+    }
+  }
+
   validateEventShape(event, eventType, attemptId, axis, line, findings);
   const key = recordAttemptIdentity(
     event,
     eventType,
+    runId,
     cycleId,
     attemptId,
     axis,
@@ -813,6 +834,7 @@ function check(fileInput: string, allowOpen = false): Evidence {
     eventIds: new Set<string>(),
     identities: new Map<string, Identity>(),
     previousOrder: 0,
+    runId: undefined,
   };
 
   for (const [index, event] of events.entries()) {
@@ -885,6 +907,7 @@ function check(fileInput: string, allowOpen = false): Evidence {
         : undefined,
       closed: state.closeIndex >= 0,
       events: events.length,
+      run_id: state.runId,
     },
     findings
   );
@@ -905,6 +928,7 @@ function selfTest(): number {
       observability: "observed",
       observed_at: "2026-08-10T00:00:00Z",
       provider_operation_id: "provider-1",
+      run_id: "target-key/1",
     };
     const events = [
       {
@@ -958,6 +982,15 @@ function selfTest(): number {
     );
     if (check(file).gate !== "passed") {
       throw new Error("valid journal should pass");
+    }
+
+    fs.writeFileSync(
+      file,
+      `${events.map((event, index) => JSON.stringify(index === 1 ? { ...event, run_id: "target-key/2" } : event)).join("\n")}\n`,
+      "utf-8"
+    );
+    if (check(file).gate !== "failed") {
+      throw new Error("cross-generation journal identity must fail");
     }
 
     fs.writeFileSync(
