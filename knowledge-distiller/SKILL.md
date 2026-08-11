@@ -557,7 +557,9 @@ the environment provides subagents:
   `claim_id`, `body_claim`, scope/boundary, source locator, support, limits, and mapped `surface_id`s. Include all
   claims represented by tables, callouts, code comments, Mermaid labels, links, and metadata; do not persist a new packet
   file. Pass the packet with the exact prompt from the reference. The reviewer checks this bounded index against the final
-  bytes and listed evidence; it must not perform broad rediscovery of the topic.
+  bytes and listed evidence; it must not perform broad rediscovery of the topic. Before dispatch, compare packet
+  `claim_id`s with all material claim IDs in the body map and compare mapped claim-bearing surfaces with packet `surfaces`.
+  If either set is incomplete, do not dispatch accuracy; use the existing exact-draft fallback/unverified path.
 
 Pass each reviewer the resolved absolute path, `run_id`, and exact draft identity required by the reference. Wait for both results
 before adjudication. There is no wall-clock deadline: keep `ReviewAttempt`s open until a terminal result, explicit

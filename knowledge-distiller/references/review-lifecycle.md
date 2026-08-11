@@ -329,11 +329,13 @@ accuracy_packet:
 Treat the packet as the review index, not as truth. Check every packet claim against the exact note bytes and its listed
 source/evidence, including claims expressed in tables, callouts, code comments, diagrams, examples, links, and metadata.
 If a material claim-bearing surface in the note has no packet entry, report it as an accuracy blocker; do not rediscover
-the whole note from scratch. Inspect only the listed sources needed to decide support, scope, and limits. Do not perform
-broad topic research or read unrelated reference files; an inaccessible listed source is `unverified`, not a reason to
-expand the search. For each issue, quote the claim, explain the correction or missing qualification, and cite the source.
+the whole note from scratch. Inspect the listed sources needed to decide support, scope, and limits. If one is insufficient,
+allow one bounded, claim-specific lookup for that claim; do not turn it into broad topic research or read unrelated
+reference files. An inaccessible or still-insufficient source is `unverified`, not a reason to keep searching. For each
+issue, quote the claim, explain the correction or missing qualification, and cite the source.
 
-Return `claims_checked` equal to the number of packet claims plus any uncovered material surfaces. Use
+Return `claims_checked` equal to the number of packet claims; report uncovered material surfaces in the finding/unverified
+evidence instead of counting them as claims. Use
 `source_coverage: complete` only when every packet claim and every material surface is covered, `unverified: —` when none,
 and `A1: —` when no issue exists. Return `clean` only when all claims are accurate, scoped, and supported. Do not guess;
 use `findings` or `unverified` when evidence is incomplete. Keep the response to the contract fields and concise finding

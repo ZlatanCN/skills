@@ -2000,6 +2000,29 @@ function selfTest(): number {
       file,
       JSON.stringify({
         ...report,
+        label: "已写入；审查状态不确定，未完成",
+        review: {
+          accuracy: report.review.accuracy,
+          clarity: { outcome: "manual_checked" },
+          journal: { closed: false, gate: "unavailable" },
+          review_budget: {
+            fallback_passes_by_axis: { accuracy: 0, clarity: 1 },
+            max_attempts_per_axis_per_revision: 2,
+            max_fallback_passes_per_axis: 1,
+            max_revision_rounds: 2,
+            revision_rounds: 0,
+          },
+        },
+      }),
+      "utf-8"
+    );
+    if (check(file).gate !== "passed") {
+      throw new Error("mixed unavailable-journal fallback should pass");
+    }
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        ...report,
         label: "已交付；部分审查由人工复核",
         review: {
           accuracy: { outcome: "manual_checked" },
