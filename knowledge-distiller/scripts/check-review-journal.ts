@@ -135,6 +135,7 @@ type Identity = {
   draft_hash: string;
   note_path: string;
   note_revision: number;
+  event_type: string;
 };
 
 type JournalState = {
@@ -334,12 +335,16 @@ function recordAttemptIdentity(
     axis,
     cycle_id: cycleId,
     draft_hash: draftHash,
+    event_type: eventType,
     note_path: notePath,
     note_revision: Number(event.note_revision),
     run_id: runId,
   };
   const prior = state.identities.get(key);
-  if (prior && JSON.stringify(prior) !== JSON.stringify(identity)) {
+  const stableIdentity = prior
+    ? { ...identity, event_type: prior.event_type }
+    : identity;
+  if (prior && JSON.stringify(prior) !== JSON.stringify(stableIdentity)) {
     findings.push(
       finding(
         "journal-identity-drift",
@@ -349,7 +354,7 @@ function recordAttemptIdentity(
       )
     );
   } else if (cycleId && attemptId) {
-    state.identities.set(key, identity);
+    state.identities.set(key, stableIdentity);
   }
   return key;
 }
@@ -515,6 +520,16 @@ function validateAttemptTransition(
   line: number,
   findings: Finding[]
 ): void {
+  if (prior && ["dispatch", "manual_fallback"].includes(eventType)) {
+    findings.push(
+      finding(
+        "journal-attempt-restart-invalid",
+        "error",
+        "dispatch and manual_fallback may only start a new attempt_id",
+        { line }
+      )
+    );
+  }
   if (!prior && !["dispatch", "manual_fallback"].includes(eventType)) {
     findings.push(
       finding(
@@ -755,6 +770,25 @@ function validateAttemptEvent(
     return;
   }
   const prior = state.attemptStates.get(key);
+  if (eventType === "dispatch" || eventType === "manual_fallback") {
+    for (const [priorKey, identity] of state.identities.entries()) {
+      if (
+        priorKey !== key &&
+        identity.axis === axis &&
+        identity.note_revision === Number(event.note_revision) &&
+        ["pending", "running"].includes(state.attemptStates.get(priorKey) ?? "")
+      ) {
+        findings.push(
+          finding(
+            "journal-concurrent-attempt",
+            "error",
+            "a new attempt cannot start while another attempt for the same axis and revision is pending or running",
+            { line }
+          )
+        );
+      }
+    }
+  }
   validateAttemptTransition(eventType, attemptState, prior, line, findings);
   validateDispatchState(eventType, attemptState, line, findings);
   validateObservationState(eventType, attemptState, line, findings);
@@ -812,6 +846,20 @@ function validateClose(
       )
     );
   }
+  if (
+    [...state.attemptStates.values()].some((attemptState) =>
+      ["pending", "running"].includes(attemptState)
+    )
+  ) {
+    findings.push(
+      finding(
+        "journal-close-with-active-attempt",
+        "error",
+        "report_closed requires every attempt to be terminal; slow providers remain open until an explicit stop is confirmed",
+        { line }
+      )
+    );
+  }
 }
 
 function validateBudgetLimits(
@@ -852,13 +900,42 @@ function validateBudgetRevision(
   events: Record<string, unknown>[],
   findings: Finding[]
 ): void {
-  const revisions = events
-    .filter(
-      (event) =>
-        event.event_type !== "report_closed" &&
-        event.event_type !== "late_ignored"
-    )
-    .map((event) => Number(event.note_revision));
+  const revisions: number[] = [];
+  let previousRevision: number | undefined;
+  for (const [index, event] of events.entries()) {
+    if (
+      event.event_type === "report_closed" ||
+      event.event_type === "late_ignored"
+    ) {
+      continue;
+    }
+    const revision = Number(event.note_revision);
+    if (!Number.isInteger(revision)) {
+      continue;
+    }
+    if (previousRevision !== undefined && revision < previousRevision) {
+      findings.push(
+        finding(
+          "journal-review-budget-revision-regressed",
+          "error",
+          "note_revision must be monotonic; a revision cannot move backward",
+          { line: index + 1 }
+        )
+      );
+    }
+    if (previousRevision !== undefined && revision > previousRevision + 1) {
+      findings.push(
+        finding(
+          "journal-review-budget-revision-jump",
+          "error",
+          "note_revision may advance by at most one per changed draft",
+          { line: index + 1 }
+        )
+      );
+    }
+    previousRevision = revision;
+    revisions.push(revision);
+  }
   const actualRevisionRounds = revisions.length
     ? Math.max(...revisions) - Math.min(...revisions)
     : 0;
@@ -873,6 +950,18 @@ function validateBudgetRevision(
   }
 }
 
+function observedRevisionRounds(events: Record<string, unknown>[]): number {
+  const revisions = events
+    .filter(
+      (event) =>
+        event.event_type !== "report_closed" &&
+        event.event_type !== "late_ignored"
+    )
+    .map((event) => Number(event.note_revision))
+    .filter((revision) => Number.isInteger(revision));
+  return revisions.length ? Math.max(...revisions) - Math.min(...revisions) : 0;
+}
+
 function validateBudgetAttempts(
   budget: Record<string, unknown>,
   state: JournalState,
@@ -880,6 +969,9 @@ function validateBudgetAttempts(
 ): void {
   const attemptsByRevisionAxis = new Map<string, number>();
   for (const identity of state.identities.values()) {
+    if (identity.event_type === "manual_fallback") {
+      continue;
+    }
     const key = `${identity.note_revision}\u0000${identity.axis}`;
     attemptsByRevisionAxis.set(key, (attemptsByRevisionAxis.get(key) ?? 0) + 1);
   }
@@ -1038,6 +1130,18 @@ function check(fileInput: string, allowOpen = false): Evidence {
         "journal has no report_closed event yet; use --allow-open only while the lifecycle is still running"
       )
     );
+    if (allowOpen) {
+      const openBudget = {
+        max_attempts_per_axis_per_revision: 2,
+        max_fallback_passes_per_axis: 1,
+        max_revision_rounds: 2,
+        revision_rounds: observedRevisionRounds(events),
+      };
+      validateBudgetLimits(openBudget, findings);
+      validateBudgetRevision(openBudget, events, findings);
+      validateBudgetAttempts(openBudget, state, findings);
+      validateBudgetFallbacks(openBudget, events, findings);
+    }
   }
 
   const errors = findings.filter((item) => item.severity === "error");
@@ -1229,6 +1333,106 @@ function selfTest(): number {
     );
     if (check(file).gate !== "passed") {
       throw new Error("explicit stop sequence should pass");
+    }
+
+    const retryThenFallback = [
+      {
+        ...base,
+        attempt_id: "retry-1",
+        attempt_state: "pending",
+        event_id: "f1",
+        event_type: "dispatch",
+        order: 1,
+      },
+      {
+        ...base,
+        attempt_id: "retry-1",
+        attempt_state: "failed",
+        event_id: "f2",
+        event_type: "failure",
+        failure_reason: "provider_failed",
+        order: 2,
+      },
+      {
+        ...base,
+        attempt_id: "retry-2",
+        attempt_state: "pending",
+        event_id: "f3",
+        event_type: "dispatch",
+        order: 3,
+      },
+      {
+        ...base,
+        attempt_id: "retry-2",
+        attempt_state: "failed",
+        event_id: "f4",
+        event_type: "failure",
+        failure_reason: "provider_failed_again",
+        order: 4,
+      },
+      {
+        ...base,
+        attempt_id: "fallback-1",
+        attempt_state: "completed",
+        event_id: "f5",
+        event_type: "manual_fallback",
+        fallback: "manual_checked",
+        fallback_id: "fallback-evidence-1",
+        order: 5,
+      },
+      {
+        ...base,
+        attempt_id: "run",
+        axis: "system",
+        close_order: 6,
+        event_id: "f6",
+        event_type: "report_closed",
+        order: 6,
+        review_budget: {
+          max_attempts_per_axis_per_revision: 2,
+          max_fallback_passes_per_axis: 1,
+          max_revision_rounds: 2,
+          revision_rounds: 0,
+        },
+      },
+    ];
+    fs.writeFileSync(
+      file,
+      `${retryThenFallback.map((event) => JSON.stringify(event)).join("\n")}\n`,
+      "utf-8"
+    );
+    if (check(file).gate !== "passed") {
+      throw new Error("two provider attempts plus one fallback should pass");
+    }
+
+    fs.writeFileSync(
+      file,
+      `${retryThenFallback
+        .map((event, index) =>
+          JSON.stringify(index === 2 ? { ...event, note_revision: 0 } : event)
+        )
+        .join("\n")}\n`,
+      "utf-8"
+    );
+    if (check(file).gate !== "failed") {
+      throw new Error("revision rollback must fail closed");
+    }
+
+    fs.writeFileSync(
+      file,
+      `${[retryThenFallback[0], retryThenFallback[5]]
+        .map((event) =>
+          JSON.stringify({
+            ...event,
+            close_order: event.event_id === "f6" ? 2 : undefined,
+            order: event.event_id === "f6" ? 2 : 1,
+          })
+        )
+        .join("\n")}\n`,
+      "utf-8"
+    );
+    if (check(file).gate !== "failed") {
+      throw new Error("an active attempt cannot be closed");
     }
 
     fs.writeFileSync(

@@ -1147,6 +1147,64 @@ function validateReviewJournal(
   return journal;
 }
 
+function validUnavailableFallbackBudget(
+  budget: Record<string, unknown> | undefined,
+  fallbackPasses: Record<string, unknown> | undefined
+): boolean {
+  if (!budget || !fallbackPasses) {
+    return false;
+  }
+  if (
+    !Number.isInteger(budget.max_revision_rounds) ||
+    Number(budget.max_revision_rounds) < 0 ||
+    Number(budget.max_revision_rounds) > 2 ||
+    !Number.isInteger(budget.revision_rounds) ||
+    Number(budget.revision_rounds) < 0 ||
+    Number(budget.revision_rounds) > Number(budget.max_revision_rounds)
+  ) {
+    return false;
+  }
+  if (
+    !Number.isInteger(budget.max_attempts_per_axis_per_revision) ||
+    Number(budget.max_attempts_per_axis_per_revision) < 1 ||
+    Number(budget.max_attempts_per_axis_per_revision) > 2 ||
+    budget.max_fallback_passes_per_axis !== 1
+  ) {
+    return false;
+  }
+  return fallbackPasses.clarity === 1 && fallbackPasses.accuracy === 1;
+}
+
+function validateUnavailableFallbackBudget(
+  review: Record<string, unknown> | undefined,
+  results: Record<string, string>,
+  journal: Record<string, unknown> | undefined,
+  findings: Finding[]
+): void {
+  if (
+    journal?.gate !== "unavailable" ||
+    results.clarity !== "manual_checked" ||
+    results.accuracy !== "manual_checked"
+  ) {
+    return;
+  }
+  const budget = isRecord(review?.review_budget)
+    ? (review.review_budget as Record<string, unknown>)
+    : undefined;
+  const fallbackPasses = isRecord(budget?.fallback_passes_by_axis)
+    ? budget.fallback_passes_by_axis
+    : undefined;
+  if (!validUnavailableFallbackBudget(budget, fallbackPasses)) {
+    findings.push(
+      finding(
+        "delivery-manual-fallback-budget-invalid",
+        "error",
+        "an unavailable journal with two manual_checked axes must carry one fallback pass per axis within the hard review budget"
+      )
+    );
+  }
+}
+
 function validateReviewOpenItems(
   report: Record<string, unknown>,
   findings: Finding[]
@@ -1188,6 +1246,7 @@ function validateReview(
   }
   const results = validateReviewResults(review, report, written, findings);
   const journal = validateReviewJournal(review, findings);
+  validateUnavailableFallbackBudget(review, results, journal, findings);
   const { blockers, openItems } = validateReviewOpenItems(report, findings);
   return {
     blockers,
@@ -1918,12 +1977,42 @@ function selfTest(): number {
             outcome: "manual_checked",
           },
           journal: { closed: false, gate: "unavailable" },
+          review_budget: {
+            fallback_passes_by_axis: { accuracy: 1, clarity: 1 },
+            max_attempts_per_axis_per_revision: 2,
+            max_fallback_passes_per_axis: 1,
+            max_revision_rounds: 2,
+            revision_rounds: 0,
+          },
         },
       }),
       "utf-8"
     );
     if (check(file).gate !== "passed") {
       throw new Error("explicit two-axis manual fallback should pass");
+    }
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        ...report,
+        label: "已交付；部分审查由人工复核",
+        review: {
+          accuracy: { outcome: "manual_checked" },
+          clarity: { outcome: "manual_checked" },
+          journal: { closed: false, gate: "unavailable" },
+          review_budget: {
+            fallback_passes_by_axis: { accuracy: 1, clarity: 2 },
+            max_attempts_per_axis_per_revision: 2,
+            max_fallback_passes_per_axis: 1,
+            max_revision_rounds: 2,
+            revision_rounds: 0,
+          },
+        },
+      }),
+      "utf-8"
+    );
+    if (check(file).gate !== "failed") {
+      throw new Error("repeated unavailable-journal fallback must fail closed");
     }
     fs.writeFileSync(
       file,

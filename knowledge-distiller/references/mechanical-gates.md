@@ -108,7 +108,7 @@ node scripts/check-review-journal.ts --journal "$JOURNAL" --allow-open --json
 # before report_closed, omit --allow-open
 ```
 
-脚本验证 JSONL 可解析、`event_id` 唯一、`order` 单调、cycle/attempt/path/revision/hash/axis 身份不漂移、dispatch/provider identity、observability、evidence 字段存在、`ReviewAttempt` 状态转移合法、枚举值合法、`result: clean` 只能出现在 `attempt_state: completed` 的结果事件且具备 complete coverage/claims/after-state、`report_closed` 唯一且必须位于至少一个真实生命周期事件之后；空 journal 失败，关闭后的结果只能标记为 `late_ignored`。它不判断 reviewer 的事实判断是否正确，也不把 client timeout、空轮询或父任务暂时等待推断成 provider failure。
+脚本验证 JSONL 可解析、`event_id` 唯一、`order` 单调、cycle/attempt/path/revision/hash/axis 身份不漂移、dispatch/provider identity、observability、evidence 字段存在、`ReviewAttempt` 状态转移合法、枚举值合法、`result: clean` 只能出现在 `attempt_state: completed` 的结果事件且具备 complete coverage/claims/after-state、`report_closed` 唯一且必须位于至少一个真实生命周期事件之后；空 journal 失败，关闭后的结果只能标记为 `late_ignored`。它不判断 reviewer 的事实判断是否正确，也不把 client timeout、空轮询或父任务暂时等待推断成 provider failure；带 `--allow-open` 时仍会审计 revision/retry/fallback 硬预算，超限即失败。
 
 ## 4. 交付门：阻止成功标签越权
 
@@ -127,7 +127,7 @@ node scripts/check-delivery-report.ts --report "$DELIVERY_JSON" --json
 - `write_state: uncertain`、`idle`、`staging` 等写状态必须落到对应的非成功标签。
 - 当 journal 为 `passed` 时，报告必须携带 journal 文件路径和 SHA-256；脚本会重新运行 journal checker、比对事件数量/关闭游标，并要求两个 clean 轴的 attempt、draft hash、note path 以及 `source_coverage`、claims、after-state、C1–C5/A1 结果都能在同一份真实事件流中逐字段对齐。
 
-人工 fallback 不伪装成 provider 结果；轴级直接记录 `outcome: manual_checked`，并由 checker 根据两轴 outcome 推导 fallback 完成。不可用 provider 记录 `outcome: unavailable`，不能同时宣称 clean。
+人工 fallback 不伪装成 provider 结果；轴级直接记录 `outcome: manual_checked`，并由 checker 根据两轴 outcome 推导 fallback 完成。不可用 provider 记录 `outcome: unavailable`，不能同时宣称 clean。若 journal 本身 unavailable，delivery 的 `review.review_budget.fallback_passes_by_axis` 必须证明每个 manual_checked 轴恰好一次 fallback。
 
 ## 5. 不要机械化的部分
 

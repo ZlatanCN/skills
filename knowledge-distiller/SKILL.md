@@ -560,6 +560,11 @@ provider failure/stall, confirmed stop, or dispatch/journal failure. Do not call
 poll is empty, a client wait expires, or the provider is slow. If `write_state` is not `committed`, use the exact-draft
 fallback required by the reference.
 
+While the journal is open, run its checker with `--allow-open` after every dispatch, explicit provider failure/retry,
+manual fallback, and changed draft. A failed open-journal budget check stops new attempts and revisions; it is an event
+budget guard, not a wall-clock timeout. A pending/running provider remains open until a terminal result, explicit
+provider stall/failure, or confirmed stop.
+
 When using the exact clarity prompt from `references/review-lifecycle.md` §7, append this C5 check: “For every
 reader-visible correction or contrast, verify that its antecedent is introduced in the note and has an in-scope purpose;
 inspect all claim-bearing frontmatter fields, tags, title/filename, headings, lists, tables, callouts, footnotes,
@@ -595,6 +600,10 @@ If either axis is unavailable or invalid, run the reference's exact-draft manual
 `manual_checked`; manual fallback is never reviewer `clean`. Adjudicate valid findings together, make one integrated
 edit pass, then rerun the required gates and both reviewers for the new draft. Stop at the reference's clean convergence,
 fallback, open blocker, explicit stop, or finite revision-budget boundary.
+
+If the review journal itself is unavailable, include `review.review_budget` with the hard ceilings and
+`fallback_passes_by_axis: {clarity: 1, accuracy: 1}`; the delivery checker requires exactly one exact-draft fallback per
+manually checked axis.
 
 ## 9. Phase 8 — truthful delivery report
 

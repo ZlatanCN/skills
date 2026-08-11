@@ -140,7 +140,9 @@ stopped   → stopped
 `report_closed` uses `axis: system`, `attempt_id: run`, and `close_order` equal to its own `order`; it has no
 `attempt_state`. After it, only `late_ignored` events are allowed. A late result is evidence of lateness, not a result for
 the delivery decision. It also carries the closed `review_budget`; the journal checker verifies the observed revision span,
-attempt count per axis/revision, and fallback count against that budget.
+attempt count per axis/revision, and fallback count against that budget. It rejects `report_closed` while any attempt is
+`pending` or `running`; a slow provider therefore remains open until it returns, explicitly fails/stalls, or is explicitly
+stopped and the stop is confirmed.
 
 If the journal cannot be durably appended before dispatch, do not dispatch an asynchronous reviewer: use the exact-draft
 manual fallback. If a later append fails, stop new dispatches and report review uncertainty; do not invent provider
@@ -163,6 +165,11 @@ confirmation that the provider stopped.
 
 Do not retry a pending/running attempt. After an explicit transient failure, a retry uses a new `attempt_id`; after a
 draft revision, all prior results are invalid and the new cycle starts with new attempts.
+
+While a journal is open, run `node scripts/check-review-journal.ts --journal JOURNAL.jsonl --allow-open` after each
+dispatch, explicit failure/retry, fallback, and changed draft. The open-journal check applies the same hard ceilings as
+the close check; a failed check is a stop signal for new dispatches, retries, fallbacks, or revisions. This is an event
+budget guard, not a clock: an empty poll or slow provider does not consume budget and does not become a timeout.
 
 Closure is event-ordered, not time-ordered: first adjudicate results observed before `report_closed`, then append the close
 event. A result observed later is `late_ignored` even if the provider started it earlier.
@@ -224,6 +231,11 @@ label. A terminal provider failure may create at most one new attempt for that a
 use the one exact-draft fallback when available. After the fallback budget is used, stop retrying and move the existing Run
 to `blocked(reason=review_attempt_budget_exhausted)` if the result is still actionable. This budget never force-closes a
 pending/running provider attempt: slow responses still follow §3's event protocol.
+
+`manual_fallback` is not a provider attempt and does not consume the provider-attempt budget; it consumes the one
+per-axis fallback budget. If the journal itself is unavailable, the delivery record must carry the same budget plus
+`fallback_passes_by_axis: {clarity, accuracy}`; the delivery checker requires exactly one pass for each manually checked
+axis, so an unavailable journal cannot become a retry loop.
 
 Close when both valid provider outcomes are clean, manual fallback leaves no actionable repair, no new actionable
 information appears, an explicit stop is confirmed, or the revision budget is exhausted. A late result cannot reopen a
