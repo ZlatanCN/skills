@@ -10,7 +10,13 @@ Open both reviewers in parallel against the same absolute note path and exact dr
 ### Clarity
 
 Reconstruct the note's spine, reader after-state, top-level section roles, prerequisites, transitions, terminology,
-formatting, diagrams, links, and hidden corrections from the note alone.
+formatting, diagrams, links, and hidden corrections from the note alone. For external links, verify that each link is an
+affordance on an existing semantic unit in the claim-bearing sentence, footnote, or callout. Flag a standalone source tail,
+source list, or generic anchor that introduces a new citation object. Do not flag a sentence-final link when it is grammatically
+part of the sentence, or an identifiable source-title/citation used as a syntactic participant. For each new abstraction,
+check that the reader can recover its concrete origin, the design problem it solves, and its status as a standard, working
+model, or disputed claim. Do not require this sequence for every definition; require a motivation when the abstraction is
+novel, user-proposed, contested, or central to the note.
 
 Return:
 
@@ -39,8 +45,10 @@ unverified    → claims without sufficient evidence
 findings      → claim, issue, scope, and source
 ```
 
-`clean` requires complete coverage, supported claims, correct boundaries, and no unverified material claim. Do not
-rediscover the whole topic; use the claim ledger and make only bounded claim-specific lookups when necessary.
+`clean` requires complete coverage, supported claims, correct boundaries, and no unverified material claim. For a
+classification, verify its source status, comparison axis, abstraction level, scope, overlap, and claimed coverage; do not
+treat a user's proposed categories as formal facts without evidence. Do not rediscover the whole topic; use the claim ledger
+and make only bounded claim-specific lookups when necessary.
 
 ## Revision
 
@@ -72,7 +80,9 @@ Pass the resolved path, exact hash, reader contract, claim ledger, and the follo
 
 ```text
 Read the exact note bytes. Do not rewrite them. Return the required fields only.
-For clarity, reconstruct teach-back and after-state before listing findings.
-For accuracy, check every material claim and mapped surface against its source and limits.
+For clarity, reconstruct teach-back and after-state before listing findings. For each novel, user-proposed, contested, or
+central abstraction, identify its concrete origin, design motivation, and epistemic status.
+For accuracy, check every material claim and mapped surface against its source and limits. Treat proposed classifications as
+hypotheses until their status, axis, scope, overlap, and coverage are adjudicated.
 Use the smallest quote for each finding. Use — when absent. Do not mark clean with partial coverage.
 ```

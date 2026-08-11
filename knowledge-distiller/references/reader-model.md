@@ -20,6 +20,11 @@ one spine, narrow or split them. If the input is broad but coherent, choose a bo
 Before comparing technologies, name their axes. Representation, retrieval, orchestration, and governance can compose;
 they are not automatically alternatives.
 
+When introducing an unfamiliar or user-proposed abstraction, default to concrete phenomenon → design problem → reason for
+an organizing model → working model → category contents → overlap and boundary. This is a clarity heuristic, not a rigid
+template: a mature taxonomy or reference note may lead with its definition, but must still state the model's status, axis,
+and scope.
+
 ## 2. Build the argument
 
 Use the smallest useful outline:

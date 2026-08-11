@@ -46,6 +46,10 @@ scope   → included questions and intentionally excluded branches
 spine   → problem → mechanism → consequence → decision or boundary
 ```
 
+Before research, separate the supplied material into observed phenomena, design problems, proposed models, and factual
+claims. Preserve each item's epistemic role—user-provided, tentative, source-backed, or disputed—in reasoning without
+copying the raw wording into the note. A user-proposed taxonomy remains a hypothesis until research adjudicates it.
+
 Read `references/reader-model.md` for the argument shape. If the input cannot share one spine, narrow it or split the
 request; do not make a catalog of related technologies.
 
@@ -91,11 +95,17 @@ scope   → version, conditions, and boundary
 limits  → what the evidence does not establish
 decision → include | qualify | correct | defer | drop
 role    → premise | mechanism | example | boundary | decision
+status  → user hypothesis | working model | source-backed claim | disputed
 ```
 
 Every material body claim needs a ledger entry. If evidence is partial, qualify it; if the central causal model is
 unsupported, do not write it as fact. Do not use a search snippet, remembered fact, or one source to prove unrelated
 claims.
+
+For a user-proposed classification, research its status before presenting it: confirm a source-backed taxonomy, retain it
+as an explicitly labelled working model, split mixed axes, or correct/drop it when the evidence does not support it. Check
+the classification's axis, abstraction level, scope, overlap, and claimed coverage; “not a protocol standard” is a boundary,
+not evidence that the classification is valid.
 
 When correcting the user's understanding, write the supported domain claim directly. Do not write a reply to an unseen
 claim such as `“X”不准确`, `不是 X 而是 Y`, or `把 X 说成 Y`. A contrast is allowed only when the note introduces both
@@ -143,7 +153,8 @@ The mechanical contract is in `references/mechanical-gates.md`.
 
 Review the exact final note bytes, not a summary or stale draft. Open both independent read-only reviewers in parallel:
 
-`clarity` checks the reader model, spine, section roles, transitions, terminology, formatting, and hidden corrections.
+`clarity` checks the reader model, spine, section roles, transitions, terminology, formatting, natural link integration,
+and hidden corrections.
 
 `accuracy` checks every material claim, source, scope, boundary, example, diagram, link, and metadata assertion.
 

@@ -34,9 +34,25 @@ levels, rely on custom CSS, or use a callout as decoration.
 
 ## Links and sources
 
-External links belong in the sentence, footnote, or callout that states the supported claim. Do not append a bare URL or
-a source-title link list at the end. The clickable text should be natural wording from the claim; RFC sections, papers,
-and versioned specifications may use their citation as the anchor.
+Treat an external link as an affordance attached to wording that already belongs to the surrounding sentence, footnote, or
+callout—not as a new citation object appended after the claim. A link may appear at sentence end when it is grammatically
+part of the sentence; the problem is an independent source tail or source list.
+
+- Put the link where the supported claim is made, and make the anchor identify the linked subject without adding a new
+  discourse unit.
+- Use natural claim wording by default. An RFC section, paper, or versioned specification may be the anchor when the
+  source itself is a syntactic participant and the reader needs to identify it.
+- Do not use a generic anchor such as “here” or “source” when a more informative phrase is available.
+
+```markdown
+<!-- good: the link is part of the sentence's meaning -->
+The cache key includes the request method, as specified in [RFC 9110 §5.2](https://example.com/rfc).
+[The HTML Living Standard](https://example.com/html) defines the parsing behavior used by this example.
+
+<!-- bad: the source is appended as a separate citation tail -->
+The cache key includes the request method. [RFC 9110](https://example.com/rfc)
+The cache key includes the request method. Source: [RFC 9110](https://example.com/rfc)
+```
 
 Do not link every ordinary term. Link density follows the reader model, not the number of search results.
 
