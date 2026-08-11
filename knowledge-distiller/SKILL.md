@@ -62,7 +62,8 @@ target          → requested path, canonical path, scope, containment, symlink 
 draft           → path, note_revision, body map, format_plan, content hash, self-check state
 write_tx        → not_applicable | idle | staging | committed(outcome) | uncertain
 review_cycle    → cycle/revision/hash, two ReviewAttempts, fallback, events
-review_budget   → max_revision_rounds: 2, revision_rounds, review_attempts, fallback_passes
+review_budget   → max_revision_rounds: 2, max_attempts_per_axis_per_revision: 2,
+                   max_fallback_passes_per_axis: 1, counters
 artifacts       → runtime_root, target_key, generation, run_id, manifest, fixed file paths
 delivery        → label, blockers, corrections, mutations, open items
 mechanical_evidence → checker JSON, exact input hashes, gate states, commands, versions, exit codes
@@ -578,7 +579,7 @@ The reference owns the canonical Run, ReviewAttempt, WriteTransaction, GateResul
 event-order closure, and result normalization. Follow those rules without inventing a second local state machine.
 
 Use the reference's bounded convergence rules. Before the first reviewer dispatch, set
-`review_budget.max_revision_rounds: 2` and `revision_rounds: 0`. After any content revision, increment
+`review_budget.max_revision_rounds: 2` and `revision_rounds: 0`. After any draft byte change, increment
 `revision_rounds`, rerun the required gates, and invalidate
 results for the previous draft. A revision that changes claim meaning, scope, antecedent, provenance, reader path,
 surface inventory, source binding, or format-block role must restart at Phase 2 and rebuild the model, body map, format

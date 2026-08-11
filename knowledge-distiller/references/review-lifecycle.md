@@ -139,7 +139,8 @@ stopped   → stopped
 
 `report_closed` uses `axis: system`, `attempt_id: run`, and `close_order` equal to its own `order`; it has no
 `attempt_state`. After it, only `late_ignored` events are allowed. A late result is evidence of lateness, not a result for
-the delivery decision.
+the delivery decision. It also carries the closed `review_budget`; the journal checker verifies the observed revision span,
+attempt count per axis/revision, and fallback count against that budget.
 
 If the journal cannot be durably appended before dispatch, do not dispatch an asynchronous reviewer: use the exact-draft
 manual fallback. If a later append fails, stop new dispatches and report review uncertainty; do not invent provider
@@ -206,17 +207,23 @@ separately:
 
 ```text
 max_revision_rounds → 2
+max_attempts_per_axis_per_revision → 2
+max_fallback_passes_per_axis → 1
 review_attempts | fallback_passes | revision_rounds
 ```
 
-Waiting does not consume a revision round. A revision round is consumed only by a material body change. Adjudicate valid
+Waiting does not consume a revision round. Any changed draft bytes consume one revision round; an identical draft is a
+no-op and must not reopen review. Adjudicate valid
 clarity and accuracy findings together in one edit pass. Structural changes, claim corrections, scope changes, links, or
 diagrams rerun both axes; a provably local wording change may rerun only its affected axis.
 
 Do not reset `revision_rounds` when starting a new `ReviewCycle`; a new cycle after a body change consumes the next round.
-When `revision_rounds == max_revision_rounds`, do not enter `compose` again. If actionable reader/accuracy blockers remain,
+When `revision_rounds >= max_revision_rounds`, do not enter `compose` again. If actionable reader/accuracy blockers remain,
 move the existing Run to `blocked(reason=revision_budget_exhausted)`; otherwise stop revising and use the truthful delivery
-label. This budget never force-closes a pending/running provider attempt: slow responses still follow §3's event protocol.
+label. A terminal provider failure may create at most one new attempt for that axis and revision; after the attempt budget,
+use the one exact-draft fallback when available. After the fallback budget is used, stop retrying and move the existing Run
+to `blocked(reason=review_attempt_budget_exhausted)` if the result is still actionable. This budget never force-closes a
+pending/running provider attempt: slow responses still follow §3's event protocol.
 
 Close when both valid provider outcomes are clean, manual fallback leaves no actionable repair, no new actionable
 information appears, an explicit stop is confirmed, or the revision budget is exhausted. A late result cannot reopen a
@@ -235,6 +242,7 @@ The machine-readable record uses `knowledge-distiller.delivery.v3`:
 schema_version → knowledge-distiller.delivery.v3
 run_id        → locked target generation owning the report
 manifest      → {path, sha256} for the fixed run bundle # required for staging/committed/uncertain
+review_budget → max_revision_rounds, max_attempts_per_axis_per_revision, max_fallback_passes_per_axis, counters
 write_state  → not_applicable | idle | staging | committed | uncertain
 write_outcome → created | updated | unchanged   # required for committed
 review.*.outcome → provider_clean | provider_findings | provider_unverified | manual_checked | unavailable

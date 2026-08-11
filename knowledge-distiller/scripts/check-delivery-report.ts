@@ -467,7 +467,9 @@ function validateJournalSummary(
   if (
     checked?.metrics?.closed !== true ||
     checked.metrics.events !== journal.events ||
-    checked.metrics.close_order !== journal.close_order
+    checked.metrics.close_order !== journal.close_order ||
+    JSON.stringify(checked?.metrics?.review_budget) !==
+      JSON.stringify(journal.review_budget)
   ) {
     findings.push(
       finding(
@@ -481,6 +483,7 @@ function validateJournalSummary(
               close_order: journal.close_order,
               closed: journal.closed,
               events: journal.events,
+              review_budget: journal.review_budget,
             },
           },
           path: journalPath,
@@ -1740,6 +1743,12 @@ function selfTest(): number {
         event_id: "j7",
         event_type: "report_closed",
         order: 7,
+        review_budget: {
+          max_attempts_per_axis_per_revision: 2,
+          max_fallback_passes_per_axis: 1,
+          max_revision_rounds: 2,
+          revision_rounds: 0,
+        },
       },
     ];
     fs.writeFileSync(
@@ -1753,6 +1762,12 @@ function selfTest(): number {
       events: 7,
       gate: "passed",
       path: journalPath,
+      review_budget: {
+        max_attempts_per_axis_per_revision: 2,
+        max_fallback_passes_per_axis: 1,
+        max_revision_rounds: 2,
+        revision_rounds: 0,
+      },
       run_id: report.run_id,
       sha256: fileHash(journalPath),
     };

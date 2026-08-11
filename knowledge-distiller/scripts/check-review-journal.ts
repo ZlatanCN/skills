@@ -814,6 +814,146 @@ function validateClose(
   }
 }
 
+function validateBudgetLimits(
+  budget: Record<string, unknown>,
+  findings: Finding[]
+): boolean {
+  const maxRevisionRounds = budget.max_revision_rounds;
+  const revisionRounds = budget.revision_rounds;
+  const maxAttempts = budget.max_attempts_per_axis_per_revision;
+  const maxFallbacks = budget.max_fallback_passes_per_axis;
+  const valid =
+    Number.isInteger(maxRevisionRounds) &&
+    Number(maxRevisionRounds) >= 0 &&
+    Number(maxRevisionRounds) <= 2 &&
+    Number.isInteger(revisionRounds) &&
+    Number(revisionRounds) >= 0 &&
+    Number(revisionRounds) <= Number(maxRevisionRounds) &&
+    Number.isInteger(maxAttempts) &&
+    Number(maxAttempts) >= 1 &&
+    Number(maxAttempts) <= 2 &&
+    Number.isInteger(maxFallbacks) &&
+    Number(maxFallbacks) >= 0 &&
+    Number(maxFallbacks) <= 1;
+  if (!valid) {
+    findings.push(
+      finding(
+        "journal-review-budget-invalid",
+        "error",
+        "review_budget must use max_revision_rounds<=2, max_attempts_per_axis_per_revision<=2, and max_fallback_passes_per_axis<=1"
+      )
+    );
+  }
+  return valid;
+}
+
+function validateBudgetRevision(
+  budget: Record<string, unknown>,
+  events: Record<string, unknown>[],
+  findings: Finding[]
+): void {
+  const revisions = events
+    .filter(
+      (event) =>
+        event.event_type !== "report_closed" &&
+        event.event_type !== "late_ignored"
+    )
+    .map((event) => Number(event.note_revision));
+  const actualRevisionRounds = revisions.length
+    ? Math.max(...revisions) - Math.min(...revisions)
+    : 0;
+  if (actualRevisionRounds !== Number(budget.revision_rounds)) {
+    findings.push(
+      finding(
+        "journal-review-budget-revision-mismatch",
+        "error",
+        "review_budget.revision_rounds must match the observed note_revision span"
+      )
+    );
+  }
+}
+
+function validateBudgetAttempts(
+  budget: Record<string, unknown>,
+  state: JournalState,
+  findings: Finding[]
+): void {
+  const attemptsByRevisionAxis = new Map<string, number>();
+  for (const identity of state.identities.values()) {
+    const key = `${identity.note_revision}\u0000${identity.axis}`;
+    attemptsByRevisionAxis.set(key, (attemptsByRevisionAxis.get(key) ?? 0) + 1);
+  }
+  if (
+    [...attemptsByRevisionAxis.values()].some(
+      (count) => count > Number(budget.max_attempts_per_axis_per_revision)
+    )
+  ) {
+    findings.push(
+      finding(
+        "journal-review-budget-attempts-exceeded",
+        "error",
+        "review attempts exceeded max_attempts_per_axis_per_revision"
+      )
+    );
+  }
+}
+
+function validateBudgetFallbacks(
+  budget: Record<string, unknown>,
+  events: Record<string, unknown>[],
+  findings: Finding[]
+): void {
+  const fallbacksByAxis = new Map<string, number>();
+  for (const event of events) {
+    if (event.event_type !== "manual_fallback") {
+      continue;
+    }
+    const axis = String(event.axis);
+    fallbacksByAxis.set(axis, (fallbacksByAxis.get(axis) ?? 0) + 1);
+  }
+  if (
+    [...fallbacksByAxis.values()].some(
+      (count) => count > Number(budget.max_fallback_passes_per_axis)
+    )
+  ) {
+    findings.push(
+      finding(
+        "journal-review-budget-fallbacks-exceeded",
+        "error",
+        "manual fallback exceeded max_fallback_passes_per_axis"
+      )
+    );
+  }
+}
+
+function validateReviewBudget(
+  closeEvent: Record<string, unknown>,
+  events: Record<string, unknown>[],
+  state: JournalState,
+  findings: Finding[]
+): Record<string, unknown> | undefined {
+  const budget = isRecord(closeEvent.review_budget)
+    ? closeEvent.review_budget
+    : undefined;
+  if (!budget) {
+    findings.push(
+      finding(
+        "journal-review-budget-missing",
+        "error",
+        "report_closed requires review_budget evidence"
+      )
+    );
+    return undefined;
+  }
+  if (!validateBudgetLimits(budget, findings)) {
+    return budget;
+  }
+  validateBudgetRevision(budget, events, findings);
+  validateBudgetAttempts(budget, state, findings);
+  validateBudgetFallbacks(budget, events, findings);
+  return budget;
+}
+
 function check(fileInput: string, allowOpen = false): Evidence {
   const file = path.resolve(fileInput);
   const findings: Finding[] = [];
@@ -869,7 +1009,12 @@ function check(fileInput: string, allowOpen = false): Evidence {
     }
   }
 
+  let reviewBudget: Record<string, unknown> | undefined;
   if (state.closeIndex >= 0) {
+    const closeEvent = events[state.closeIndex];
+    reviewBudget = closeEvent
+      ? validateReviewBudget(closeEvent, events, state, findings)
+      : undefined;
     if (
       !events.some(
         (event) =>
@@ -907,6 +1052,7 @@ function check(fileInput: string, allowOpen = false): Evidence {
         : undefined,
       closed: state.closeIndex >= 0,
       events: events.length,
+      review_budget: reviewBudget,
       run_id: state.runId,
     },
     findings
@@ -973,6 +1119,12 @@ function selfTest(): number {
         event_id: "e4",
         event_type: "report_closed",
         order: 4,
+        review_budget: {
+          max_attempts_per_axis_per_revision: 2,
+          max_fallback_passes_per_axis: 1,
+          max_revision_rounds: 2,
+          revision_rounds: 0,
+        },
       },
     ];
     fs.writeFileSync(
@@ -982,6 +1134,15 @@ function selfTest(): number {
     );
     if (check(file).gate !== "passed") {
       throw new Error("valid journal should pass");
+    }
+
+    fs.writeFileSync(
+      file,
+      `${events.map((event, index) => JSON.stringify(index === 3 ? { ...event, review_budget: { ...events[3].review_budget, max_revision_rounds: 3 } } : event)).join("\n")}\n`,
+      "utf-8"
+    );
+    if (check(file).gate !== "failed") {
+      throw new Error("review budget limits must fail closed");
     }
 
     fs.writeFileSync(
@@ -1053,6 +1214,12 @@ function selfTest(): number {
         event_id: "s5",
         event_type: "report_closed",
         order: 5,
+        review_budget: {
+          max_attempts_per_axis_per_revision: 2,
+          max_fallback_passes_per_axis: 1,
+          max_revision_rounds: 2,
+          revision_rounds: 0,
+        },
       },
     ];
     fs.writeFileSync(
