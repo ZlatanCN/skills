@@ -65,6 +65,8 @@ const DELIVERY_LABELS = new Set([
   "未写入（阻塞）",
 ]);
 const SCRIPT_DIR = path.dirname(new URL(import.meta.url).pathname);
+const DELIVERY_SCHEMA_VERSION = "knowledge-distiller.delivery.v3";
+const LEGACY_DELIVERY_SCHEMA_VERSION = "knowledge-distiller.delivery.v2";
 const SHA256_RE = /^[a-f0-9]{64}$/iu;
 const MANIFEST_BASENAMES = {
   draft: "draft.md",
@@ -814,12 +816,16 @@ function validateArtifact(
   reportPath: string,
   findings: Finding[]
 ): boolean {
-  if (report.schema_version !== "knowledge-distiller.delivery.v2") {
+  if (report.schema_version !== DELIVERY_SCHEMA_VERSION) {
     findings.push(
       finding(
-        "delivery-version-invalid",
+        report.schema_version === LEGACY_DELIVERY_SCHEMA_VERSION
+          ? "delivery-schema-legacy"
+          : "delivery-version-invalid",
         "error",
-        "schema_version must be knowledge-distiller.delivery.v2"
+        report.schema_version === LEGACY_DELIVERY_SCHEMA_VERSION
+          ? "knowledge-distiller.delivery.v2 is a legacy pre-manifest contract; regenerate the report as delivery.v3"
+          : `schema_version must be ${DELIVERY_SCHEMA_VERSION}`
       )
     );
   }
@@ -1604,7 +1610,7 @@ function selfTest(): number {
         },
       },
       run_id: `${targetKey}/1`,
-      schema_version: "knowledge-distiller.delivery.v2",
+      schema_version: DELIVERY_SCHEMA_VERSION,
       write_outcome: "updated",
       write_state: "committed",
     };
@@ -1755,6 +1761,24 @@ function selfTest(): number {
     if (check(file).gate !== "passed") {
       throw new Error("hash-bound journal and final artifact should pass");
     }
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        ...report,
+        schema_version: LEGACY_DELIVERY_SCHEMA_VERSION,
+      }),
+      "utf-8"
+    );
+    const legacyResult = check(file);
+    if (
+      legacyResult.gate !== "failed" ||
+      !legacyResult.findings.some(
+        (item) => item.code === "delivery-schema-legacy"
+      )
+    ) {
+      throw new Error("legacy delivery.v2 must be rejected explicitly");
+    }
+    fs.writeFileSync(file, JSON.stringify(report), "utf-8");
     const manifest = JSON.parse(
       fs.readFileSync(manifestPath, "utf-8")
     ) as Record<string, unknown>;

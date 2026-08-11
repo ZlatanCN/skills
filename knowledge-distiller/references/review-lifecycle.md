@@ -221,9 +221,12 @@ claim; it cannot be relabeled as provider clean.
 
 ## 6. Delivery record and labels
 
-The machine-readable record uses `knowledge-distiller.delivery.v2`:
+The machine-readable record uses `knowledge-distiller.delivery.v3`:
 
 ```text
+schema_version → knowledge-distiller.delivery.v3
+run_id        → locked target generation owning the report
+manifest      → {path, sha256} for the fixed run bundle # required for staging/committed/uncertain
 write_state  → not_applicable | idle | staging | committed | uncertain
 write_outcome → created | updated | unchanged   # required for committed
 review.*.outcome → provider_clean | provider_findings | provider_unverified | manual_checked | unavailable

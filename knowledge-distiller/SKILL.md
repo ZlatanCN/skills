@@ -597,7 +597,7 @@ fallback, open blocker, explicit stop, or finite revision-budget boundary.
 Read `references/review-lifecycle.md` §6 for its write-state vocabulary, using the stricter state contract above when
 an example is ambiguous. Report in Chinese and include only sections with content:
 
-Before presenting the report, materialize its machine-readable `knowledge-distiller.delivery.v2` record and run:
+Before presenting the report, materialize its machine-readable `knowledge-distiller.delivery.v3` record and run:
 
 ```bash
 node scripts/check-delivery-report.ts --report "<delivery-json>" --json
