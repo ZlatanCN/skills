@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.6.0] - 2026-08-11
+
+### 文档
+- docs(references): 优化外部链接书写规范说明
+
+### 重构
+- refactor(documentation): 重构机械门和 Mermaid 参考文档
+
+### 其他
+- knowledge-distiller: tighten accuracy packet boundaries
+- knowledge-distiller: bound accuracy review input
+- knowledge-distiller: close review budget escape hatches
+- knowledge-distiller: enforce review action budgets
+- knowledge-distiller: bound review convergence
+- knowledge-distiller: version delivery manifest contract
+- knowledge-distiller: bind delivery to run manifest
+- knowledge-distiller: isolate run artifacts by identity
+
+
 ## [0.5.1] - 2026-08-11
 
 ### 重构
