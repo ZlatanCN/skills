@@ -334,8 +334,9 @@ bytes or meaning change after the scan, invalidate the link ledger and rescan.
 
 ### 5B. Run-scoped artifacts and identity
 
-Runtime evidence is not vault content. For `persist`, allocate it only after the Phase 4 target/collision gate in the
-single fixed skill-owned root `<skill-root>/knowledge-distiller-workspace/runs/`, outside the vault and never in the
+Runtime evidence is not vault content. Here `skill-root` means the directory containing this `SKILL.md`. For `persist`,
+allocate runtime evidence only after the Phase 4 target/collision gate in the single fixed skill-owned root
+`<skill-root>/knowledge-distiller-workspace/runs/`, outside the vault and never in the
 current working directory:
 
 ```text
@@ -352,11 +353,17 @@ current working directory:
 directory, timestamped, or caller-provided output directory. `target-key` is the first 16 hex characters of SHA-256 over the canonical target path. Allocate the next monotonic
 `generation` under an exclusive lock for that target; `run_id` is `<target-key>/<generation>`. File names inside a run
 are fixed: do not add timestamps, UUIDs, `iteration-*` directories, or current-directory outputs. The manifest records
-`run_id`, canonical target, generation, original hash, current draft hash, and every evidence path. Every journal event
-and delivery record must carry the same `run_id`; a stale or mismatched run is invalid even when its individual hashes
-look valid. Keep at most the active run and the last uncertain run; remove older runtime-owned generations only after
-their delivery/report outcome is closed. `state.json` remains the separate fixed setup preference file described in
-Phase 1.
+`run_id`, canonical target, generation, artifact kind, original hash (`null` only for `new_note`), current draft hash,
+and exactly these artifact paths: `manifest.json`, `draft.md`, `teaching-model.json`, `format-plan.json`, `review.jsonl`,
+and `delivery.json`. The delivery record carries `manifest: {path, sha256}`; its checker reads that exact manifest and
+rejects a missing, stale, path-mismatched, or cross-generation bundle. Every journal event and delivery record must
+carry the same `run_id`; a stale or mismatched run is invalid even when its individual hashes look valid. Keep at most
+the active run and the last uncertain run; remove older runtime-owned generations only after their delivery/report
+outcome is closed. `state.json` remains the separate fixed setup preference file described in Phase 1.
+
+The manifest check proves bundle identity and byte bindings; it does not prove that a lock was held. The runtime must
+still acquire the target lock, allocate the generation, and durably write the manifest before staging. If the manifest
+cannot be made durable or its identity does not match the delivery input, fail closed without adding a lifecycle state.
 
 Acquire the target lock before reading an update's `original_hash`, re-check it immediately before replacement, and
 move the Run to `blocked` if the file changed or the lock/generation/manifest cannot be made durable. A crash after

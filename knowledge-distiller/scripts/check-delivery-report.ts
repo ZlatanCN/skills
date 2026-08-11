@@ -14,6 +14,7 @@ import {
   readJsonInput,
   nonEmptyString,
   runMain,
+  sha256,
   withTempDir,
 } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
@@ -64,6 +65,14 @@ const DELIVERY_LABELS = new Set([
   "未写入（阻塞）",
 ]);
 const SCRIPT_DIR = path.dirname(new URL(import.meta.url).pathname);
+const SHA256_RE = /^[a-f0-9]{64}$/iu;
+const MANIFEST_BASENAMES = {
+  draft: "draft.md",
+  format_plan: "format-plan.json",
+  manifest: "manifest.json",
+  review: "review.jsonl",
+  teaching_model: "teaching-model.json",
+} as const;
 
 type MutableDeliveryReport = {
   schema_version: string;
@@ -71,6 +80,7 @@ type MutableDeliveryReport = {
   label: string;
   write_state: string;
   write_outcome?: string;
+  manifest?: { path: string; sha256: string };
   note_path: string;
   hard_gates: Record<string, string>;
   review: {
@@ -150,6 +160,236 @@ function validateCreationProbeContent(
       )
     );
   }
+}
+
+type ReadManifest = {
+  path: string;
+  value: Record<string, unknown>;
+};
+
+function readManifest(
+  report: Record<string, unknown>,
+  findings: Finding[]
+): ReadManifest | undefined {
+  const reference = isRecord(report.manifest) ? report.manifest : undefined;
+  const manifestPath = String(reference?.path ?? "");
+  const declaredHash = String(reference?.sha256 ?? "");
+  if (!path.isAbsolute(manifestPath) || !SHA256_RE.test(declaredHash)) {
+    findings.push(
+      finding(
+        "delivery-manifest-reference-invalid",
+        "error",
+        "persisted artifacts need an absolute manifest path and SHA-256"
+      )
+    );
+    return undefined;
+  }
+  if (!fs.existsSync(manifestPath) || !fs.statSync(manifestPath).isFile()) {
+    findings.push(
+      finding(
+        "delivery-manifest-missing",
+        "error",
+        "manifest.path does not identify an existing file",
+        { path: manifestPath }
+      )
+    );
+    return undefined;
+  }
+  if (fileHash(manifestPath) !== declaredHash) {
+    findings.push(
+      finding(
+        "delivery-manifest-hash-mismatch",
+        "error",
+        "manifest.sha256 does not match the manifest bytes",
+        { path: manifestPath }
+      )
+    );
+  }
+  try {
+    const value: unknown = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    if (!isRecord(value)) {
+      throw new Error("manifest root must be an object");
+    }
+    return { path: manifestPath, value };
+  } catch (error) {
+    findings.push(
+      finding(
+        "delivery-manifest-json-invalid",
+        "error",
+        `manifest is not valid JSON: ${(error as Error).message}`,
+        { path: manifestPath }
+      )
+    );
+    return undefined;
+  }
+}
+
+function validateManifestIdentity(
+  report: Record<string, unknown>,
+  manifest: ReadManifest,
+  findings: Finding[]
+): { draftHashValid: boolean; generation: number; targetKey: string } {
+  const targetPath = path.resolve(String(report.note_path ?? ""));
+  const targetKey = sha256(targetPath).slice(0, 16);
+  const generation = Number(manifest.value.generation);
+  const identityValid =
+    manifest.value.schema_version === "knowledge-distiller.manifest.v1" &&
+    manifest.value.run_id === report.run_id &&
+    manifest.value.target_path === targetPath &&
+    manifest.value.target_key === targetKey &&
+    manifest.value.artifact_kind === report.artifact_kind &&
+    Number.isInteger(manifest.value.generation) &&
+    generation > 0 &&
+    manifest.value.run_id === `${targetKey}/${String(generation)}`;
+  if (!identityValid) {
+    findings.push(
+      finding(
+        "delivery-manifest-identity-invalid",
+        "error",
+        "manifest identity does not match the delivery target, run_id, or generation",
+        { path: manifest.path }
+      )
+    );
+  }
+  const originalValid =
+    manifest.value.artifact_kind === "new_note"
+      ? manifest.value.original_hash === null
+      : typeof manifest.value.original_hash === "string" &&
+        SHA256_RE.test(manifest.value.original_hash);
+  if (!originalValid) {
+    findings.push(
+      finding(
+        "delivery-manifest-original-hash-invalid",
+        "error",
+        "manifest original_hash must be null for new_note or SHA-256 for updated_note",
+        { path: manifest.path }
+      )
+    );
+  }
+  const draftHashValid =
+    typeof manifest.value.draft_hash === "string" &&
+    SHA256_RE.test(manifest.value.draft_hash);
+  if (!draftHashValid) {
+    findings.push(
+      finding(
+        "delivery-manifest-draft-hash-invalid",
+        "error",
+        "manifest.draft_hash must be a SHA-256 digest",
+        { path: manifest.path }
+      )
+    );
+  } else if (
+    report.write_state === "committed" &&
+    manifest.value.draft_hash !== report.final_hash
+  ) {
+    findings.push(
+      finding(
+        "delivery-manifest-final-hash-mismatch",
+        "error",
+        "committed final_hash must equal manifest.draft_hash",
+        { path: manifest.path }
+      )
+    );
+  }
+  return { draftHashValid, generation, targetKey };
+}
+
+function validateManifestFiles(
+  manifest: ReadManifest,
+  reportPath: string,
+  identity: { draftHashValid: boolean; generation: number; targetKey: string },
+  findings: Finding[]
+): void {
+  const directory = path.dirname(manifest.path);
+  const expected = {
+    ...Object.fromEntries(
+      Object.entries(MANIFEST_BASENAMES).map(([name, basename]) => [
+        name,
+        path.join(directory, basename),
+      ])
+    ),
+    delivery: path.resolve(reportPath),
+  } as Record<string, string>;
+  const artifacts = isRecord(manifest.value.artifacts)
+    ? manifest.value.artifacts
+    : undefined;
+  if (!artifacts) {
+    findings.push(
+      finding(
+        "delivery-manifest-artifacts-missing",
+        "error",
+        "manifest.artifacts must list the fixed run files",
+        { path: manifest.path }
+      )
+    );
+    return;
+  }
+  for (const [name, expectedPath] of Object.entries(expected)) {
+    const declaredPath = artifacts[name];
+    if (
+      typeof declaredPath !== "string" ||
+      path.resolve(declaredPath) !== expectedPath ||
+      !fs.existsSync(expectedPath) ||
+      !fs.statSync(expectedPath).isFile()
+    ) {
+      findings.push(
+        finding(
+          "delivery-manifest-artifact-invalid",
+          "error",
+          `manifest artifact ${name} must be the existing fixed run file`,
+          { path: expectedPath }
+        )
+      );
+    }
+  }
+  if (
+    path.basename(directory) !== String(identity.generation) ||
+    path.basename(path.dirname(directory)) !== identity.targetKey
+  ) {
+    findings.push(
+      finding(
+        "delivery-manifest-directory-invalid",
+        "error",
+        "manifest must live under <target-key>/<generation>",
+        { path: manifest.path }
+      )
+    );
+  }
+  const draftPath = expected.draft;
+  if (
+    identity.draftHashValid &&
+    fs.existsSync(draftPath) &&
+    fileHash(draftPath) !== manifest.value.draft_hash
+  ) {
+    findings.push(
+      finding(
+        "delivery-manifest-draft-bytes-mismatch",
+        "error",
+        "manifest.draft_hash does not match draft.md bytes",
+        { path: draftPath }
+      )
+    );
+  }
+}
+
+function validateRunManifest(
+  report: Record<string, unknown>,
+  reportPath: string,
+  findings: Finding[]
+): void {
+  if (
+    !new Set(["staging", "committed", "uncertain"]).has(
+      String(report.write_state)
+    )
+  ) {
+    return;
+  }
+  const manifest = readManifest(report, findings);
+  if (!manifest) {
+    return;
+  }
+  const identity = validateManifestIdentity(report, manifest, findings);
+  validateManifestFiles(manifest, reportPath, identity, findings);
 }
 
 function runJournalChecker(
@@ -571,6 +811,7 @@ function validateWrittenArtifact(
 
 function validateArtifact(
   report: Record<string, unknown>,
+  reportPath: string,
   findings: Finding[]
 ): boolean {
   if (report.schema_version !== "knowledge-distiller.delivery.v2") {
@@ -664,6 +905,7 @@ function validateArtifact(
       )
     );
   }
+  validateRunManifest(report, reportPath, findings);
   return written;
 }
 
@@ -1249,7 +1491,7 @@ function check(input: string): Evidence {
       findings
     );
   }
-  const written = validateArtifact(report, findings);
+  const written = validateArtifact(report, input, findings);
   const { gateObject, gateValues } = validateHardGates(report, findings);
 
   const reviewContext = validateReview(report, written, findings);
@@ -1290,10 +1532,24 @@ function check(input: string): Evidence {
 
 function selfTest(): number {
   return withTempDir("knowledge-distiller-delivery-", (root) => {
-    const file = path.join(root, "report.json");
+    const note = path.join(root, "Note.md");
+    const targetKey = sha256(path.resolve(note)).slice(0, 16);
+    const bundle = path.join(root, targetKey, "1");
+    fs.mkdirSync(bundle, { recursive: true });
+    const file = path.join(bundle, "delivery.json");
+    const manifestPath = path.join(bundle, "manifest.json");
+    const draftPath = path.join(bundle, "draft.md");
+    const teachingModelPath = path.join(bundle, "teaching-model.json");
+    const formatPlanPath = path.join(bundle, "format-plan.json");
+    const journalPath = path.join(bundle, "review.jsonl");
+    fs.writeFileSync(note, "# Note\n", "utf-8");
+    fs.writeFileSync(draftPath, "# Note\n", "utf-8");
+    fs.writeFileSync(teachingModelPath, "{}\n", "utf-8");
+    fs.writeFileSync(formatPlanPath, "{}\n", "utf-8");
+    const noteHash = fileHash(note);
     const report: MutableDeliveryReport = {
       artifact_kind: "updated_note",
-      final_hash: "b".repeat(64),
+      final_hash: noteHash,
       hard_gates: {
         evidence: "passed",
         heading: "passed",
@@ -1305,7 +1561,8 @@ function selfTest(): number {
         write_readback: "passed",
       },
       label: "双轴审查通过",
-      note_path: "/tmp/Note.md",
+      manifest: { path: manifestPath, sha256: "0".repeat(64) },
+      note_path: note,
       open_blockers: [],
       open_items: [],
       review: {
@@ -1315,7 +1572,7 @@ function selfTest(): number {
           attempt_id: "accuracy-1",
           claims_checked: 3,
           cycle_id: "cycle-1",
-          draft_hash: "a".repeat(64),
+          draft_hash: noteHash,
           note_revision: 1,
           observability: "observed",
           outcome: "provider_clean",
@@ -1331,7 +1588,7 @@ function selfTest(): number {
           attempt_id: "clarity-1",
           claims_checked: 3,
           cycle_id: "cycle-1",
-          draft_hash: "a".repeat(64),
+          draft_hash: noteHash,
           note_revision: 1,
           observability: "observed",
           outcome: "provider_clean",
@@ -1343,25 +1600,46 @@ function selfTest(): number {
           closed: true,
           events: 7,
           gate: "passed",
-          run_id: "target-key/1",
+          run_id: `${targetKey}/1`,
         },
       },
-      run_id: "target-key/1",
+      run_id: `${targetKey}/1`,
       schema_version: "knowledge-distiller.delivery.v2",
       write_outcome: "updated",
       write_state: "committed",
     };
-    const note = path.join(root, "Note.md");
-    fs.writeFileSync(note, "# Note\n", "utf-8");
-    report.note_path = note;
-    report.final_hash = fileHash(note);
-    report.review.clarity.draft_hash = report.final_hash;
-    report.review.accuracy.draft_hash = report.final_hash;
+    function writeManifest(
+      artifactKind: string,
+      originalHash: string | null
+    ): void {
+      fs.writeFileSync(
+        manifestPath,
+        JSON.stringify({
+          artifact_kind: artifactKind,
+          artifacts: {
+            delivery: file,
+            draft: draftPath,
+            format_plan: formatPlanPath,
+            manifest: manifestPath,
+            review: journalPath,
+            teaching_model: teachingModelPath,
+          },
+          draft_hash: report.final_hash,
+          generation: 1,
+          original_hash: originalHash,
+          run_id: report.run_id,
+          schema_version: "knowledge-distiller.manifest.v1",
+          target_key: targetKey,
+          target_path: path.resolve(note),
+        }),
+        "utf-8"
+      );
+      report.manifest = { path: manifestPath, sha256: fileHash(manifestPath) };
+    }
     fs.writeFileSync(file, JSON.stringify(report), "utf-8");
     if (check(file).gate !== "failed") {
       throw new Error("unbound journal must fail closed");
     }
-    const journalPath = path.join(root, "journal.jsonl");
     const journalBase = {
       client_dispatch_id: "dispatch",
       cycle_id: "cycle-1",
@@ -1372,7 +1650,7 @@ function selfTest(): number {
       observability: "observed",
       observed_at: "2026-08-10T00:00:00Z",
       provider_operation_id: "provider",
-      run_id: "target-key/1",
+      run_id: `${targetKey}/1`,
     };
     const journalEvents = [
       {
@@ -1472,10 +1750,26 @@ function selfTest(): number {
       run_id: report.run_id,
       sha256: fileHash(journalPath),
     };
+    writeManifest("updated_note", "c".repeat(64));
     fs.writeFileSync(file, JSON.stringify(report), "utf-8");
     if (check(file).gate !== "passed") {
       throw new Error("hash-bound journal and final artifact should pass");
     }
+    const manifest = JSON.parse(
+      fs.readFileSync(manifestPath, "utf-8")
+    ) as Record<string, unknown>;
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({ ...manifest, target_path: path.join(root, "Other.md") }),
+      "utf-8"
+    );
+    report.manifest = { path: manifestPath, sha256: fileHash(manifestPath) };
+    fs.writeFileSync(file, JSON.stringify(report), "utf-8");
+    if (check(file).gate !== "failed") {
+      throw new Error("manifest target drift must fail closed");
+    }
+    writeManifest("updated_note", "c".repeat(64));
+    fs.writeFileSync(file, JSON.stringify(report), "utf-8");
     fs.writeFileSync(
       file,
       JSON.stringify({
@@ -1500,6 +1794,7 @@ function selfTest(): number {
     );
     const noteAfterProbe = new Date(Date.now() + 1000);
     fs.utimesSync(note, noteAfterProbe, noteAfterProbe);
+    writeManifest("new_note", null);
     const newReport = {
       ...report,
       artifact_kind: "new_note",
@@ -1523,6 +1818,7 @@ function selfTest(): number {
     if (check(file).gate !== "failed") {
       throw new Error("a new note without a creation probe must fail");
     }
+    writeManifest("updated_note", "c".repeat(64));
     fs.writeFileSync(
       file,
       JSON.stringify({
