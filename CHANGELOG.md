@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.1] - 2026-08-11
+
+### 重构
+- refactor(ui): 删除knowledge-distiller评估数据及Darwin结果卡页面
+
+
 ## [0.5.0] - 2026-08-11
 
 ### 重构
