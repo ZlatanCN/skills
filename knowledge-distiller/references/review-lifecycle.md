@@ -200,15 +200,23 @@ comments do not start a revision round.
 
 ## 5. Convergence and fallback
 
-Reserve a finite revision budget before dispatch. Track these counters separately:
+Reserve a finite revision budget before dispatch. The default and hard ceiling for one invocation is two material
+revision rounds after the initial draft; record the value instead of inferring it from event count. Track these counters
+separately:
 
 ```text
+max_revision_rounds → 2
 review_attempts | fallback_passes | revision_rounds
 ```
 
 Waiting does not consume a revision round. A revision round is consumed only by a material body change. Adjudicate valid
 clarity and accuracy findings together in one edit pass. Structural changes, claim corrections, scope changes, links, or
 diagrams rerun both axes; a provably local wording change may rerun only its affected axis.
+
+Do not reset `revision_rounds` when starting a new `ReviewCycle`; a new cycle after a body change consumes the next round.
+When `revision_rounds == max_revision_rounds`, do not enter `compose` again. If actionable reader/accuracy blockers remain,
+move the existing Run to `blocked(reason=revision_budget_exhausted)`; otherwise stop revising and use the truthful delivery
+label. This budget never force-closes a pending/running provider attempt: slow responses still follow §3's event protocol.
 
 Close when both valid provider outcomes are clean, manual fallback leaves no actionable repair, no new actionable
 information appears, an explicit stop is confirmed, or the revision budget is exhausted. A late result cannot reopen a
