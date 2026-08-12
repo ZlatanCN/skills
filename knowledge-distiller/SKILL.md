@@ -1,6 +1,6 @@
 ---
 name: knowledge-distiller
-version: "0.6.1"
+version: "0.6.2"
 description: >
   Turn a user's rough technical understanding, research fragments, or existing technical note into a durable Chinese
   Obsidian note or a read-only structural/accuracy review. Use whenever the user asks to distill, fact-check, causally

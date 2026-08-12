@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.2] - 2026-08-12
+
+### 文档
+- docs(knowledge-distiller): 优化知识蒸馏器参考文档和流程说明
+- docs(knowledge-distiller): 优化读者认知模型和审核流程指南
+
+### 重构
+- refactor(documentation): 优化读者模型与审核生命周期说明
+- refactor(review): 优化审核流程与外部链接处理规则
+
+### 其他
+- chore: 收敛教学审查与提交前检查
+
+
 ## [0.6.1] - 2026-08-12
 
 ### 重构
