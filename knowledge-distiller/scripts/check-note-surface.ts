@@ -138,6 +138,33 @@ function collectCalloutFindings(
   }
 }
 
+function collectExternalLinkFindings(
+  file: string,
+  strict: boolean,
+  bodyLines: ReturnType<typeof parseMarkdown>["body_lines"],
+  findings: Finding[]
+): void {
+  const link =
+    "(?:\\[[^\\]\\n]+\\]\\(https?://[^\\s)\\]>]+\\)|https?://[^\\s)\\]>]+)";
+  const sourceTail = new RegExp(`[。.!！？?]\\s*${link}\\s*$`, "iu");
+  const sourceLine = new RegExp(
+    `^\\s*(?:[-*]\\s*)?(?:(?:source|reference|see|来源|参考资料|参见|详见)\\s*[:：]?\\s*)?${link}\\s*$`,
+    "iu"
+  );
+  for (const [line, text] of bodyLines) {
+    if (sourceTail.test(text) || sourceLine.test(text)) {
+      findings.push(
+        finding(
+          "external-link-source-tail",
+          strict ? "error" : "warning",
+          "external link is a source tail; attach it to the claim wording or omit it",
+          { line, path: file }
+        )
+      );
+    }
+  }
+}
+
 function collectBodyFindings(
   file: string,
   strict: boolean,
@@ -346,6 +373,7 @@ function check(
 
   collectFenceFindings(file, strict, surface.fences, findings);
   collectCalloutFindings(file, portable, surface.callouts, findings);
+  collectExternalLinkFindings(file, strict, surface.body_lines, findings);
   collectBodyFindings(file, strict, surface, findings);
   collectMermaidFindings(file, strict, surface.mermaid_blocks, findings);
   collectEmphasisFindings(file, strict, surface.body_lines, findings);
@@ -473,6 +501,20 @@ function selfTest(): number {
     if (validResult.gate !== "passed" || validResult.metrics.callouts !== 3) {
       throw new Error("valid surface should pass, including nested callouts");
     }
+
+    const inlineLink = path.join(root, "inline-link.md");
+    fs.writeFileSync(
+      inlineLink,
+      "# Note\\nThe cache key is defined by [RFC 9110](https://example.com/rfc).\\n[The HTML Standard](https://example.com/html) defines parsing.\\n",
+      "utf-8"
+    );
+    if (check(inlineLink, true, true).gate !== "passed") {
+      throw new Error("claim-integrated links should pass");
+    }
+    assertSurfaceFailed(root, "source-tail", [
+      "# Note",
+      "The cache key is defined by RFC 9110. [RFC 9110](https://example.com/rfc)",
+    ]);
 
     assertSurfaceFailed(root, "unsupported", [
       "```mermaid",

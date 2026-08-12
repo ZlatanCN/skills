@@ -34,14 +34,13 @@ levels, rely on custom CSS, or use a callout as decoration.
 
 ## Links and sources
 
-Treat an external link as an affordance attached to wording that already belongs to the surrounding sentence, footnote, or
-callout—not as a new citation object appended after the claim. A link may appear at sentence end when it is grammatically
-part of the sentence; the problem is an independent source tail or source list.
+Treat an external link as an affordance inside the claim it supports, not as a citation object appended after the claim.
+A link may end a sentence when it is grammatically part of that sentence; a link after terminal punctuation is a source tail.
 
-- Put the link where the supported claim is made, and make the anchor identify the linked subject without adding a new
-  discourse unit.
-- Use natural claim wording by default. An RFC section, paper, or versioned specification may be the anchor when the
-  source itself is a syntactic participant and the reader needs to identify it.
+- Put the link inside the claim-bearing sentence, footnote, or callout; do not add it in a later source-append pass.
+- The anchor must identify the linked subject without creating a new discourse unit.
+- Standalone source lines, `Source:`, `参考资料：`, and source lists are forbidden.
+- An RFC section, paper, or versioned specification may be the anchor when the source itself is a syntactic participant.
 - Do not use a generic anchor such as “here” or “source” when a more informative phrase is available.
 
 ```markdown

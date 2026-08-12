@@ -54,8 +54,8 @@ Before research, separate the supplied material into observed phenomena, design 
 claims. Preserve each item's epistemic role—user-provided, tentative, source-backed, or disputed—in reasoning without
 copying the raw wording into the note. A user-proposed taxonomy remains a hypothesis until research adjudicates it.
 
-Read `references/reader-model.md` for the argument shape. If the input cannot share one spine, narrow it or split the
-request; do not make a catalog of related technologies.
+Read `references/reader-model.md` before building the argument. If the input cannot share one spine, narrow it or split
+the request; do not make a catalog of related technologies.
 
 ## 2. Resolve the vault and target
 
@@ -84,6 +84,8 @@ Use at most five central cross-note links. Emit only a link copied from the actu
 
 The target file and anchor must each be unique and the target passage must define or materially explain the alias. A
 mechanically valid but semantically adjacent link is omitted. Read `references/wikilinks.md` when links are needed.
+
+For external-link placement, read `references/obsidian-writing-style.md`; clarity review owns the semantic decision.
 
 ## 3. Research and claims
 
@@ -167,29 +169,14 @@ For a new note, prove the target is absent. For an update, read the original byt
 If the target changed, replacement failed, or read-back is uncertain, stop all writes and report an uncertain state. Do
 not create runtime bundles, journals, format plans, or setup state for a normal invocation.
 
-The mechanical contract is in `references/mechanical-gates.md`.
+Read `references/mechanical-gates.md` before the mechanical gate. It defines what the scripts can prove and what remains
+semantic review.
 
 ## 6. Mandatory review
 
-Review the exact final note bytes, not a summary or stale draft. Open both independent read-only reviewers in parallel:
-
-`clarity` checks the reader model, spine, section roles, transitions, terminology, formatting, natural link integration,
-heading tree, sibling inflation, false parents, missing parents, and hidden corrections.
-
-`accuracy` checks every material claim, source, scope, boundary, example, diagram, link, and metadata assertion.
-
-Use this small in-memory record:
-
-```text
-review → { clarity, accuracy, note_path, draft_hash, findings }
-```
-
-Each axis returns `clean`, `findings`, or `unavailable`. `unavailable` is never `clean`. A reviewer may not rewrite the
-note directly. Combine actionable findings into one edit pass, rerun the write/read-back checks, and review the new
-hash. Allow at most two material revision rounds; then report the remaining blockers instead of looping.
-
-If the review provider is unavailable, perform the same exact-draft manual check and label it `manual_checked`; never
-claim provider-clean review.
+Read `references/review-lifecycle.md` before dispatching either reviewer. Review the exact final note bytes, not a summary
+or stale draft. Follow that reference for clarity/accuracy scope, per-axis two-round ceiling, exact-hash review, and revision
+handling. A reviewer may not rewrite the note directly.
 
 ## 7. Delivery report
 

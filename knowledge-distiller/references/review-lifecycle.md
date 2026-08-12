@@ -1,11 +1,12 @@
 # Review protocol
 
 Review is mandatory and read-only. It increases confidence; it never authorizes an unsafe write and never edits the note
-itself.
+itself. Read this reference before dispatching either reviewer.
 
-## Two independent axes
+## Two independent axes and per-axis rounds
 
-Open both reviewers in parallel against the same absolute note path and exact draft hash.
+Open clarity and accuracy in parallel against the same absolute note path and exact draft hash when both are available.
+Each axis has at most two rounds; stop early when both are clean.
 
 ### Clarity
 
@@ -57,40 +58,43 @@ and make only bounded claim-specific lookups when necessary.
 
 ## Revision
 
-Adjudicate both axes together. Make one integrated edit pass, then repeat the safe write, final read-back, and both
-reviews against the new hash. Allow at most two material revision rounds. A punctuation-only change still requires a new
-final hash but does not require a new research model.
+Adjudicate both axes together. Round one reviews the draft/final bytes. If actionable findings remain, make one integrated
+edit pass and run round two for both axes against the new exact bytes. Do not start a second revision or a third round for
+any axis. If both axes are clean in round one, stop; two rounds each is a ceiling, not a quota.
 
-If a provider is unavailable or returns contradictory metadata, perform the same exact-draft manual check and report
-`manual_checked` or `unavailable`; never call it provider-clean. A client timeout or empty poll is not evidence of clean
-or failed review, but the user-facing task must not hang forever waiting for an opaque provider.
+A provider failure, timeout, empty result, or contradictory metadata is not silently retried. Record that axis as
+`unavailable` or `manual_checked`; only the planned second wave may run, and it must review the new exact hash. A
+punctuation-only change still requires a new final hash but does not require a new research model.
 
 ## Compact review record
 
 ```text
 review → {
-  clarity: {result, findings},
-  accuracy: {result, findings},
+  clarity: {round, result, coverage, findings},
+  accuracy: {round, result, coverage, findings},
   note_path,
   draft_hash,
   revision
 }
 ```
 
-No JSONL event stream, attempt state machine, observability field, late-result protocol, or fallback budget is required.
+No persistent event stream or run bundle is required. Keep the two per-axis round counters in memory and include them in the
+review record; do not use missing persistence as permission to exceed either two-round limit.
 
 ## Reviewer prompts
 
 Pass the resolved path, exact hash, reader contract, claim ledger, and the following instructions:
 
 ```text
-Read the exact note bytes. Do not rewrite them. Return the required fields only.
-For clarity, reconstruct teach-back, after-state, heading convention, and heading tree before listing findings. For every
-heading, state its parent question and sibling relation; distinguish true parallel H1 chapters from flattened child
-questions. Flag sibling inflation, false parents, heading flood, or unjustified depth. Do not demand extra hierarchy when the
+Read the exact note bytes. Do not rewrite them or dispatch another agent. Return the required fields only, including
+this axis's round number and coverage.
+For clarity, reconstruct teach-back, after-state, and heading tree before listing findings. For every H1, state its
+independent top-level question; for every H2/H3, state its parent question and sibling relation. Distinguish true parallel H1
+chapters from flattened child questions. Flag sibling inflation, false parents, heading flood, or unjustified depth. Check
+every external link for natural claim placement; a source tail or source list is a finding. Do not demand extra hierarchy when
 questions are genuinely independent. For each novel, user-proposed, contested, or central abstraction, identify its concrete
 origin, design motivation, and epistemic status.
 For accuracy, check every material claim and mapped surface against its source and limits. Treat proposed classifications as
 hypotheses until their status, axis, scope, overlap, and coverage are adjudicated.
-Use the smallest quote for each finding. Use — when absent. Do not mark clean with partial coverage.
+Use the smallest quote for each finding. Use — when absent. Do not mark clean with partial coverage or a stale hash.
 ```
