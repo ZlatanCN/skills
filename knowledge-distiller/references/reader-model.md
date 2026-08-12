@@ -1,6 +1,10 @@
 # Reader model
 
-This reference defines the teaching shape. It is not a second workflow or a machine schema.
+**Purpose**
+
+This reference defines the teaching shape. It is **not** a second workflow or a machine schema.
+
+> The note must let a future reader teach back **one causal model**, not recite a catalogue of terms, controls, or sources.
 
 ## 1. Define the destination
 
@@ -31,6 +35,11 @@ template: a mature taxonomy or reference note may lead with its definition, but 
 and scope.
 
 ## 2. Build the argument
+
+> **Use the smallest tree that preserves reasoning.**
+>
+> Every retained section must answer a question, move the reader forward, and have a recoverable relationship to the next
+> decision. More headings are not more teaching.
 
 Use the smallest useful teaching tree:
 
@@ -76,16 +85,25 @@ representative example, defer it, or drop it.
 For each surviving claim, record its source, limits, role, and disposition. Research returns are inputs to editorial
 judgment, not paragraphs to paste. When evidence changes the model, redraw the outline before writing.
 
-Every paragraph has one job: establish the problem, explain the mechanism, show the running example, state a boundary,
-make the choice, or make a transition. A definition that does none of these is deferred or deleted. An enumeration belongs in one sentence only when its items share the same axis and predicate; otherwise
-use groups or separate sentences. A correction, limitation, or conclusion inherited from the user's reasoning must also make
+Split the material into independent teaching units before polishing prose. Each unit has one job: establish the problem, explain
+one mechanism, show the running example, state a boundary, make the choice, or make a transition. Treat each paragraph as a
+licensed teaching move: identify the prior question or mechanism it answers, its one job, and the later explanation or decision it
+enables. A paragraph that introduces a new topic without recoverable local context is orphan material; delete it first, move it
+only when it belongs elsewhere, or add the smallest in-scope premise. A paragraph may contain one short setup and its answer, but
+a semicolon or connective phrase must not hide a change of subject, mechanism, or reader task; split it when it does. A definition
+that does none of these is deferred or deleted. An enumeration belongs in one sentence only
+when its items share the same axis and predicate; otherwise use groups or separate sentences. A correction, limitation, or conclusion inherited from the user's reasoning must also make
 its local antecedent recoverable to a standalone reader. If it depends on an unseen conversational premise, add the smallest premise,
 rewrite it as a self-contained boundary, or delete it. If it has no job in the spine, or does not help the reader make the target choice, merge, move, defer, or delete it.
 
 For updates, preserve unrelated content by default. Change only incorrect, duplicate, out-of-scope, explicitly retired,
-or structurally misplaced material.
+or structurally misplaced material. When a review finding changes a mechanism, classification, state, participant role, boundary,
+or choice, reread and rebuild the whole affected unit rather than patching the quoted sentence.
 
 ## 4. Teach-back
+
+> **Stop condition:** If the reader cannot recover the problem → mechanism → example → choice path from the note alone,
+> **do not polish**. Repair scope or structure first.
 
 Read the note top to bottom without following links. Reconstruct both the argument and its heading tree. Stop when:
 

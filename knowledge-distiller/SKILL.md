@@ -11,23 +11,31 @@ description: >
 
 # Knowledge Distiller
 
-Write one standalone Chinese Obsidian note for a future reader. The default path is one path:
+**Operating contract**
 
-```text
-reader contract → vault target → evidence → causal draft → safe write → clarity + accuracy review → report
-```
+**Write one standalone Chinese Obsidian note for a future reader.** Follow one path; do not invent quick, strict, or
+formatting-only variants.
 
-If review finds actionable problems, make one integrated revision, write it safely, read it back, and review the new
-exact bytes. Do not create a second workflow for “strict” or “quick” work.
+`reader contract → vault target → evidence → causal draft → safe write → clarity + accuracy review → report`
+
+**Review findings diagnose teaching units; they are not line-edit instructions.** Rebuild the affected unit instead of
+patching a stale draft.
+
+If review finds actionable problems, treat findings as diagnoses of affected teaching units, not line-edit instructions.
+Reconcile the findings, rebuild each affected unit from premise/problem through mechanism, example, boundary, transition, and
+choice, make one integrated revision, write it safely, read it back, and review the new exact bytes. Do not stack patches on a
+stale draft or create a second workflow for “strict” or “quick” work.
 
 ## Non-negotiable contract
 
-- Default to writing the note into the resolved Obsidian vault.
-- Always run two independent read-only reviews: `clarity` and `accuracy`.
-- Never write an unsupported material claim, guessed link, unsafe path, or unverified replacement.
-- Keep the user's raw wording in reasoning only. The body contains the adjudicated domain claim, not the conversation.
-- A failed or uncertain write is never reported as success.
-- An explicit user request not to write overrides the default write, but it is an early return, not a second mode.
+> **Rules that override convenience**
+>
+> - **Write by default** into the resolved Obsidian vault.
+> - **Review twice, independently:** `clarity` and `accuracy` are separate gates.
+> - **Never write** an unsupported material claim, guessed link, unsafe path, or unverified replacement.
+> - **Keep raw user wording out of the note.** The body contains the adjudicated domain claim, not the conversation.
+> - **Never report success** after a failed or uncertain write.
+> - **Honor an explicit no-write request early.** It is an early return, not a second workflow.
 
 ## 1. Route and reader contract
 
@@ -128,6 +136,11 @@ do not preserve its conversational rebuttal shell just because the user stated i
 
 ## 4. Compose the note
 
+> **Structure before polish**
+>
+> Build the teaching tree and complete the teaching units **before** naturalness or formatting polish. If wording exposes a
+> structural or factual problem, stop polishing and return to the affected unit.
+
 Build a teaching tree before prose, not a flat section list:
 
 ```text
@@ -155,20 +168,38 @@ children; and would removing the heading lose navigation rather than only visual
 the tree. The causal spine sets teaching order, not heading depth. Never invent a parent merely to avoid an all-H1 note, and
 never keep unrelated chapters flat merely because H1 siblings are mechanically legal.
 
-Open with the core judgment and concrete problem. Then teach one causal path: why the problem occurs, how the mechanism
-changes it, what the reader can observe in one small example, and which choice follows. Keep one main job per paragraph. Do not
-compress different classification axes, predicates, or paragraph roles into one comma-separated list. For a necessary
-enumeration, state its shared axis or action and return to the current decision; if the reader would retain more names but lose
-the relation, group, split, exemplify, or delete instead. Prefer one mechanism, consequence, and decision path over a survey
-of valid controls; move implementation detail out when it does not change the reader's teach-back. Before retaining a
-correction, limitation, or conclusion from the user's reasoning, apply the standalone-reader test: can the reader tell what it
-qualifies or follows from in the note's local context? If not, add the smallest missing premise, restate it as a direct
-boundary, or delete it. Use a running example when it makes the mechanism observable; use separate examples only when they
-clarify distinct choices.
+Open with the core judgment and concrete problem. Then split the material into independent teaching units, each with one
+job: establish a phenomenon, explain one mechanism, show its observable example, state its boundary, or make a choice. Treat
+each paragraph as a licensed teaching move, not merely a true claim: identify the prior question or mechanism it answers, its one
+job, and the later explanation or decision that needs it. If it introduces a new topic without recoverable local context, delete
+it first; move it only when it belongs elsewhere, or add the smallest in-scope premise only when that premise stays within the
+existing spine. Connect units with explicit transitions rather than one large paragraph. A semicolon or connective phrase must
+not hide a change of subject, mechanism, or reader task; split the sentence or paragraph when it does. Then teach the causal
+path: why the problem occurs, how the mechanism changes it, what the reader can observe, and which choice follows. Do not
+compress different classification axes, predicates, or paragraph roles into one comma-separated list. For a necessary enumeration, state its
+shared axis or action and return to the current decision; if the reader would retain more names but lose the relation, group,
+split, exemplify, or delete instead. Prefer one mechanism, consequence, and decision path over a survey of valid controls; move
+implementation detail out when it does not change the reader's teach-back. Before retaining a correction, limitation, or
+conclusion from the user's reasoning, apply the standalone-reader test: can the reader tell what it qualifies or follows from in
+the note's local context? If not, add the smallest missing premise, restate it as a direct boundary, or delete it. Use a running
+example when it makes the mechanism observable; use separate examples only when they clarify distinct choices.
 
-Read `references/obsidian-writing-style.md` for Markdown choices. Use ordinary paragraphs by default; use headings,
-tables, callouts, code, Mermaid, and links only when they improve scanning, comparison, execution, or causal clarity.
-If the user explicitly requests Mermaid, include a real Mermaid block. Read `references/mermaid.md` before drawing.
+After teaching units and surfaces are composed, run a bounded naturalness pass before review. Write direct technical Chinese:
+remove filler, praise, promotional claims, vague authority, formulaic transitions, empty summaries, forced contrasts, and
+unnecessary three-item rhetoric; prefer simple verbs and explicit subjects. Keep uncertainty and technical qualifiers, vary
+sentence rhythm without adding personality as decoration, and rewrite literal translations when a precise Chinese expression
+exists. This pass may change wording only; it must not alter claim scope, protocol mappings, teaching-unit boundaries, causal
+order, surfaces, or review findings. If wording exposes a structural or factual problem, return to unit-level revision instead.
+
+Read `references/obsidian-writing-style.md` for Markdown choices. Choose the smallest surface that preserves the reader's job:
+prose for explanation, code for executable behavior, tables for aligned comparison, Mermaid for relationships, and callouts for
+content with an independent attention or retrieval function. Ordinary paragraphs remain the default, not a ban on richer
+surfaces: when a reader would otherwise reconstruct a key flow, sequence, state, entity relation, or timeline across paragraphs,
+choose the Mermaid type that answers that question; when a core judgment, boundary, warning, stop rule, example, or model would
+be lost during scanning, choose the matching callout type. Treat reminder phrases such as “注意”, “第一原则”, “关键认知”,
+or “需要明确” as prompts to evaluate callout fit, not as automatic conversions; a boundary or stop rule without such a phrase
+still needs the same evaluation. Do not add formats for quota or decoration. If the user explicitly
+requests Mermaid, include a real Mermaid block. Read `references/mermaid.md` before drawing.
 
 For an update, preserve unrelated frontmatter, paragraphs, links, examples, and format blocks. Delete or rewrite only
 when the content is wrong, duplicated, out of scope, explicitly retired, or necessary to repair the teaching path.
@@ -191,6 +222,11 @@ Read `references/mechanical-gates.md` before the mechanical gate. It defines wha
 semantic review.
 
 ## 6. Mandatory review
+
+> **Review is a release gate**
+>
+> Read `references/review-lifecycle.md` before dispatching either reviewer. **Clarity and accuracy are independent; one cannot
+> cancel the other.** Review the exact final bytes, never a summary or stale draft.
 
 Read `references/review-lifecycle.md` before dispatching either reviewer. Review the exact final note bytes, not a summary
 or stale draft. Run clarity and accuracy independently when both axes are needed; each axis uses its own evidence and question,
@@ -225,11 +261,12 @@ two review results, and write outcome are sufficient evidence.
 
 ## Never do
 
-- Do not write before route, target, containment, and collision decisions are settled.
-- Do not guess a filename, heading, block ID, source, or version boundary.
-- Do not call a partial vault scan complete.
-- Do not replace an update after its original bytes changed.
-- Do not claim clean review from a timeout, empty poll, contradictory payload, or missing coverage.
-- Do not treat a mechanically valid all-H1 outline as semantically correct, and do not force depth merely to improve a
-  heading count.
-- Do not put reviewer prose, audit state, or process status into the note body.
+> **Hard stops**
+>
+> - **Do not write** before route, target, containment, and collision decisions are settled.
+> - **Do not guess** a filename, heading, block ID, source, or version boundary.
+> - **Do not call** a partial vault scan complete.
+> - **Do not replace** an update after its original bytes changed.
+> - **Do not claim clean review** from a timeout, empty poll, contradictory payload, or missing coverage.
+> - **Do not confuse syntax with teaching.** A mechanically valid all-H1 outline is not semantically correct.
+> - **Do not put** reviewer prose, audit state, or process status into the note body.
