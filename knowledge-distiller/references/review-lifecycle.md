@@ -10,8 +10,9 @@ Each axis has at most two rounds; stop early when both are clean.
 
 ### Clarity
 
-Reconstruct the note's spine, reader after-state, filename-title convention, heading tree, top-level section roles, prerequisites,
-transitions, terminology, formatting, diagrams, links, and hidden corrections from the note alone. For each heading, identify
+Reconstruct the note's spine, single reader teach-back and resulting choice, filename-title convention, heading tree,
+top-level section roles, prerequisites, transitions, terminology, formatting, diagrams, links, and hidden corrections from the
+note alone. For each heading, identify
 the parent question it serves and whether its siblings are genuinely parallel, composable, alternative, causal, or refining.
 Flag `sibling_inflation` when contained subquestions are flattened; `false_parent` when a substantive section is used as the
 parent of unrelated chapters; `heading_flood` when local examples or boundaries are promoted without navigation value; and
@@ -33,7 +34,8 @@ findings     → smallest quoted passage plus repair
 coverage     → complete | partial
 ```
 
-`clean` requires complete coverage, a usable teach-back, a recoverable heading tree, and no actionable finding. Mechanical
+`clean` requires complete coverage, a concise teach-back that names the mechanism, consequence, and resulting choice, a
+recoverable heading tree, and no actionable finding. A catalogue of covered topics is not a teach-back. Mechanical
 heading validity alone is not sufficient.
 
 ### Accuracy
@@ -88,12 +90,17 @@ Pass the resolved path, exact hash, reader contract, claim ledger, and the follo
 ```text
 Read the exact note bytes. Do not rewrite them or dispatch another agent. Return the required fields only, including
 this axis's round number and coverage.
-For clarity, reconstruct teach-back, after-state, and heading tree before listing findings. For every H1, state its
+For clarity, reconstruct the single teach-back, resulting choice, and heading tree before listing findings. Reject a note that
+is locally correct but requires the reader to retain a catalogue of controls, terms, or sources rather than one causal model. For every H1, state its
 independent top-level question; for every H2/H3, state its parent question and sibling relation. Distinguish true parallel H1
 chapters from flattened child questions. Flag sibling inflation, false parents, heading flood, or unjustified depth. Check
-every external link for natural claim placement; a source tail or source list is a finding. Do not demand extra hierarchy when
-questions are genuinely independent. For each novel, user-proposed, contested, or central abstraction, identify its concrete
-origin, design motivation, and epistemic status.
+every external link for natural claim placement; a source tail or source list is a finding. Check each correction, limitation,
+or causal conclusion inherited from the user's reasoning: its local antecedent must be recoverable from the note, otherwise
+flag the smallest missing premise or conversational rebuttal shell. For each necessary enumeration, check that its items share
+a classification axis and predicate, and that reading it returns the reader to the current decision; if not, flag mixed axes,
+role mixing, redundant coverage, or list-induced loss of the paragraph's subject and causal relation. Do not demand extra
+hierarchy when questions are genuinely independent. For each novel, user-proposed, contested, or central abstraction, identify
+its concrete origin, design motivation, and epistemic status.
 For accuracy, check every material claim and mapped surface against its source and limits. Treat proposed classifications as
 hypotheses until their status, axis, scope, overlap, and coverage are adjudicated.
 Use the smallest quote for each finding. Use — when absent. Do not mark clean with partial coverage or a stale hash.

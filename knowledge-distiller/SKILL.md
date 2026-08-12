@@ -44,11 +44,14 @@ Before research, record in memory:
 ```text
 reader  → who the note is for and what they already know
 question → the one question the note answers
-after   → what the reader can explain, predict, or choose afterward
+after   → the one explanation, prediction, or choice the reader must be able to teach back
 scope   → included questions and intentionally excluded branches
 spine   → problem → mechanism → consequence → decision or boundary
 heading_convention → implicit filename title only
 ```
+
+The after-state is a learning target, not a topic inventory. If it cannot be stated as one short teach-back, narrow or split
+the request before researching. A shared topic is not enough to justify one note.
 
 Before research, separate the supplied material into observed phenomena, design problems, proposed models, and factual
 claims. Preserve each item's epistemic role—user-provided, tentative, source-backed, or disputed—in reasoning without
@@ -106,7 +109,8 @@ status  → user hypothesis | working model | source-backed claim | disputed
 
 Every material body claim needs a ledger entry. If evidence is partial, qualify it; if the central causal model is
 unsupported, do not write it as fact. Do not use a search snippet, remembered fact, or one source to prove unrelated
-claims.
+claims. Treat a complete source list as input, not output: retain an item only when it advances the single teach-back and
+changes the reader's current decision; group, exemplify, defer, or drop the rest. Evidence is not a retention license.
 
 For a user-proposed classification, research its status before presenting it: confirm a source-backed taxonomy, retain it
 as an explicitly labelled working model, split mixed axes, or correct/drop it when the evidence does not support it. Check
@@ -115,7 +119,10 @@ not evidence that the classification is valid.
 
 When correcting the user's understanding, write the supported domain claim directly. Do not write a reply to an unseen
 claim such as `“X”不准确`, `不是 X 而是 Y`, or `把 X 说成 Y`. A contrast is allowed only when the note introduces both
-sides and the comparison has a reader-facing purpose.
+sides and the comparison has a reader-facing purpose. Treat the user's conversational premise as unavailable to the future
+reader: if a correction, limitation, or causal conclusion depends on it, introduce the needed premise locally, rewrite the
+sentence as a self-contained domain boundary, or drop it. Preserve the boundary when omitting it would cause a wrong decision;
+do not preserve its conversational rebuttal shell just because the user stated it.
 
 ## 4. Compose the note
 
@@ -146,7 +153,14 @@ than only visual emphasis? If any answer is unclear, redraw the tree. Never inve
 and never keep unrelated chapters flat merely because H1 siblings are mechanically legal.
 
 Write the causal model before advice: why the mechanism exists, how it works, what it composes with, and where it stops.
-Keep one main job per paragraph. Use a running example only when it clarifies a transition.
+Keep one main job per paragraph. Do not compress different classification axes, predicates, or paragraph roles into one
+comma-separated list. For a necessary enumeration, state its shared axis or action and return to the current decision; if the
+reader would retain more names but lose the relation, group, split, exemplify, or delete instead. Prefer one mechanism,
+consequence, and decision path over a survey of valid controls; move implementation detail out when it does not change the
+reader's teach-back. Before retaining a correction, limitation, or conclusion from the user's reasoning, apply the
+standalone-reader test: can the reader tell what it qualifies or follows from in the note's local context? If not, add the
+smallest missing premise, restate it as a direct boundary, or delete it. Use a running example only when it clarifies a
+transition.
 
 Read `references/obsidian-writing-style.md` for Markdown choices. Use ordinary paragraphs by default; use headings,
 tables, callouts, code, Mermaid, and links only when they improve scanning, comparison, execution, or causal clarity.
