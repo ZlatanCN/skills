@@ -14,8 +14,9 @@ scope   → included questions and parked branches
 spine   → problem → mechanism → consequence → decision or boundary
 ```
 
-Treat `after` as one learning target, not a list of topics. A note may mention several controls or examples, but if the reader
-cannot teach back one causal model and the choice it enables, narrow or split the note.
+Treat `after` as one learning target, not a list of topics. State one memorable core judgment and the concrete problem it
+solves. A note may mention several controls or examples, but the reader must be able to teach back problem → mechanism → one
+observable example → choice; otherwise narrow or split the note.
 
 A note changes the reader's mental model; it is not a warehouse of verified facts. If unrelated questions cannot share
 one spine, narrow or split them. If the input is broad but coherent, choose a boundary and continue. A shared domain or
@@ -34,8 +35,10 @@ and scope.
 Use the smallest useful teaching tree:
 
 ```text
-problem or constraint
+core judgment
+  → concrete problem or failure
   → mechanism
+  → observable example
   → remaining failure or trade-off
   → next decision
   → boundary and default choice
@@ -72,8 +75,8 @@ representative example, defer it, or drop it.
 For each surviving claim, record its source, limits, role, and disposition. Research returns are inputs to editorial
 judgment, not paragraphs to paste. When evidence changes the model, redraw the outline before writing.
 
-Every paragraph has one job: define, explain a mechanism, show an example, state a boundary, compare on one axis, or
-make a transition. An enumeration belongs in one sentence only when its items share the same axis and predicate; otherwise
+Every paragraph has one job: establish the problem, explain the mechanism, show the running example, state a boundary,
+make the choice, or make a transition. A definition that does none of these is deferred or deleted. An enumeration belongs in one sentence only when its items share the same axis and predicate; otherwise
 use groups or separate sentences. A correction, limitation, or conclusion inherited from the user's reasoning must also make
 its local antecedent recoverable to a standalone reader. If it depends on an unseen conversational premise, add the smallest premise,
 rewrite it as a self-contained boundary, or delete it. If it has no job in the spine, or does not help the reader make the target choice, merge, move, defer, or delete it.
@@ -97,7 +100,7 @@ Read the note top to bottom without following links. Reconstruct both the argume
 - a term is defined but its purpose is unclear;
 - the last section introduces an earlier prerequisite instead of completing the argument.
 
-State the spine, the heading convention, each top-level section's role, and each non-top-level section's parent in one
-sentence. Then state the reader's teach-back and resulting choice in no more than three short sentences. If that cannot be
-done from the note alone, or the summary is only a catalogue of sections and terms, repair the scope or teaching path before
-polishing prose. A mechanically valid heading tree is not a clarity pass.
+State the core judgment, problem, mechanism, example, and choice before stating the heading convention, each top-level
+section's role, and each non-top-level section's parent. Then state the reader's teach-back in no more than three short
+sentences. If any part is missing, or the summary is only a catalogue of sections and terms, repair the scope or teaching path
+before polishing prose. A mechanically valid heading tree is not a clarity pass.

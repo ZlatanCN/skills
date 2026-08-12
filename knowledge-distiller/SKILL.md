@@ -50,15 +50,17 @@ spine   → problem → mechanism → consequence → decision or boundary
 heading_convention → implicit filename title only
 ```
 
-The after-state is a learning target, not a topic inventory. If it cannot be stated as one short teach-back, narrow or split
-the request before researching. A shared topic is not enough to justify one note.
+The after-state is a learning target, not a topic inventory. State the note's core judgment in one memorable sentence, then
+name the concrete problem that makes it necessary. If the after-state cannot be taught back as problem → mechanism → concrete
+example → choice, narrow or split the request before researching. A shared topic is not enough to justify one note.
 
 Before research, separate the supplied material into observed phenomena, design problems, proposed models, and factual
 claims. Preserve each item's epistemic role—user-provided, tentative, source-backed, or disputed—in reasoning without
 copying the raw wording into the note. A user-proposed taxonomy remains a hypothesis until research adjudicates it.
 
 Read `references/reader-model.md` before building the argument. If the input cannot share one spine, narrow it or split
-the request; do not make a catalog of related technologies.
+the request; do not make a catalog of related technologies. Do not let a complete control inventory, source inventory, or
+architecture inventory substitute for the one teaching path.
 
 ## 2. Resolve the vault and target
 
@@ -152,15 +154,16 @@ preceding section; does the parent genuinely summarize all children; and would r
 than only visual emphasis? If any answer is unclear, redraw the tree. Never invent a parent merely to avoid an all-H1 note,
 and never keep unrelated chapters flat merely because H1 siblings are mechanically legal.
 
-Write the causal model before advice: why the mechanism exists, how it works, what it composes with, and where it stops.
-Keep one main job per paragraph. Do not compress different classification axes, predicates, or paragraph roles into one
-comma-separated list. For a necessary enumeration, state its shared axis or action and return to the current decision; if the
-reader would retain more names but lose the relation, group, split, exemplify, or delete instead. Prefer one mechanism,
-consequence, and decision path over a survey of valid controls; move implementation detail out when it does not change the
-reader's teach-back. Before retaining a correction, limitation, or conclusion from the user's reasoning, apply the
-standalone-reader test: can the reader tell what it qualifies or follows from in the note's local context? If not, add the
-smallest missing premise, restate it as a direct boundary, or delete it. Use a running example only when it clarifies a
-transition.
+Open with the core judgment and concrete problem. Then teach one causal path: why the problem occurs, how the mechanism
+changes it, what the reader can observe in one small example, and which choice follows. Keep one main job per paragraph. Do not
+compress different classification axes, predicates, or paragraph roles into one comma-separated list. For a necessary
+enumeration, state its shared axis or action and return to the current decision; if the reader would retain more names but lose
+the relation, group, split, exemplify, or delete instead. Prefer one mechanism, consequence, and decision path over a survey
+of valid controls; move implementation detail out when it does not change the reader's teach-back. Before retaining a
+correction, limitation, or conclusion from the user's reasoning, apply the standalone-reader test: can the reader tell what it
+qualifies or follows from in the note's local context? If not, add the smallest missing premise, restate it as a direct
+boundary, or delete it. Use a running example when it makes the mechanism observable; use separate examples only when they
+clarify distinct choices.
 
 Read `references/obsidian-writing-style.md` for Markdown choices. Use ordinary paragraphs by default; use headings,
 tables, callouts, code, Mermaid, and links only when they improve scanning, comparison, execution, or causal clarity.
@@ -190,7 +193,8 @@ semantic review.
 
 Read `references/review-lifecycle.md` before dispatching either reviewer. Review the exact final note bytes, not a summary
 or stale draft. Follow that reference for clarity/accuracy scope, per-axis two-round ceiling, exact-hash review, and revision
-handling. A reviewer may not rewrite the note directly.
+handling. A reviewer may not rewrite the note directly. Clarity is the teaching gate: accuracy and mechanical validity cannot
+rescue a note whose core judgment, concrete problem, mechanism, example, or resulting choice is not recoverable.
 
 ## 7. Delivery report
 
