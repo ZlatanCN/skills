@@ -149,10 +149,11 @@ limits, or helps decide the parent question. Heading depth expresses scope and d
 consequence, example, or boundary is not automatically a child: nest it only when the parent question actually contains it.
 Use a paragraph, list, table, or callout when a heading would add no independent navigation value.
 
-Before writing, run the sibling test: do the proposed siblings share one parent question; can each stand alone without the
-preceding section; does the parent genuinely summarize all children; and would removing the heading lose navigation rather
-than only visual emphasis? If any answer is unclear, redraw the tree. Never invent a parent merely to avoid an all-H1 note,
-and never keep unrelated chapters flat merely because H1 siblings are mechanically legal.
+Before writing, run the sibling test: name the immediate parent question for every proposed H2/H3; do the proposed siblings
+share that parent question; can each stand alone without the preceding section; does the parent genuinely summarize all
+children; and would removing the heading lose navigation rather than only visual emphasis? If any answer is unclear, redraw
+the tree. The causal spine sets teaching order, not heading depth. Never invent a parent merely to avoid an all-H1 note, and
+never keep unrelated chapters flat merely because H1 siblings are mechanically legal.
 
 Open with the core judgment and concrete problem. Then teach one causal path: why the problem occurs, how the mechanism
 changes it, what the reader can observe in one small example, and which choice follows. Keep one main job per paragraph. Do not
@@ -192,9 +193,11 @@ semantic review.
 ## 6. Mandatory review
 
 Read `references/review-lifecycle.md` before dispatching either reviewer. Review the exact final note bytes, not a summary
-or stale draft. Follow that reference for clarity/accuracy scope, per-axis two-round ceiling, exact-hash review, and revision
-handling. A reviewer may not rewrite the note directly. Clarity is the teaching gate: accuracy and mechanical validity cannot
-rescue a note whose core judgment, concrete problem, mechanism, example, or resulting choice is not recoverable.
+or stale draft. Run clarity and accuracy independently when both axes are needed; each axis uses its own evidence and question,
+but both may cite the same note passage. A reviewer may not rewrite the note or dispatch another reviewer. Follow that
+reference for per-axis two-round ceiling, exact-hash review, and revision handling. Clarity is the teaching gate: accuracy and
+mechanical validity cannot rescue a note whose core judgment, concrete problem, mechanism, example, or resulting choice is not
+recoverable.
 
 ## 7. Delivery report
 

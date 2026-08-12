@@ -58,11 +58,12 @@ The filename is always the document title. If frontmatter has a `title`, it must
 create a second title identity. Do not add a duplicate body title H1. Genuine top-level questions are H1 siblings;
 contained questions use H2/H3.
 
-Use the sibling test before prose: do the sections share one parent question; can each stand alone without the preceding
-section; does the proposed parent genuinely summarize all children; and would removing the heading lose navigation rather
-than only visual emphasis? If the relationship is unclear, redraw the tree. Do not invent a parent merely to avoid an all-H1
-note, and do not flatten related subquestions merely because H1 siblings are legal. Never jump heading levels, and default
-to H3 or shallower unless deeper navigation is essential.
+Use the sibling test before prose: name the immediate parent question for every proposed H2/H3; do the sections share that
+parent question; can each stand alone without the preceding section; does the proposed parent genuinely summarize all children;
+and would removing the heading lose navigation rather than only visual emphasis? If the relationship is unclear, redraw the tree.
+The causal spine determines teaching order, not heading depth. Do not invent a parent merely to avoid an all-H1 note, and do not
+flatten related subquestions merely because H1 siblings are legal. Never jump heading levels, and default to H3 or shallower
+unless deeper navigation is essential.
 
 Name sections after the question or decision they resolve. A mechanism or example is not automatically a child; its level is
 determined by the question it serves. Use one running example only when it reduces abstraction. A fact backed by a source but

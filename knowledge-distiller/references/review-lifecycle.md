@@ -5,8 +5,10 @@ itself. Read this reference before dispatching either reviewer.
 
 ## Two independent axes and per-axis rounds
 
-Open clarity and accuracy in parallel against the same absolute note path and exact draft hash when both are available.
-Each axis has at most two rounds; stop early when both are clean.
+When both axes are needed, open clarity and accuracy in parallel against the same absolute note path and exact draft hash.
+Each axis uses its own question and evidence: clarity uses the reader contract and note; accuracy uses the claim ledger and
+sources. They may cite the same passage, but neither result substitutes for the other. Each axis has at most two rounds; stop
+early when both are clean.
 
 ### Clarity
 
@@ -66,8 +68,10 @@ edit pass and run round two for both axes against the new exact bytes. Do not st
 any axis. If both axes are clean in round one, stop; two rounds each is a ceiling, not a quota.
 
 A provider failure, timeout, empty result, or contradictory metadata is not silently retried. Record that axis as
-`unavailable` or `manual_checked`; only the planned second wave may run, and it must review the new exact hash. A
-punctuation-only change still requires a new final hash but does not require a new research model.
+`unavailable` or `manual_checked`; only the planned second wave may run, and it must review the new exact hash. The parent
+workflow may reconcile findings from both axes and choose one bounded revision, but it must not invent a third review axis or
+re-review the note outside the stated round limits. A punctuation-only change still requires a new final hash but does not
+require a new research model.
 
 ## Compact review record
 
@@ -89,14 +93,16 @@ review record; do not use missing persistence as permission to exceed either two
 Pass the resolved path, exact hash, reader contract, claim ledger, and the following instructions:
 
 ```text
-Read the exact note bytes. Do not rewrite them or dispatch another agent. Return the required fields only, including
-this axis's round number and coverage.
+Read the exact note bytes. Do not rewrite them or dispatch another reviewer. Return the required fields only, including this
+axis's round number and coverage.
 For clarity, reconstruct the core judgment, concrete problem, mechanism, observable example, resulting choice, and heading tree
-before listing findings. Reject a note that is locally correct but requires the reader to retain a catalogue of controls, terms,
-or sources rather than one causal model. If the mechanism is never made observable in a minimal example or scenario, flag the
-smallest missing example unless the topic genuinely cannot be demonstrated. For every H1, state its
-independent top-level question; for every H2/H3, state its parent question and sibling relation. Distinguish true parallel H1
-chapters from flattened child questions. Flag sibling inflation, false parents, heading flood, or unjustified depth. Check
+before listing findings. For every H1, state its independent top-level question; for every H2/H3, state its immediate parent
+question and sibling relation. Do not infer heading depth from the causal spine: flag a parent only when it fails to contain the
+child question, and flag flattened H1 siblings only when they share a genuine parent. Reject a note that is locally correct but
+requires the reader to retain a catalogue of controls, terms, or sources rather than one causal model. If the mechanism is
+never made observable in a minimal example or scenario, flag the smallest missing example unless the topic genuinely cannot be
+demonstrated. Distinguish true parallel H1 chapters from flattened child questions. Flag sibling inflation, false parents,
+heading flood, or unjustified depth. Check
 every external link for natural claim placement; a source tail or source list is a finding. Check each correction, limitation,
 or causal conclusion inherited from the user's reasoning: its local antecedent must be recoverable from the note, otherwise
 flag the smallest missing premise or conversational rebuttal shell. For each necessary enumeration, check that its items share
