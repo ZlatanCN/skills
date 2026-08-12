@@ -228,7 +228,7 @@ function selfTest(): number {
     const vault = path.join(root, "vault");
     fs.mkdirSync(vault);
     const note = path.join(vault, "Note.md");
-    fs.writeFileSync(note, "# Note\n\n正文。\n", "utf-8");
+    fs.writeFileSync(note, "# 内容\n\n正文。\n", "utf-8");
     if (
       check({
         file: note,

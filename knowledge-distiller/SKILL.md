@@ -2,10 +2,11 @@
 name: knowledge-distiller
 version: "0.6.0"
 description: >
-  Turn a user's rough technical understanding into a durable Chinese Obsidian note. Use when the user supplies
-  technical thoughts that need fact-checking, causal structure, correction, or vault integration. By default write the
-  note to Obsidian and always run independent clarity and accuracy review. Do not use for a plain factual question,
-  simple polishing, or general vault operations.
+  Turn a user's rough technical understanding, research fragments, or existing technical note into a durable Chinese
+  Obsidian note or a read-only structural/accuracy review. Use whenever the user asks to distill, fact-check, causally
+  restructure, audit a teaching spine or heading tree, repair sibling inflation, or connect a technical note to a vault,
+  even without naming this skill. By default write the note to Obsidian and always run independent clarity and accuracy
+  review. Do not use for a plain factual question, simple polishing, or general vault operations.
 ---
 
 # Knowledge Distiller
@@ -30,10 +31,12 @@ exact bytes. Do not create a second workflow for “strict” or “quick” wor
 
 ## 1. Route and reader contract
 
-First decide whether the input contains understanding to distill.
+First decide whether the input contains understanding to distill or an existing technical note to audit.
 
 - Plain factual question with no supplied reasoning: answer it and stop.
 - Distillable technical understanding: continue through the full path below.
+- An explicit request to inspect an existing note, teaching path, or heading tree: read it exactly and enter the same
+  clarity/accuracy path without writing unless the user separately authorizes a revision.
 - Unrelated topics, ambiguous output, or unresolved safety choice: ask one concise question and stop.
 
 Before research, record in memory:
@@ -44,6 +47,7 @@ question → the one question the note answers
 after   → what the reader can explain, predict, or choose afterward
 scope   → included questions and intentionally excluded branches
 spine   → problem → mechanism → consequence → decision or boundary
+heading_convention → implicit filename title only
 ```
 
 Before research, separate the supplied material into observed phenomena, design problems, proposed models, and factual
@@ -113,18 +117,34 @@ sides and the comparison has a reader-facing purpose.
 
 ## 4. Compose the note
 
-Build a short teaching outline before prose:
+Build a teaching tree before prose, not a flat section list:
 
 ```text
-section → question it resolves
-answer  → smallest answer that moves the reader forward
-needs   → prerequisites
-role    → premise | mechanism | example | boundary | decision
-next    → the question or decision this section unlocks
+section   → question it resolves
+answer    → smallest answer that moves the reader forward
+needs     → prerequisites
+role      → premise | mechanism | example | boundary | decision
+relation  → causal | prerequisite | parallel | composable | alternative | refinement
+parent    → the larger question this section belongs to, or — for a top-level section
+children  → contained subquestions, or —
+next      → the question or decision this section unlocks
+surface   → H1 | H2 | H3 | paragraph | list | table | callout
 ```
 
-Write the causal model before advice: why the mechanism exists, how it works, what it composes with, and where it
-stops. Keep one main job per paragraph. Use a running example only when it clarifies a transition.
+The filename is always the document title. If frontmatter has a `title`, it must match the filename; metadata must not
+create a second title identity. Do not add a duplicate body title H1. Genuine top-level questions are H1 siblings; use
+H2/H3 when a section is contained by, refines, explains,
+limits, or helps decide the parent question. Heading depth expresses scope and dependency, never importance. A mechanism,
+consequence, example, or boundary is not automatically a child: nest it only when the parent question actually contains it.
+Use a paragraph, list, table, or callout when a heading would add no independent navigation value.
+
+Before writing, run the sibling test: do the proposed siblings share one parent question; can each stand alone without the
+preceding section; does the parent genuinely summarize all children; and would removing the heading lose navigation rather
+than only visual emphasis? If any answer is unclear, redraw the tree. Never invent a parent merely to avoid an all-H1 note,
+and never keep unrelated chapters flat merely because H1 siblings are mechanically legal.
+
+Write the causal model before advice: why the mechanism exists, how it works, what it composes with, and where it stops.
+Keep one main job per paragraph. Use a running example only when it clarifies a transition.
 
 Read `references/obsidian-writing-style.md` for Markdown choices. Use ordinary paragraphs by default; use headings,
 tables, callouts, code, Mermaid, and links only when they improve scanning, comparison, execution, or causal clarity.
@@ -154,7 +174,7 @@ The mechanical contract is in `references/mechanical-gates.md`.
 Review the exact final note bytes, not a summary or stale draft. Open both independent read-only reviewers in parallel:
 
 `clarity` checks the reader model, spine, section roles, transitions, terminology, formatting, natural link integration,
-and hidden corrections.
+heading tree, sibling inflation, false parents, missing parents, and hidden corrections.
 
 `accuracy` checks every material claim, source, scope, boundary, example, diagram, link, and metadata assertion.
 
@@ -202,4 +222,6 @@ two review results, and write outcome are sufficient evidence.
 - Do not call a partial vault scan complete.
 - Do not replace an update after its original bytes changed.
 - Do not claim clean review from a timeout, empty poll, contradictory payload, or missing coverage.
+- Do not treat a mechanically valid all-H1 outline as semantically correct, and do not force depth merely to improve a
+  heading count.
 - Do not put reviewer prose, audit state, or process status into the note body.

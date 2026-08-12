@@ -18,7 +18,7 @@ node scripts/check-note.ts \
 The aggregate checks:
 
 - frontmatter, fenced code, tables, callouts, emphasis, unsafe HTML/URLs, and Mermaid hazards;
-- heading root, level jumps, duplicate anchors, and implicit-title convention;
+- heading root, level jumps, duplicate anchors, and the filename-only title convention (frontmatter must match the filename; no duplicate body title H1);
 - vault containment, symlink exclusion, unique wikilink targets, and unique anchors;
 - update preservation when `--original` is supplied.
 

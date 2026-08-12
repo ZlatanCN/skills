@@ -12,7 +12,7 @@ import {
   withTempDir,
 } from "./lib/evidence.ts";
 import type { Evidence, Finding } from "./lib/evidence.ts";
-import { frontmatterTitle, parseMarkdown } from "./lib/markdown.ts";
+import { frontmatterTitle, key, parseMarkdown } from "./lib/markdown.ts";
 import type { Heading } from "./lib/markdown.ts";
 
 function check(fileInput: string, strict: boolean): Evidence {
@@ -95,25 +95,42 @@ function check(fileInput: string, strict: boolean): Evidence {
   }
 
   const rootCount = headings.filter((heading) => heading.level === 1).length;
-  const title = frontmatterTitle(surface) ?? path.basename(file, ".md");
-  if (
-    strict &&
-    rootCount === 1 &&
-    headings.length > 1 &&
-    headings[0].text !== title
-  ) {
-    findings.push(
-      finding(
-        "implicit-title-violation",
-        "error",
-        "one substantive H1 contains all other headings; use sibling H1 chapters under the implicit-title convention or make the first H1 match the note title",
-        {
-          evidence: { first_heading: headings[0].text, note_title: title },
-          line: headings[0].line,
-          path: file,
-        }
-      )
-    );
+  const filenameTitle = path.basename(file, ".md");
+  const metadataTitle = frontmatterTitle(surface);
+  const title = key(filenameTitle);
+  if (strict) {
+    if (metadataTitle && key(metadataTitle) !== title) {
+      findings.push(
+        finding(
+          "frontmatter-title-mismatch",
+          "error",
+          "frontmatter title must match the filename; the filename is the implicit document title",
+          {
+            evidence: {
+              filename_title: filenameTitle,
+              frontmatter_title: metadataTitle,
+            },
+            path: file,
+          }
+        )
+      );
+    }
+    for (const heading of headings) {
+      if (heading.level === 1 && heading.key === title) {
+        findings.push(
+          finding(
+            "body-title-duplicate",
+            "error",
+            "the filename is the implicit document title; do not repeat it as a body H1",
+            {
+              evidence: { heading: heading.text, note_title: filenameTitle },
+              line: heading.line,
+              path: file,
+            }
+          )
+        );
+      }
+    }
   }
 
   const duplicateHeadings = new Map<string, Heading[]>();
@@ -162,15 +179,18 @@ function check(fileInput: string, strict: boolean): Evidence {
 function selfTest(): number {
   return withTempDir("knowledge-distiller-heading-", (root) => {
     const cases: [string, boolean][] = [
-      ["---\ntitle: Good\n---\n# Good\n## Chapter\n### Detail\n", true],
+      ["---\ntitle: Good\n---\n# Chapter\n## Detail\n### Example\n", true],
       [
         "---\ntitle: Good\n---\n# Chapter A\n## Detail\n# Chapter B\n## Detail\n",
         true,
       ],
+      ["---\ntitle: Good\n---\n# Good\n## Chapter\n", false],
       [
         "---\ntitle: Bad\n---\n# Chapter A\n## Chapter B\n## Chapter C\n",
         false,
       ],
+      ["# Good\n## Chapter\n", false],
+      ["# Chapter\n## Child\n", true],
       ["# Good\n### skipped\n", false],
       ["```\n# Fake\n```\n# Real\n", true],
     ];
@@ -182,6 +202,23 @@ function selfTest(): number {
         throw new Error(`self-test case failed: ${JSON.stringify(body)}`);
       }
     }
+
+    const spaced = path.join(root, "My  Note.md");
+    fs.writeFileSync(spaced, "# My Note\n## Chapter\n", "utf-8");
+    if (check(spaced, true).gate !== "failed") {
+      throw new Error("filename whitespace duplicate should fail");
+    }
+
+    const mismatched = path.join(root, "Note.md");
+    fs.writeFileSync(
+      mismatched,
+      "---\ntitle: Other\n---\n# Note\n## Chapter\n",
+      "utf-8"
+    );
+    if (check(mismatched, true).gate !== "failed") {
+      throw new Error("frontmatter title mismatch should fail");
+    }
+
     console.log("heading-tree checker self-test: PASS");
     return 0;
   });
